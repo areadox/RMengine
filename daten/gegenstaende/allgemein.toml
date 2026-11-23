@@ -1,0 +1,96 @@
+# =====================================================================
+#  Gegenstände
+# =====================================================================
+#  typ:    waffe, ruestung, trank, nahrung, schluessel, werkzeug, schmuck, behaelter, sonstiges
+#  platz:  waffe, schild, kopf, koerper, haende, beine, fuesse, hals, ring, umhang, licht
+#          (nur nötig, wenn man den Gegenstand anlegen kann)
+#  akkusativ: Name nach "Du nimmst ..." (z.B. "einen roten Apfel"); fehlt er, wird name benutzt
+#  eigenschaften: frei wählbare Zahlen. "heilung" und "mana" wirken beim Benutzen.
+
+[[gegenstand]]
+id   = "apfel"
+name = "ein roter Apfel"
+akkusativ = "einen roten Apfel"
+schluesselwoerter = ["apfel"]
+typ  = "nahrung"
+beschreibung = "Ein knackiger, roter Apfel."
+eigenschaften = { heilung = 5 }
+benutzen_text = "Du beißt in den Apfel. Lecker!"
+
+[[gegenstand]]
+id   = "brot"
+name = "ein Laib Brot"
+akkusativ = "einen Laib Brot"
+schluesselwoerter = ["brot", "laib"]
+typ  = "nahrung"
+beschreibung = "Frisch gebacken und noch ein wenig warm."
+eigenschaften = { heilung = 10 }
+benutzen_text = "Du isst das Brot und fühlst dich gestärkt."
+
+[[gegenstand]]
+id   = "pilz"
+name = "ein seltsamer Pilz"
+akkusativ = "einen seltsamen Pilz"
+schluesselwoerter = ["pilz"]
+bodentext = "Am Wegesrand wächst ein seltsamer, bläulicher Pilz."
+beschreibung = "Ein bläulicher Pilz. Ob man den essen kann?"
+typ  = "nahrung"
+eigenschaften = { mana = 15 }
+benutzen_text = "Du isst den Pilz. Die Welt schimmert kurz in allen Farben."
+
+[[gegenstand]]
+id   = "heiltrank"
+name = "ein roter Heiltrank"
+akkusativ = "einen roten Heiltrank"
+schluesselwoerter = ["trank", "heiltrank"]
+typ  = "trank"
+beschreibung = "Eine kleine Flasche mit einer leuchtend roten Flüssigkeit."
+eigenschaften = { heilung = 40 }
+wert = 25
+benutzen_text = "Du trinkst den Heiltrank. Wärme breitet sich in dir aus."
+
+[[gegenstand]]
+id   = "manatrank"
+name = "ein blauer Manatrank"
+akkusativ = "einen blauen Manatrank"
+schluesselwoerter = ["trank", "manatrank"]
+typ  = "trank"
+beschreibung = "Eine Flasche mit einer blau glitzernden Flüssigkeit."
+eigenschaften = { mana = 30 }
+wert = 25
+
+[[gegenstand]]
+id   = "fackel"
+name = "eine Fackel"
+schluesselwoerter = ["fackel"]
+typ  = "werkzeug"
+platz = "licht"
+beschreibung = "Ein Holzstab, mit Pech getränkt."
+
+[[gegenstand]]
+id   = "amboss"
+name = "ein schwerer Amboss"
+akkusativ = "einen schweren Amboss"
+schluesselwoerter = ["amboss"]
+bodentext = "Ein schwerer Amboss steht neben der Esse."
+beschreibung = "Ein Amboss aus schwarzem Eisen. Viel zu schwer zum Tragen."
+tragbar = false
+gewicht = 200
+
+[[gegenstand]]
+id   = "rattenschwanz"
+name = "ein Rattenschwanz"
+akkusativ = "einen Rattenschwanz"
+schluesselwoerter = ["schwanz"]
+beschreibung = "Igitt."
+
+[[gegenstand]]
+id   = "wolfspelz"
+name = "ein grauer Wolfspelz"
+akkusativ = "einen grauen Wolfspelz"
+schluesselwoerter = ["pelz", "fell"]
+typ  = "ruestung"
+platz = "umhang"
+beschreibung = "Ein dichter, warmer Pelz."
+eigenschaften = { ruestung = 2 }
+wert = 40

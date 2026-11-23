@@ -1,0 +1,38 @@
+[[monster]]
+id   = "eichhoernchen"
+name = "ein Eichhörnchen"
+schluesselwoerter = ["eichhoernchen", "hoernchen"]
+beschreibung = "Ein kleines, rotes Eichhörnchen mit buschigem Schwanz."
+lebenspunkte = 3
+wandert = true
+wander_chance = 20
+sprueche = ["*knabbert an einer Nuss.", "*huscht einen Baum hinauf und wieder herunter."]
+
+[[monster]]
+id   = "wolf"
+name = "ein grauer Wolf"
+akkusativ = "einen grauen Wolf"
+schluesselwoerter = ["wolf"]
+raumtext = "Ein grauer Wolf schleicht knurrend zwischen den Bäumen umher."
+beschreibung = "Ein magerer Wolf mit struppigem Fell und hungrigen Augen."
+stufe = 3
+lebenspunkte = 30
+werte = { staerke = 12, geschick = 14 }
+aggressiv = true
+wandert = true
+wander_chance = 8
+sprueche = ["*heult.", "*fletscht die Zähne."]
+beute = [ { gegenstand = "wolfspelz", chance = 75 } ]
+
+[[monster]]
+id   = "hoehlenspinne"
+name = "eine riesige Höhlenspinne"
+schluesselwoerter = ["spinne"]
+raumtext = "Eine riesige Spinne lauert in ihrem Netz an der Decke."
+beschreibung = "Acht schwarze Augen starren dich an. Ihre Beine sind so lang wie dein Arm."
+stufe = 6
+lebenspunkte = 60
+mana = 20
+zauber = ["feuerpfeil"]
+aggressiv = true
+beute = [ { gegenstand = "heiltrank", chance = 30 } ]

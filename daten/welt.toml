@@ -1,0 +1,98 @@
+# =====================================================================
+#  welt.toml – die Grundeinstellungen deiner Welt
+# =====================================================================
+#  Alles, was mit # beginnt, ist ein Kommentar und wird ignoriert.
+
+[welt]
+name       = "Eichenhain"
+port       = 4000                 # Mit diesem Port verbinden sich die Spieler
+startraum  = "dorfplatz"          # Hier beginnen neue Spieler
+willkommen = """
+Willkommen im kleinen Dorf {gruen}Eichenhain{/} am Rande des Dunkelwaldes.
+Hier beginnt dein Abenteuer."""
+
+# Diese Namen sind Baumeister und dürfen Baumeister-Befehle benutzen.
+# WICHTIG: Lege die Figur "Admin" sofort selbst an (oder ändere den Namen)!
+admins = ["Admin"]
+
+karte_beim_umsehen  = true        # Bei jedem "schau" die kleine Karte zeigen
+karten_radius       = 3           # Wie viele Räume in jede Richtung zu sehen sind
+nur_besuchte_raeume_auf_karte = false   # true = "Nebel des Krieges"
+ausgaenge_beidseitig = true       # Rückwege automatisch anlegen
+
+takt_sekunden          = 3        # Alle 3 Sekunden "lebt" die Welt (Monster laufen ...)
+zuruecksetzen_minuten  = 10       # Dann werden Gegenstände/Monster wieder aufgefüllt
+speichern_minuten      = 5        # Automatisches Speichern
+regeneration_lp        = 1        # Erholung pro Takt
+regeneration_mp        = 1
+
+# ---------------------------------------------------------------------
+# Damit beginnen neue Spieler
+# ---------------------------------------------------------------------
+[start]
+lebenspunkte = 100
+mana         = 50
+gegenstaende = ["brot", "fackel"]
+zauber       = ["kleine_heilung", "heimkehr", "feuerpfeil"]
+
+[start.fertigkeiten]       # Fertigkeit = Stufe
+magie        = 1
+heilkunde    = 1
+schwertkampf = 1
+
+[start.werte]              # Frei wählbare Grundwerte
+staerke      = 10
+geschick     = 10
+ausdauer     = 10
+intelligenz  = 10
+weisheit     = 10
+
+# ---------------------------------------------------------------------
+# Geländearten: So sehen Räume auf der Karte aus
+# Farben: rot gruen gelb blau magenta cyan weiss grau schwarz
+#         hellrot hellgruen hellgelb hellblau hellmagenta hellcyan hellweiss
+# ---------------------------------------------------------------------
+[gelaende.platz]
+name   = "Platz"
+symbol = "+"
+farbe  = "hellgelb"
+
+[gelaende.strasse]
+name   = "Straße"
+symbol = "."
+farbe  = "weiss"
+
+[gelaende.haus]
+name   = "Gebäude"
+symbol = "#"
+farbe  = "hellweiss"
+
+[gelaende.tempel]
+name   = "Tempel"
+symbol = "T"
+farbe  = "hellcyan"
+
+[gelaende.wald]
+name   = "Wald"
+symbol = "♣"
+farbe  = "gruen"
+
+[gelaende.lichtung]
+name   = "Wiese"
+symbol = "\""
+farbe  = "hellgruen"
+
+[gelaende.wasser]
+name   = "Wasser"
+symbol = "~"
+farbe  = "hellblau"
+
+[gelaende.berg]
+name   = "Fels"
+symbol = "^"
+farbe  = "grau"
+
+[gelaende.hoehle]
+name   = "Höhle"
+symbol = "o"
+farbe  = "grau"

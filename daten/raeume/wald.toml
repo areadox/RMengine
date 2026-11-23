@@ -1,0 +1,112 @@
+# =====================================================================
+#  Der Dunkelwald nördlich des Dorfes
+# =====================================================================
+
+[[raum]]
+id       = "waldrand"
+name     = "Am Waldrand"
+x = 0
+y = 3
+gebiet   = "wald"
+gelaende = "wald"
+beschreibung = """
+Hohe Eichen ragen vor dir auf. Ein schmaler Pfad verschwindet zwischen den
+Bäumen nach Norden. Im Süden liegt das Dorftor."""
+ausgaenge = { nord = "waldweg" }
+
+[[raum]]
+id       = "waldweg"
+name     = "Ein Waldweg"
+x = 0
+y = 4
+gebiet   = "wald"
+gelaende = "wald"
+beschreibung = """
+Der Pfad gabelt sich. Nach Westen wird es heller, nach Osten dichter, und
+im Norden wird der Wald immer finsterer."""
+ausgaenge = { nord = "tiefer_wald", west = "lichtung", ost = "dickicht" }
+gegenstaende = ["pilz"]
+
+[[raum]]
+id       = "lichtung"
+name     = "Eine sonnige Lichtung"
+x = -1
+y = 4
+gebiet   = "wald"
+gelaende = "lichtung"
+beschreibung = """
+Sonnenlicht fällt auf eine Wiese voller Blumen. Im Nordwesten glitzert
+Wasser zwischen den Bäumen."""
+ausgaenge = { nordwest = "seeufer" }
+monster   = ["eichhoernchen"]
+
+[[raum]]
+id       = "seeufer"
+name     = "Am Ufer des Waldsees"
+x = -2
+y = 5
+gebiet   = "wald"
+gelaende = "wasser"
+beschreibung = "Ein stiller, dunkler See. Libellen tanzen über dem Wasser."
+
+[[raum]]
+id       = "dickicht"
+name     = "Im Dickicht"
+x = 1
+y = 4
+gebiet   = "wald"
+gelaende = "wald"
+beschreibung = "Dornen zerren an deiner Kleidung. Im Nordosten siehst du einen gewaltigen Baum."
+ausgaenge = { nordost = "alte_eiche" }
+
+[[raum]]
+id       = "alte_eiche"
+name     = "Die Alte Eiche"
+x = 2
+y = 5
+gebiet   = "wald"
+gelaende = "wald"
+symbol   = "Y"          # eigenes Kartensymbol nur für diesen Raum
+farbe    = "hellgruen"
+beschreibung = """
+Eine uralte, riesige Eiche. Ihr Stamm ist so dick, dass fünf Menschen ihn
+nicht umfassen könnten. In der Rinde sind seltsame Zeichen eingeritzt."""
+gegenstaende = ["lederhelm"]
+
+[raum.details]
+zeichen = "Die Zeichen leuchten schwach, wenn du sie berührst. Es sind Runen der Heilkunst."
+rinde   = "Die Rinde ist rau und warm."
+
+[[raum]]
+id       = "tiefer_wald"
+name     = "Tief im Dunkelwald"
+x = 0
+y = 5
+gebiet   = "wald"
+gelaende = "wald"
+beschreibung = """
+Hier dringt kaum noch Licht durch die Baumkronen. Irgendwo heult ein Wolf.
+Im Norden erhebt sich eine Felswand."""
+ausgaenge = { nord = "hoehleneingang" }
+monster   = ["wolf"]
+
+[[raum]]
+id       = "hoehleneingang"
+name     = "Vor einer Höhle"
+x = 0
+y = 6
+gebiet   = "wald"
+gelaende = "berg"
+beschreibung = "Ein dunkles Loch klafft in der Felswand. Kalte Luft strömt heraus."
+ausgaenge = { runter = "hoehle" }
+
+[[raum]]
+id       = "hoehle"
+name     = "In der Höhle"
+x = 0
+y = 6
+z = -1
+gebiet   = "hoehle"
+gelaende = "hoehle"
+beschreibung = "Spinnweben überall. Von der Decke tropft Wasser."
+monster   = ["hoehlenspinne"]
