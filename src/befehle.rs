@@ -3,6 +3,7 @@
 use crate::beschreibung::{self, Detail, Sinn};
 use crate::daten::{Daten, Richtung};
 use crate::gespraech;
+use crate::kampf::{self, Haltung};
 use crate::karte;
 use crate::spieler::{self, Rolle};
 use crate::text::{self, aufzaehlen, gross, normalisieren, umbrechen};
@@ -42,6 +43,18 @@ pub fn ausfuehren(w: &mut Welt, sid: u64, eingabe: &str) -> Folge {
     let rolle = w.spieler[&sid].rolle;
     let baut = rolle >= Rolle::Baumeister;
 
+    // Tote können nur wenig tun
+    const ALS_TOTER: &[&str] = &[
+        "aufgeben", "ende", "quit", "exit", "tschuess", "schau", "l", "look", "umsehen", "sage", "sag", "say", "emote",
+        "me", "rufe", "ruf", "shout", "wer", "who", "spielstand", "sp", "werte", "score", "status", "hilfe", "help",
+        "?", "spielerbuch", "buch", "karte", "map", "k", "inventar", "i", "inv",
+    ];
+    if kampf::ist_tot(w, sid) && !ALS_TOTER.contains(&befehl.as_str()) {
+        w.sende(sid, "{grau}Du bist tot. Warte, bis dich jemand wiederbelebt, oder tippe 'aufgeben'.{/}");
+        prompt(w, sid);
+        return Folge::Weiter;
+    }
+
     match befehl.as_str() {
         "ende" | "quit" | "exit" | "tschuess" => {
             w.sende(sid, "Bis bald! Deine Figur wurde gespeichert.");
@@ -78,6 +91,43 @@ pub fn ausfuehren(w: &mut Welt, sid: u64, eingabe: &str) -> Folge {
         "benutze" | "benutzen" | "trinke" | "trink" | "iss" | "esse" | "use" | "drink" | "eat" => {
             benutzen(w, sid, rest)
         }
+        "toete" | "tote" | "angriff" | "angreifen" | "greif" | "greife" | "attackiere" | "kill" | "kaempfe"
+        | "schlag" | "schlage" => toeten(w, sid, rest),
+        "ausweichen" | "weiche" | "duck" | "ducke" | "dodge" => kampf::ausweichen(w, sid),
+        "flieh" | "fliehe" | "flucht" | "flee" => kampf::fliehen(w, sid),
+        "stopp" | "stop" | "aufhoeren" => {
+            if let Some(s) = w.spieler.get_mut(&sid) {
+                s.kampf_ziel = None;
+            }
+            w.sende(sid, "Du hörst auf anzugreifen. (Wer dich angreift, macht vielleicht trotzdem weiter.)");
+        }
+        "haltung" => match Haltung::aus_text(rest) {
+            Some(h) => {
+                if let Some(s) = w.spieler.get_mut(&sid) {
+                    s.haltung = h;
+                }
+                let wirkung = match h {
+                    Haltung::Angriffslustig => "Du teilst mehr aus, steckst aber auch mehr ein.",
+                    Haltung::Ausgewogen => "Angriff und Verteidigung halten sich die Waage.",
+                    Haltung::Defensiv => "Du wirst seltener und schwächer getroffen, teilst aber weniger aus.",
+                };
+                w.sende(sid, &format!("Deine Haltung ist jetzt {}. {wirkung}", h.name()));
+            }
+            None => {
+                let jetzt = w.spieler[&sid].haltung.name();
+                w.sende(sid, &format!("Deine Haltung: {jetzt}. Möglich: angriffslustig, ausgewogen, defensiv."));
+            }
+        },
+        "steigere" | "verbessere" | "trainiere" => kampf::steigern(w, sid, rest),
+        "schaetze" | "einschaetzen" | "consider" | "con" => {
+            let raum = w.spieler[&sid].sp.raum.clone();
+            match finde_monster(w, &raum, rest) {
+                Some(mid) => kampf::einschaetzen(w, sid, mid),
+                None => w.sende(sid, "Wen willst du einschätzen?"),
+            }
+        }
+        "wiederbeleben" | "wiederbelebe" | "belebe" | "rette" | "revive" => kampf::wiederbeleben(w, sid, rest),
+        "aufgeben" => kampf::aufgeben(w, sid),
         "sage" | "sag" | "say" => sagen(w, sid, rest),
         "frage" | "frag" | "ask" => fragen(w, sid, rest),
         "rede" | "red" | "sprich" | "sprech" | "talk" => reden(w, sid, rest),
@@ -124,9 +174,20 @@ pub fn prompt(w: &Welt, sid: u64) {
             s.sende_ohne_umbruch("\n> ");
             return;
         }
+        if s.tot_bis.is_some() {
+            s.sende_ohne_umbruch("\n{rot}[tot]{/} > ");
+            return;
+        }
+        // Im Kampf: Zustand des Gegners anzeigen
+        let gegner = s
+            .kampf_ziel
+            .and_then(|mid| w.monster.get(&mid))
+            .and_then(|m| w.d.monster.get(&m.def).map(|d| (d, m.lebenspunkte)))
+            .map(|(d, lp)| format!(" {{hellrot}}[{}: {}]{{/}}", gross(&d.name), kampf::zustand(lp, d.lebenspunkte)))
+            .unwrap_or_default();
         s.sende_ohne_umbruch(&format!(
-            "\n{{gruen}}LP {}/{}{{/}} {{cyan}}MP {}/{}{{/}} > ",
-            p.lebenspunkte, p.max_lebenspunkte, p.mana, p.max_mana
+            "\n{{gruen}}LP {}/{}{{/}} {{cyan}}MP {}/{}{{/}} {{gelb}}AP {}/{}{{/}}{gegner} > ",
+            p.lebenspunkte, p.max_lebenspunkte, p.mana, p.max_mana, p.ausdauer, p.max_ausdauer
         ));
     }
 }
@@ -181,7 +242,19 @@ fn hilfe(w: &Welt, sid: u64, rolle: Rolle) {
   {gelb}emote{/} <text>         Eine Handlung zeigen (kurz: :text)
   {gelb}rufe{/} <text>          Etwas rufen, das alle hören
   {gelb}wer{/}                  Wer ist gerade da?
-  {gelb}spielstand{/} (sp)      Deine Werte, Ausrüstung und Fortschritte
+  {gelb}spielstand{/} (sp)      Deine Werte, Stufe, Ausrüstung und Fortschritte
+  {gelb}steigere{/} <wert>      Punkte aus dem Stufenaufstieg verteilen
+
+{fett}Kampf{/} (in Echtzeit – jeder Angriff braucht Erholungszeit)
+  {gelb}toete{/} <monster>      Angreifen (danach geht es automatisch weiter)
+  {gelb}schaetze{/} <monster>   Wie gefährlich ist es?
+  {gelb}ausweichen{/}           Kurz in Deckung: Angriffe treffen seltener
+  {gelb}haltung{/} <art>        angriffslustig, ausgewogen oder defensiv
+  {gelb}flieh{/}                Aus dem Kampf fliehen (klappt nicht immer)
+  {gelb}stopp{/}                Nicht mehr angreifen
+  {gelb}wiederbeleben{/} <name> Einen toten Mitspieler zurückholen
+  {gelb}aufgeben{/}             Als Toter sofort im Tempel erwachen
+
   {gelb}spielerbuch{/}          Einstellungen: Karte, Farben, Titel, Passwort ...
   {gelb}fertigkeiten{/}         Deine Fertigkeiten
   {gelb}zauber{/}               Deine Zaubersprüche
@@ -213,6 +286,7 @@ fn hilfe(w: &Welt, sid: u64, rolle: Rolle) {
   {gelb}rauswerfen{/} <spieler> [grund]   Spieler vom Server werfen
   {gelb}verkuende{/} <text>               Nachricht an alle
   {gelb}lehre{/} <spieler> <fertigkeit-/zauber-id> [stufe]
+  {gelb}erfahrung{/} <spieler> <menge>     Erfahrungspunkte geben (zum Testen)
   {gelb}speichernalle{/}                  Alle Spieler sofort speichern",
         );
     }
@@ -327,18 +401,34 @@ fn raum_zeigen(w: &Welt, sid: u64, voll: bool) {
     }
     for mid in w.monster_im_raum(&raum.id) {
         let Some(def) = w.monster.get(&mid).and_then(|m| w.d.monster.get(&m.def)) else { continue };
-        let t = if def.raumtext.is_empty() { format!("{} ist hier.", gross(&def.name)) } else { def.raumtext.clone() };
+        let gegner: Vec<String> = w.monster[&mid].ziele.iter().filter_map(|p| w.spieler.get(p)).map(|s| s.sp.name.clone()).collect();
+        let t = if !gegner.is_empty() {
+            format!("{} kämpft hier mit {}!", gross(&def.name), aufzaehlen(&gegner))
+        } else if def.raumtext.is_empty() {
+            format!("{} ist hier.", gross(&def.name))
+        } else {
+            def.raumtext.clone()
+        };
         aus.push_str(&format!("{{hellrot}}{t}{{/}}\n"));
     }
     for pid in w.spieler_im_raum(&raum.id) {
         if pid != sid {
-            aus.push_str(&format!("{{hellgruen}}{} ist hier.{{/}}\n", w.spieler[&pid].sp.voller_name()));
+            let anderer = &w.spieler[&pid];
+            if anderer.tot_bis.is_some() {
+                aus.push_str(&format!("{{rot}}{} liegt leblos am Boden. (wiederbeleben {}){{/}}\n", anderer.sp.name, anderer.sp.name.to_lowercase()));
+            } else {
+                aus.push_str(&format!("{{hellgruen}}{} ist hier.{{/}}\n", anderer.sp.voller_name()));
+            }
         }
     }
     w.sende(sid, aus.trim_end());
 }
 
 fn gehen(w: &mut Welt, sid: u64, richt: Richtung) {
+    if kampf::im_kampf(w, sid) {
+        w.sende(sid, "{hellrot}Du bist mitten im Kampf! Mit 'flieh' kannst du versuchen zu entkommen.{/}");
+        return;
+    }
     let s = &w.spieler[&sid];
     let alt = s.sp.raum.clone();
     let name = s.sp.name.clone();
@@ -1089,9 +1179,10 @@ fn zaubern(w: &mut Welt, sid: u64, rest: &str) {
     w.sende_raum(&raum, &format!("{{magenta}}{}{{/}}", ersetzen(im_raum)), &ausser);
 
     // Wirkungen
-    if ziel_monster.is_some() {
-        if z.wirkungen.iter().any(|w| w.art == "schaden") {
-            w.sende(sid, "{grau}(Das Kampfsystem ist noch nicht eingebaut – der Schaden wird später verrechnet.){/}");
+    if let Some(mid) = ziel_monster {
+        let schaden: i32 = z.wirkungen.iter().filter(|w| w.art == "schaden").map(|w| w.wert).sum();
+        if schaden > 0 {
+            kampf::zauber_trifft(w, sid, mid, schaden, &z.fertigkeit);
         }
     } else {
         for p in ziel_spieler {
@@ -1149,7 +1240,7 @@ fn wirkung_anwenden(w: &mut Welt, sid: u64, art: &str, wert: i32, raum: &str) {
             raum_anzeigen(w, sid);
         }
         "schaden" => {
-            s.sende("{grau}(Schaden gegen Spieler gibt es erst mit dem Kampfsystem.){/}");
+            s.sende("{grau}(Gegen andere Spieler wird hier nicht gekämpft.){/}");
         }
         _ => {}
     }
@@ -1161,7 +1252,7 @@ fn wirkung_anwenden(w: &mut Welt, sid: u64, art: &str, wert: i32, raum: &str) {
 
 /// Befehle, die nur Admins benutzen dürfen (Baumeister nicht).
 const NUR_ADMIN: &[&str] = &[
-    "rolle", "rauswerfen", "kick", "verkuende", "verkuenden", "lehre", "teach", "speichernalle",
+    "rolle", "rauswerfen", "kick", "verkuende", "verkuenden", "lehre", "teach", "speichernalle", "erfahrung",
 ];
 
 fn admin_befehl(w: &mut Welt, sid: u64, befehl: &str, rest: &str) -> bool {
@@ -1194,6 +1285,22 @@ fn admin_befehl(w: &mut Welt, sid: u64, befehl: &str, rest: &str) -> bool {
             } else {
                 let von = w.spieler[&sid].sp.name.clone();
                 w.sende_alle(&format!("\n{{hellgelb}}*** Verkündung von {von}: {rest} ***{{/}}\n"), &[]);
+            }
+        }
+        "erfahrung" => {
+            let teile: Vec<&str> = rest.split_whitespace().collect();
+            let (Some(name), Some(Ok(ep))) = (teile.first(), teile.get(1).map(|z| z.parse::<u64>())) else {
+                w.sende(sid, "Benutzung: erfahrung <spieler> <menge>");
+                return true;
+            };
+            let Some(pid) = w.spieler.iter().find(|(_, s)| s.sp.name.eq_ignore_ascii_case(name)).map(|(id, _)| *id) else {
+                w.sende(sid, "Dieser Spieler ist nicht online.");
+                return true;
+            };
+            w.sende(pid, &format!("{{hellgruen}}Du erhältst {ep} Erfahrungspunkte.{{/}}"));
+            kampf::erfahrung_geben(w, pid, ep);
+            if pid != sid {
+                w.sende(sid, "Erledigt.");
             }
         }
         "speichernalle" => {
@@ -1402,6 +1509,28 @@ fn spielstand(w: &Welt, sid: u64) {
         sp.mana,
         sp.max_mana
     ));
+    t.push_str(&format!(
+        "  Ausdauer     {} {:>4}/{}\n",
+        balken(sp.ausdauer, sp.max_ausdauer, 20, "gelb"),
+        sp.ausdauer,
+        sp.max_ausdauer
+    ));
+    let naechste = kampf::ep_fuer_naechste(w, sp.stufe);
+    t.push_str(&format!(
+        "\n  {{fett}}Stufe {}{{/}}      {} {:>4}/{} EP\n",
+        sp.stufe,
+        balken(sp.erfahrung as i32, naechste as i32, 20, "hellmagenta"),
+        sp.erfahrung,
+        naechste
+    ));
+    if sp.freie_punkte > 0 {
+        t.push_str(&format!(
+            "  {{hellgelb}}{} {} zu verteilen{{/}} {{grau}}(steigere <wert>){{/}}\n",
+            sp.freie_punkte,
+            if sp.freie_punkte == 1 { "Punkt" } else { "Punkte" }
+        ));
+    }
+    t.push_str(&format!("  {{grau}}Siege: {}   Tode: {}{{/}}\n", sp.siege, sp.tode));
 
     // Boni durch angelegte Ausrüstung
     let mut boni: std::collections::BTreeMap<String, i32> = Default::default();
@@ -1497,7 +1626,8 @@ fn als_schalter(wert: &str) -> Option<bool> {
 }
 
 const EINSTELLUNGEN: &[&str] = &[
-    "farben", "karte", "kartengroesse", "kurz", "breite", "prompt", "ankuendigungen", "npc", "titel", "beschreibung", "passwort",
+    "farben", "karte", "kartengroesse", "kurz", "breite", "prompt", "ankuendigungen", "npc", "autoangriff", "kampfzahlen",
+    "titel", "beschreibung", "passwort",
 ];
 
 fn spielerbuch_zeigen(w: &Welt, sid: u64) {
@@ -1522,6 +1652,9 @@ fn spielerbuch_zeigen(w: &Welt, sid: u64) {
     t.push_str("\n{fett}Mitteilungen{/}\n");
     t.push_str(&zeile("ankuendigungen", an_aus(e.ankuendigungen), "melden, wenn Spieler kommen und gehen"));
     t.push_str(&zeile("npc", an_aus(e.npc_sprueche), "Sprüche von Bewohnern und Tieren"));
+    t.push_str("\n{fett}Kampf{/}\n");
+    t.push_str(&zeile("autoangriff", an_aus(e.autoangriff), "automatisch weiter angreifen, sobald du bereit bist"));
+    t.push_str(&zeile("kampfzahlen", an_aus(e.kampfzahlen), "Schaden als Zahl anzeigen"));
     t.push_str("\n{fett}Deine Figur{/}\n");
     let titel = if sp.titel.is_empty() { "(keiner)".to_string() } else { sp.titel.clone() };
     t.push_str(&format!("  {{gelb}}{:<15}{{/}} {titel}\n", "titel"));
@@ -1552,6 +1685,8 @@ fn spielerbuch(w: &mut Welt, sid: u64, rest: &str) {
         "prompt" => Some(&mut e.prompt),
         "ankuendigungen" | "ankuendigung" => Some(&mut e.ankuendigungen),
         "npc" | "npcs" | "sprueche" | "npc_sprueche" => Some(&mut e.npc_sprueche),
+        "autoangriff" | "auto" => Some(&mut e.autoangriff),
+        "kampfzahlen" | "zahlen" => Some(&mut e.kampfzahlen),
         _ => None,
     };
     let meldung = if let Some(feld) = schalter {
@@ -1686,4 +1821,32 @@ fn rolle_vergeben(w: &mut Welt, sid: u64, rest: &str) {
     }
     w.sende(sid, &t);
     println!("{} hat {anzeige} die Rolle {} gegeben.", w.spieler[&sid].sp.name, neu.name());
+}
+
+/// toete <monster> / angriff (ohne Ziel: weiter auf das aktuelle Ziel)
+fn toeten(w: &mut Welt, sid: u64, rest: &str) {
+    let rest = rest.trim();
+    let rest = rest.strip_suffix(" an").unwrap_or(rest).trim();
+    let raum = w.spieler[&sid].sp.raum.clone();
+    if rest.is_empty() {
+        let s = &w.spieler[&sid];
+        match s.kampf_ziel {
+            Some(_) if s.bereit_ab <= Instant::now() => {
+                kampf::spieler_schlaegt(w, sid);
+            }
+            Some(_) => {
+                let r = (s.bereit_ab - Instant::now()).as_secs_f64();
+                w.sende(sid, &format!("Du bist noch nicht bereit ({r:.1} s)."));
+            }
+            None => w.sende(sid, "Wen willst du angreifen?"),
+        }
+        return;
+    }
+    if let Some(mid) = finde_monster(w, &raum, rest) {
+        kampf::angreifen(w, sid, mid);
+    } else if finde_spieler_im_raum(w, &raum, rest).is_some() {
+        w.sende(sid, "Gegen andere Spieler wird hier nicht gekämpft.");
+    } else {
+        w.sende(sid, "So etwas siehst du hier nicht.");
+    }
 }

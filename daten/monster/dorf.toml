@@ -6,7 +6,17 @@
 #  raumtext: wie das Monster im Raum beschrieben wird (optional)
 #  wandert:  läuft herum (bleibt aber im Gebiet seines Startraums)
 #  sprueche: zufällige Sätze. Beginnt ein Spruch mit *, ist es eine Handlung.
-#  beute:    was es später im Kampf fallen lässt (chance in Prozent)
+#  beute:    was es beim Tod fallen lässt (chance in Prozent)
+#
+#  Kampf:
+#    aggressiv  = true          greift Spieler von selbst an
+#    schaden    = 4             Grundschaden (ohne Angabe: 2 + 2 * stufe)
+#    ruestung   = 1             zieht so viel von jedem Treffer ab
+#    erholung   = 3.0           Sekunden zwischen zwei Angriffen
+#    angriffe   = ["beißt", "kratzt"]   "Die Ratte beißt dich."
+#    erfahrung  = 20            Erfahrung für den Sieg (sonst automatisch)
+#    todestext  = "*fiept ein letztes Mal."
+#    angreifbar = false         kann nicht angegriffen werden (NPCs: Standard)
 
 [[monster]]
 id   = "ratte"
@@ -20,4 +30,7 @@ wander_chance = 15
 aggressiv = true
 sprueche = ["*fiept.", "*nagt an einem Fass."]
 beute = [ { gegenstand = "rattenschwanz", chance = 50 } ]
+erholung  = 2.5
+angriffe  = ["beißt", "kratzt"]
+todestext = "*fiept ein letztes Mal und bleibt reglos liegen."
 

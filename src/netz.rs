@@ -39,6 +39,16 @@ pub async fn starten(welt: GeteilteWelt) -> io::Result<()> {
         }
     });
 
+    // Der Kampftakt: mehrmals pro Sekunde, damit Kämpfe in Echtzeit laufen
+    let w = welt.clone();
+    tokio::spawn(async move {
+        let mut intervall = tokio::time::interval(Duration::from_millis(200));
+        loop {
+            intervall.tick().await;
+            crate::kampf::takt(&mut sperren(&w));
+        }
+    });
+
     loop {
         let (sock, adresse) = listener.accept().await?;
         let w = welt.clone();

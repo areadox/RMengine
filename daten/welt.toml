@@ -53,6 +53,38 @@ intelligenz  = 10
 weisheit     = 10
 
 # ---------------------------------------------------------------------
+# Kampf: Echtzeit, keine Runden. Jeder Angriff hat eine Erholungszeit.
+# Alle Zeiten in Sekunden (Kommazahlen erlaubt, z.B. 2.5).
+# ---------------------------------------------------------------------
+[kampf]
+auto_angriff        = true    # nach "toete ratte" geht der Kampf von selbst weiter
+waffenlos_schaden   = 2       # Schaden ohne Waffe
+waffenlos_erholung  = 2.5     # Sekunden zwischen zwei Faustschlägen
+zauber_erholung     = 2.0     # Sekunden nach einem Kampfzauber
+ausdauer            = 100     # Ausdauer zu Beginn (jeder Angriff kostet etwas)
+ausdauer_pro_angriff = 5
+ausdauer_erholung   = 3       # pro Takt
+
+# Stufen: Für die nächste Stufe braucht man  ep_basis * stufe ^ ep_faktor
+# Erfahrungspunkte (Stufe 1: 100, Stufe 2: 283, Stufe 3: 520, ...)
+ep_basis            = 100
+ep_faktor           = 1.5
+lp_pro_stufe        = 10      # so viel mehr Lebenspunkte pro Stufe
+mp_pro_stufe        = 5
+ausdauer_pro_stufe  = 5
+punkte_pro_stufe    = 2       # zum Verteilen mit "steigere staerke" usw.
+
+# Tod: Man bleibt liegen und kann von anderen wiederbelebt werden.
+# Nach der Wartezeit (oder mit "aufgeben") erwacht man im Wiederbelebungsraum.
+wiederbelebung_raum       = "tempel"
+tod_wartezeit             = 300   # Sekunden (= 5 Minuten)
+wiederbelebung_lp_prozent = 50    # so viele Lebenspunkte hat man danach
+tod_ep_verlust_prozent    = 0     # Verlust an Erfahrung (0 = keiner)
+tod_gegenstaende          = "behalten"   # oder "fallen_lassen"
+
+monster_erholung_prozent  = 5     # Monster heilen sich außerhalb des Kampfes
+
+# ---------------------------------------------------------------------
 # Anzeigenamen: IDs dürfen keine Umlaute haben, hier stehen die schönen
 # Namen für Werte, Ausrüstungsplätze und Eigenschaften.
 # ---------------------------------------------------------------------

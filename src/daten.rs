@@ -274,6 +274,72 @@ impl Default for GelaendeDef {
     }
 }
 
+/// Einstellungen für das Kampfsystem ([kampf] in welt.toml).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields, default)]
+pub struct KampfConfig {
+    /// Spieler greifen automatisch weiter an, sobald sie bereit sind
+    pub auto_angriff: bool,
+    pub waffenlos_schaden: i32,
+    /// Sekunden zwischen zwei Angriffen ohne Waffe
+    pub waffenlos_erholung: f64,
+    /// Fertigkeit, die ohne Waffe benutzt und geübt wird (leer = keine)
+    pub waffenlos_fertigkeit: String,
+    /// Sekunden, die man nach einem Kampfzauber nicht angreifen kann
+    pub zauber_erholung: f64,
+    pub ausdauer: i32,
+    pub ausdauer_pro_angriff: i32,
+    /// Erholung der Ausdauer pro Takt
+    pub ausdauer_erholung: i32,
+    /// Erfahrung für die nächste Stufe: ep_basis * stufe ^ ep_faktor
+    pub ep_basis: f64,
+    pub ep_faktor: f64,
+    pub lp_pro_stufe: i32,
+    pub mp_pro_stufe: i32,
+    pub ausdauer_pro_stufe: i32,
+    /// Punkte, die man pro Stufe auf Werte verteilen kann (Befehl: steigere)
+    pub punkte_pro_stufe: u32,
+    /// Hier wacht man nach dem Tod auf (leer = Startraum)
+    pub wiederbelebung_raum: String,
+    pub wiederbelebung_lp_prozent: i32,
+    /// So lange (Sekunden) können andere Spieler einen Toten wiederbeleben,
+    /// danach erwacht er von selbst im Wiederbelebungsraum
+    pub tod_wartezeit: u64,
+    /// Wie viel Prozent der Erfahrung der aktuellen Stufe man beim Tod verliert
+    pub tod_ep_verlust_prozent: u32,
+    /// "behalten" oder "fallen_lassen" (Gepäck bleibt am Ort des Todes liegen)
+    pub tod_gegenstaende: String,
+    /// Monster erholen sich außerhalb des Kampfes um so viel Prozent pro Takt
+    pub monster_erholung_prozent: i32,
+}
+
+impl Default for KampfConfig {
+    fn default() -> Self {
+        KampfConfig {
+            auto_angriff: true,
+            waffenlos_schaden: 2,
+            waffenlos_erholung: 2.5,
+            waffenlos_fertigkeit: String::new(),
+            zauber_erholung: 2.0,
+            ausdauer: 100,
+            ausdauer_pro_angriff: 5,
+            ausdauer_erholung: 3,
+            ep_basis: 100.0,
+            ep_faktor: 1.5,
+            lp_pro_stufe: 10,
+            mp_pro_stufe: 5,
+            ausdauer_pro_stufe: 5,
+            punkte_pro_stufe: 2,
+            wiederbelebung_raum: String::new(),
+            wiederbelebung_lp_prozent: 50,
+            tod_wartezeit: 300,
+            tod_ep_verlust_prozent: 0,
+            tod_gegenstaende: "behalten".into(),
+            monster_erholung_prozent: 5,
+        }
+    }
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct WeltDatei {
@@ -286,6 +352,8 @@ struct WeltDatei {
     deko: BTreeMap<String, String>,
     #[serde(default)]
     namen: BTreeMap<String, String>,
+    #[serde(default)]
+    kampf: KampfConfig,
 }
 
 // ---------------------------------------------------------------------------
@@ -375,6 +443,12 @@ pub struct GegenstandDef {
     pub wert: i32,
     #[serde(default = "wahr")]
     pub tragbar: bool,
+    /// Waffe: Sekunden zwischen zwei Angriffen (schnelle Waffen < 2, schwere > 3)
+    #[serde(default)]
+    pub erholung: Option<f64>,
+    /// Waffe: Fertigkeit, die benutzt und geübt wird, z.B. "schwertkampf"
+    #[serde(default)]
+    pub fertigkeit: String,
     #[serde(default)]
     pub eigenschaften: BTreeMap<String, i32>,
     #[serde(default)]
@@ -435,6 +509,26 @@ pub struct MonsterDef {
     pub beute: Vec<BeuteDef>,
     #[serde(default)]
     pub aggressiv: bool,
+    /// Grundschaden eines Treffers (ohne Angabe: 2 + 2 * stufe)
+    #[serde(default)]
+    pub schaden: Option<i32>,
+    #[serde(default)]
+    pub ruestung: i32,
+    /// Sekunden zwischen zwei Angriffen
+    #[serde(default = "standard_monster_erholung")]
+    pub erholung: f64,
+    /// Wie das Monster angreift: "beißt", "kratzt" ... (wird zufällig gewählt)
+    #[serde(default)]
+    pub angriffe: Vec<String>,
+    /// Erfahrung für den Sieg (ohne Angabe: aus Stufe und Lebenspunkten berechnet)
+    #[serde(default)]
+    pub erfahrung: Option<u64>,
+    /// Kann man es angreifen? (ohne Angabe: Monster ja, NPCs nein)
+    #[serde(default)]
+    pub angreifbar: Option<bool>,
+    /// Was beim Tod gesagt wird, z.B. "*bricht röchelnd zusammen."
+    #[serde(default)]
+    pub todestext: String,
     #[serde(default)]
     pub wandert: bool,
     #[serde(default = "zehn_u")]
@@ -533,6 +627,22 @@ pub struct ZauberDef {
     pub quelle: String,
 }
 
+fn standard_monster_erholung() -> f64 {
+    3.0
+}
+
+impl MonsterDef {
+    pub fn kampf_schaden(&self) -> i32 {
+        self.schaden.unwrap_or(2 + 2 * self.stufe as i32)
+    }
+    pub fn kampf_erfahrung(&self) -> u64 {
+        self.erfahrung.unwrap_or(10 * (self.stufe as u64).pow(2) + self.lebenspunkte.max(0) as u64 / 2)
+    }
+    pub fn ist_angreifbar(&self) -> bool {
+        self.angreifbar.unwrap_or(!self.ist_npc)
+    }
+}
+
 fn standard_typ() -> String {
     "sonstiges".into()
 }
@@ -606,6 +716,7 @@ pub struct Daten {
     pub deko_farben: BTreeMap<String, String>,
     /// Anzeigenamen für IDs, z.B. staerke -> "Stärke"
     pub namen: BTreeMap<String, String>,
+    pub kampf: KampfConfig,
     pub oberwelt: Option<Oberwelt>,
     /// Allgemeine Beschreibungen (Bäume, Himmel, Steine ...), auf die man mit `nutzt` verweist
     pub bibliothek: BTreeMap<String, BeschreibungDef>,
@@ -776,6 +887,7 @@ pub fn laden(ordner: &Path) -> Result<Daten, Vec<String>> {
         koordinaten: HashMap::new(),
         deko_farben: wd.deko,
         namen: wd.namen,
+        kampf: wd.kampf,
         oberwelt: None,
         bibliothek: BTreeMap::new(),
         warnungen: Vec::new(),
@@ -943,6 +1055,21 @@ fn pruefen(d: &mut Daten, fehler: &mut Vec<String>, warn: &mut Vec<String>) {
             fehler.push(format!("welt.toml [deko]: '{zeichen}' muss genau ein Zeichen sein."));
         }
         farbe_pruefen(farbe, &format!("welt.toml [deko] '{zeichen}'"), fehler);
+    }
+    {
+        let k = &d.kampf;
+        if !["behalten", "fallen_lassen"].contains(&k.tod_gegenstaende.as_str()) {
+            fehler.push("welt.toml [kampf]: 'tod_gegenstaende' muss \"behalten\" oder \"fallen_lassen\" sein.".into());
+        }
+        if !k.wiederbelebung_raum.is_empty() {
+            raum_verweis(d, &k.wiederbelebung_raum, "welt.toml [kampf] (wiederbelebung_raum)", fehler);
+        }
+        if !k.waffenlos_fertigkeit.is_empty() {
+            verweis(&d.fertigkeiten, &k.waffenlos_fertigkeit, "welt.toml [kampf]", "Fertigkeit", fehler);
+        }
+        if k.ep_basis <= 0.0 || k.waffenlos_erholung <= 0.0 {
+            fehler.push("welt.toml [kampf]: 'ep_basis' und 'waffenlos_erholung' müssen größer als 0 sein.".into());
+        }
     }
     if d.welt.takt_sekunden == 0 {
         fehler.push("welt.toml: 'takt_sekunden' muss mindestens 1 sein.".into());
@@ -1160,6 +1287,12 @@ fn pruefen(d: &mut Daten, fehler: &mut Vec<String>, warn: &mut Vec<String>) {
     // --- Gegenstände ---
     for g in d.gegenstaende.values() {
         let wo = format!("[{}] Gegenstand '{}'", g.quelle, g.id);
+        if !g.fertigkeit.is_empty() {
+            verweis(&d.fertigkeiten, &g.fertigkeit, &wo, "Fertigkeit", fehler);
+        }
+        if g.erholung.is_some_and(|e| e <= 0.0) {
+            fehler.push(format!("{wo}: 'erholung' muss größer als 0 sein."));
+        }
         if !GEGENSTAND_TYPEN.contains(&g.typ.as_str()) {
             warn.push(format!("{wo}: unbekannter Typ '{}'. Bekannt: {}", g.typ, GEGENSTAND_TYPEN.join(", ")));
         }
@@ -1174,6 +1307,9 @@ fn pruefen(d: &mut Daten, fehler: &mut Vec<String>, warn: &mut Vec<String>) {
     // --- Monster ---
     for m in d.monster.values() {
         let wo = format!("[{}] Monster '{}'", m.quelle, m.id);
+        if m.erholung <= 0.0 {
+            fehler.push(format!("{wo}: 'erholung' muss größer als 0 sein."));
+        }
         for f in m.fertigkeiten.keys() {
             verweis(&d.fertigkeiten, f, &wo, "Fertigkeit", fehler);
         }

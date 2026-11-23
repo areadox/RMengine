@@ -10,6 +10,7 @@ mod befehle;
 mod beschreibung;
 mod daten;
 mod gespraech;
+mod kampf;
 mod karte;
 mod netz;
 mod oberwelt;

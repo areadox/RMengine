@@ -79,6 +79,9 @@ das Update und veröffentlicht alles als Release.
 - **Bibliothek allgemeiner Beschreibungen** (Bäume, Himmel, Wasser, Möbel …), die Räume, Geländearten und Oberwelt-Felder mit `nutzt = [...]` verwenden
 - **NPCs in eigenen Dateien** mit Gesprächen: Standardfragen (Gruß, Beruf, Aufgabe, Neuigkeiten …) und eigene Themen
 - **Rollen:** Spieler, Baumeister und Admin, mit eigenen Befehlen
+- **Kampf in Echtzeit, ohne Runden:** Erholungszeit je nach Waffe, Ausdauer, Ausweichen, Haltungen, Flucht, Kampfzauber, aggressive und zaubernde Monster, Beute
+- **Stufen und Erfahrung**, Punkte zum Verteilen, dazu steigende Fertigkeiten
+- **Tod und Wiederbelebung:** Mitspieler können 5 Minuten lang helfen, sonst (oder mit `aufgeben`) erwacht man im Tempel
 - **Grafischer Welteditor** (`rmeditor`): Räume auf einer Karte anlegen, verschieben, verbinden und beschreiben. Kommentare in den TOML-Dateien bleiben beim Speichern erhalten.
 
 ## Code-Überblick (`src/`)
@@ -96,6 +99,7 @@ das Update und veröffentlicht alles als Release.
 | `update.rs`  | Update-Funktion über GitHub Releases                         |
 | `beschreibung.rs` | Details, Sinne und Bibliothek                          |
 | `gespraech.rs` | NPC-Gespräche                                              |
+| `kampf.rs`   | Kampf, Stufen, Tod und Wiederbelebung                        |
 
 Der Welteditor (`editor/src/`):
 
@@ -104,13 +108,3 @@ Der Welteditor (`editor/src/`):
 | `main.rs` | Programmstart, Suche nach dem Datenordner                             |
 | `welt.rs` | Räume laden, prüfen und kommentarerhaltend speichern (`toml_edit`)    |
 | `app.rs`  | Oberfläche: Karte, Raumliste, Eigenschaften, Rückgängig (`egui`)      |
-
-## Vorbereitet für das Kampfsystem
-
-Diese Felder werden schon gelesen und geprüft, wirken aber noch nicht:
-
-- Monster: `lebenspunkte`, `werte`, `aggressiv`, `beute`, `zauber`
-- Gegenstände: `eigenschaften` wie `schaden` und `ruestung`
-- Zauber: Wirkung `schaden` mit dem Ziel `gegner`
-
-Ein Kampfsystem kann sich hier in den Takt (`Welt::takt`) einklinken.

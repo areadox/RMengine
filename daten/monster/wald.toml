@@ -7,6 +7,7 @@ lebenspunkte = 3
 wandert = true
 wander_chance = 20
 sprueche = ["*knabbert an einer Nuss.", "*huscht einen Baum hinauf und wieder herunter."]
+angreifbar = false
 
 [[monster]]
 id   = "wolf"
@@ -23,6 +24,9 @@ wandert = true
 wander_chance = 8
 sprueche = ["*heult.", "*fletscht die Zähne."]
 beute = [ { gegenstand = "wolfspelz", chance = 75 } ]
+erholung  = 2.8
+angriffe  = ["beißt", "reißt mit den Zähnen an", "springt"]
+todestext = "*jault auf und bricht zusammen."
 geruch = "Der Wolf riecht nach nassem Fell und Blut."
 geraeusch = "Ein tiefes Knurren dringt aus seiner Kehle."
 
@@ -42,3 +46,7 @@ mana = 20
 zauber = ["feuerpfeil"]
 aggressiv = true
 beute = [ { gegenstand = "heiltrank", chance = 30 } ]
+ruestung  = 2
+erholung  = 3.5
+angriffe  = ["sticht", "beißt", "umschlingt"]
+todestext = "*zuckt mit allen acht Beinen und rollt sich zusammen."
