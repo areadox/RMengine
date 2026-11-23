@@ -1,0 +1,45 @@
+# =====================================================================
+#  Fertigkeiten
+# =====================================================================
+#  kategorie:       zum Gruppieren in der Anzeige
+#  attribut:        welcher Grundwert (aus [start.werte]) dazu passt
+#  voraussetzungen: andere Fertigkeiten, die man vorher braucht
+#  lernchance:      Prozent-Chance, beim Benutzen eine Stufe aufzusteigen
+
+[[fertigkeit]]
+id   = "schwertkampf"
+name = "Schwertkampf"
+kategorie = "kampf"
+attribut  = "staerke"
+beschreibung = "Der Umgang mit Klingen aller Art."
+
+[[fertigkeit]]
+id   = "schildblock"
+name = "Schildblock"
+kategorie = "kampf"
+attribut  = "ausdauer"
+voraussetzungen = ["schwertkampf"]
+beschreibung = "Angriffe mit dem Schild abwehren."
+
+[[fertigkeit]]
+id   = "schleichen"
+name = "Schleichen"
+kategorie = "allgemein"
+attribut  = "geschick"
+beschreibung = "Sich lautlos bewegen."
+
+[[fertigkeit]]
+id   = "magie"
+name = "Magie"
+kategorie = "zauberei"
+attribut  = "intelligenz"
+lernchance = 20
+beschreibung = "Die Kunst, Elemente zu beherrschen."
+
+[[fertigkeit]]
+id   = "heilkunde"
+name = "Heilkunde"
+kategorie = "zauberei"
+attribut  = "weisheit"
+lernchance = 20
+beschreibung = "Wunden heilen, mit Kräutern und Magie."

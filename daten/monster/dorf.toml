@@ -1,0 +1,61 @@
+# =====================================================================
+#  Bewohner und Tiere
+# =====================================================================
+#  name:     kurzer Name im Satz ("eine Ratte")
+#  akkusativ: Name nach "auf ..." (z.B. "einen grauen Wolf"), optional
+#  raumtext: wie das Monster im Raum beschrieben wird (optional)
+#  wandert:  läuft herum (bleibt aber im Gebiet seines Startraums)
+#  sprueche: zufällige Sätze. Beginnt ein Spruch mit *, ist es eine Handlung.
+#  beute:    was es später im Kampf fallen lässt (chance in Prozent)
+
+[[monster]]
+id   = "wirt"
+name = "der Wirt"
+akkusativ = "den Wirt"
+schluesselwoerter = ["wirt", "mann"]
+raumtext = "Der dicke Wirt poliert hinter der Theke ein Glas."
+beschreibung = "Ein freundlicher, rundlicher Mann mit einer fleckigen Schürze."
+stufe = 5
+lebenspunkte = 80
+sprueche = [
+  "Was darf's sein, Fremder?",
+  "Im Keller sind schon wieder Ratten. Jemand sollte da mal nachsehen ...",
+  "*poliert gelangweilt ein Glas.",
+]
+sprech_chance = 8
+
+[[monster]]
+id   = "schmied"
+name = "der Schmied"
+akkusativ = "den Schmied"
+schluesselwoerter = ["schmied"]
+raumtext = "Der Schmied hämmert auf ein glühendes Eisen."
+beschreibung = "Ein Bär von einem Mann, mit rußverschmiertem Gesicht."
+stufe = 8
+lebenspunkte = 150
+fertigkeiten = { schwertkampf = 30 }
+sprueche = ["*wischt sich den Schweiß von der Stirn.", "Gutes Eisen braucht Geduld."]
+
+[[monster]]
+id   = "ratte"
+name = "eine fette Ratte"
+schluesselwoerter = ["ratte"]
+beschreibung = "Eine Ratte, so groß wie eine Katze, mit gelben Zähnen."
+stufe = 1
+lebenspunkte = 8
+wandert = true
+wander_chance = 15
+aggressiv = true
+sprueche = ["*fiept.", "*nagt an einem Fass."]
+beute = [ { gegenstand = "rattenschwanz", chance = 50 } ]
+
+[[monster]]
+id   = "kraemerin"
+name = "die Krämerin"
+akkusativ = "die Krämerin"
+schluesselwoerter = ["kraemerin", "frau"]
+raumtext = "Die Krämerin zählt hinter dem Tresen ihre Münzen."
+beschreibung = "Eine hagere Frau mit flinken Augen und einem Bleistift hinter dem Ohr."
+stufe = 3
+lebenspunkte = 40
+sprueche = ["Seile, Kerzen, Proviant – alles da!", "*rückt ihre Brille zurecht."]

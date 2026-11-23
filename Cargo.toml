@@ -1,0 +1,12 @@
+[package]
+name = "mud-treiber"
+version = "0.1.0"
+edition = "2021"
+description = "Datengetriebener MUD-Treiber: Welten werden in TOML-Dateien gebaut, nicht programmiert."
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+sha2 = "0.10"
+rand = "0.8"

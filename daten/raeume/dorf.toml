@@ -1,0 +1,234 @@
+# =====================================================================
+#  Das Dorf Eichenhain
+# =====================================================================
+#  symbol: Buchstabe im Kästchen auf der Karte, z.B. K = Kneipe, T = Tempel
+#  Koordinaten: x wird nach OSTEN größer, y nach NORDEN, z nach OBEN.
+#  Ausgänge: nord, nordost, ost, suedost, sued, suedwest, west, nordwest, hoch, runter
+#  Der Rückweg wird automatisch angelegt (siehe welt.toml).
+
+[[raum]]
+id       = "dorfplatz"
+name     = "Der Dorfplatz"
+x = 0
+y = 0
+gebiet   = "dorf"
+gelaende = "platz"
+beschreibung = """
+Du stehst auf dem kopfsteingepflasterten Dorfplatz von Eichenhain. In der
+Mitte plätschert ein alter {hellblau}Brunnen{/}. Im Osten hängt das Schild
+einer Taverne, im Westen hörst du Hammerschläge. Eine Straße führt nach
+Norden, im Süden erhebt sich ein kleiner Tempel."""
+ausgaenge = { nord = "hauptstrasse", ost = "taverne", west = "schmiede", sued = "tempel", nordost = "marktstand" }
+gegenstaende = ["apfel"]
+
+[raum.details]
+brunnen = "Der Brunnen ist aus grauem Stein. Jemand hat 'Erbaut im Jahre 312' in den Rand geritzt."
+schild  = "Auf dem Schild steht: 'Zum Goldenen Eber'."
+
+[[raum]]
+id       = "hauptstrasse"
+name     = "Die Hauptstraße"
+x = 0
+y = 1
+gebiet   = "dorf"
+gelaende = "strasse"
+beschreibung = """
+Eine staubige Straße zwischen schiefen Fachwerkhäusern. Im Norden siehst du
+das Dorftor, im Süden den Dorfplatz."""
+ausgaenge = { nord = "nordtor" }
+
+[[raum]]
+id       = "marktstand"
+name     = "Ein Marktstand"
+symbol   = "M"
+x = 1
+y = 1
+gebiet   = "dorf"
+gelaende = "strasse"
+beschreibung = """
+Ein bunter Marktstand mit Körben voller Obst und Gemüse. Die Händlerin ist
+gerade nicht da."""
+gegenstaende = ["apfel", "apfel"]
+ausgaenge = { ost = "osttor" }
+
+[[raum]]
+id       = "nordtor"
+name     = "Das Nordtor"
+x = 0
+y = 2
+gebiet   = "dorf"
+gelaende = "haus"
+beschreibung = """
+Ein hölzernes Tor in der niedrigen Palisade des Dorfes. Dahinter beginnt
+der {gruen}Dunkelwald{/}."""
+ausgaenge = { nord = "waldrand" }
+
+[[raum]]
+id       = "taverne"
+name     = "Taverne 'Zum Goldenen Eber'"
+symbol   = "K"
+x = 1
+y = 0
+gebiet   = "dorf"
+gelaende = "haus"
+beschreibung = """
+Eine gemütliche, verrauchte Gaststube. Ein Feuer knistert im Kamin. Eine
+knarrende Treppe führt nach oben, eine Falltür nach unten in den Keller."""
+ausgaenge = { hoch = "gaestezimmer", runter = "keller" }
+monster   = ["wirt"]
+
+[[raum]]
+id       = "gaestezimmer"
+name     = "Ein Gästezimmer"
+symbol   = "Z"
+x = 1
+y = 0
+z = 1
+gebiet   = "dorf"
+gelaende = "haus"
+beschreibung = "Ein kleines Zimmer mit einem Bett und einer Truhe."
+gegenstaende = ["heiltrank"]
+
+[[raum]]
+id       = "keller"
+name     = "Der Weinkeller"
+x = 1
+y = 0
+z = -1
+gebiet   = "keller"
+gelaende = "hoehle"
+beschreibung = """
+Feucht und dunkel. Zwischen den Weinfässern raschelt es verdächtig. Ein
+enger Gang führt weiter nach Osten."""
+ausgaenge = { ost = "kellergang" }
+monster   = ["ratte"]
+
+[[raum]]
+id       = "kellergang"
+name     = "Ein enger Kellergang"
+x = 2
+y = 0
+z = -1
+gebiet   = "keller"
+gelaende = "hoehle"
+beschreibung = "Ein niedriger Gang. Hier ist es so eng, dass du dich bücken musst."
+monster   = ["ratte"]
+
+[[raum]]
+id       = "schmiede"
+name     = "Die Schmiede"
+symbol   = "S"
+x = -1
+y = 0
+gebiet   = "dorf"
+gelaende = "haus"
+beschreibung = """
+Hitze schlägt dir entgegen. An der Esse arbeitet ein muskulöser Schmied.
+An den Wänden hängen Werkzeuge und ein paar einfache Waffen."""
+monster      = ["schmied"]
+gegenstaende = ["kurzschwert", "holzschild", "amboss"]
+
+[[raum]]
+id       = "tempel"
+name     = "Der kleine Tempel"
+symbol   = "T"
+x = 0
+y = -1
+gebiet   = "dorf"
+gelaende = "tempel"
+beschreibung = """
+Ein stiller Raum aus weißem Stein. Durch ein buntes Glasfenster fällt
+farbiges Licht auf einen schlichten Altar."""
+gegenstaende = ["manatrank"]
+deko_richtung = { sued = "~", suedost = "~", suedwest = "~" }   # der Dorfbach
+
+[raum.details]
+altar   = "Auf dem Altar liegen frische Blumen."
+fenster = "Das Fenster zeigt eine Eiche unter einem goldenen Sonnenaufgang."
+
+[[raum]]
+id       = "osttor"
+name     = "Das Osttor"
+symbol   = "E"
+x = 2
+y = 1
+gebiet   = "dorf"
+gelaende = "haus"
+beschreibung = """
+Ein gedrungenes Tor aus Bruchstein. Draußen beginnt die Landstraße, die
+hinaus ins weite Land führt."""
+# Der Ausgang "raus" auf die Oberwelt entsteht automatisch (siehe oberwelt/oberwelt.toml).
+
+# ---------------------------------------------------------------------
+#  Besondere Orte: Der Buchstabe (symbol) erscheint im Kästchen auf der Karte.
+# ---------------------------------------------------------------------
+
+[[raum]]
+id       = "kraemerladen"
+name     = "Der Krämerladen"
+symbol   = "L"
+x = -1
+y = 1
+gebiet   = "dorf"
+gelaende = "haus"
+beschreibung = """
+Ein enger Laden, vollgestopft bis unter die Decke: Seile, Kerzen, Töpfe,
+Säcke mit Mehl. Hinter dem Tresen wartet die Krämerin."""
+ausgaenge = { ost = "hauptstrasse" }
+monster   = ["kraemerin"]
+
+[[raum]]
+id       = "gartentor"
+name     = "Vor dem Kräutergarten"
+symbol   = "G"
+x = -1
+y = -1
+gebiet   = "dorf"
+gelaende = "garten"
+beschreibung = """
+Eine niedrige Hecke umschließt einen Garten. Ein kleines, grün gestrichenes
+Tor steht offen – du könntest hineingehen."""
+ausgaenge = { nordost = "dorfplatz", rein = "kraeutergarten" }
+deko_richtung = { sued = "~" }
+
+# ---------------------------------------------------------------------
+#  Ein betretbares Gebiet mit EIGENER Karte (karte = "kraeutergarten").
+#  Seine Koordinaten überschneiden sich darum nicht mit dem Dorf.
+#  Der Rückweg "raus" zum Gartentor entsteht automatisch.
+# ---------------------------------------------------------------------
+
+[[raum]]
+id       = "kraeutergarten"
+name     = "Im Kräutergarten"
+karte    = "kraeutergarten"
+x = 0
+y = 0
+gebiet   = "kraeutergarten"
+gelaende = "garten"
+beschreibung = """
+Beete voller Salbei, Thymian und Minze. Bienen summen zwischen den Blüten.
+Im Norden steht ein kleines Gewächshaus."""
+ausgaenge = { nord = "gewaechshaus", ost = "teich" }
+
+[[raum]]
+id       = "teich"
+name     = "Am Gartenteich"
+karte    = "kraeutergarten"
+x = 1
+y = 0
+gebiet   = "kraeutergarten"
+gelaende = "garten"
+beschreibung = "Ein kleiner Teich mit Seerosen. Ein Frosch quakt empört."
+deko_richtung = { ost = "~", nordost = "~", suedost = "~" }
+
+[[raum]]
+id       = "gewaechshaus"
+name     = "Das Gewächshaus"
+symbol   = "H"
+karte    = "kraeutergarten"
+x = 0
+y = 1
+gebiet   = "kraeutergarten"
+gelaende = "haus"
+beschreibung = "Warm und feucht. Auf einem Tisch liegen frisch geerntete Pilze."
+gegenstaende = ["pilz"]

@@ -1,0 +1,213 @@
+# =====================================================================
+#  Die Oberwelt
+# =====================================================================
+#  Die Landschaft wird in karte.txt GEZEICHNET: ein Zeichen = ein Feld.
+#  Norden ist oben. Ein Leerzeichen bedeutet: hier ist nichts.
+#
+#  Koordinaten: x = Spalte, y = Zeile in karte.txt (beide ab 1).
+#  Tipp: Die meisten Texteditoren zeigen Zeile und Spalte unten an.
+#  Im Spiel zeigt der Baumeister-Befehl "wo" die Koordinaten des Feldes.
+
+[oberwelt]
+name           = "Das Land Velmar"
+karte          = "karte.txt"
+sicht          = 6        # normale Sichtweite in Feldern
+anzeige_breite = 8        # so viele Felder links und rechts zeigt die Karte
+anzeige_hoehe  = 4        # so viele Felder oben und unten  (8/4 = 17x9 Felder)
+stil           = "kompakt"  # "kompakt" = ein Zeichen pro Feld im Rahmen, X = du
+                            # "weit"    = mit Leerzeichen zwischen den Feldern
+gebiet         = "oberwelt"
+
+# ---------------------------------------------------------------------
+#  Was bedeuten die Zeichen?  [feld."ZEICHEN"]
+#
+#  name            Name des Geländes (Raumtitel und Legende)
+#  fern            wie es aus der Nähe beschrieben wird: "Im Norden siehst du ..."
+#  symbol          Zeichen auf der Karte im Spiel (ohne Angabe: das Zeichen selbst)
+#  farbe           Farbe auf der Karte
+#  begehbar        false = man kann das Feld nicht betreten (Meer, Felswand)
+#  sicht           verändert die Sichtweite, wenn man HIER steht (+ weiter, - weniger)
+#  sichtbehinderung  jedes Feld dieser Art zwischen dir und dem Ziel kostet so viel Sicht
+#  blockiert_sicht true = man kann nicht darüber hinwegsehen (Berge)
+#  hoehe           wer selbst auf einem blockierenden Feld steht, sieht über
+#                  gleich hohe oder niedrigere Blocker hinweg
+#  beschreibungen  Texte für die Felder; jedes Feld bekommt einen davon
+# ---------------------------------------------------------------------
+
+[feld."~"]
+name     = "Meer"
+fern     = "das offene Meer"
+farbe    = "hellblau"
+begehbar = false
+
+[feld.":"]
+name  = "Strand"
+fern  = "einen Sandstrand"
+farbe = "hellgelb"
+beschreibungen = [
+  "Feiner, heller Sand knirscht unter deinen Füßen. Möwen kreischen über dir.",
+  "Angespültes Treibholz liegt zwischen Muscheln und Tang.",
+]
+
+[feld."."]
+name   = "Grasland"
+fern   = "weites Grasland"
+farbe  = "hellgruen"
+beschreibungen = [
+  "Hohes Gras wogt im Wind, so weit das Auge reicht.",
+  "Eine sanfte Wiese voller Butterblumen und summender Bienen.",
+  "Das Gras ist hier niedrig und von Hasen angefressen.",
+  "Ein einzelner, knorriger Apfelbaum steht mitten in der Wiese.",
+]
+
+[feld."="]
+name   = "Landstraße"
+fern   = "eine Straße"
+farbe  = "gelb"
+sicht  = 1
+beschreibungen = [
+  "Eine ausgefahrene Landstraße. Tiefe Wagenspuren ziehen sich durch den Staub.",
+  "Die Straße ist hier mit groben Steinen ausgebessert worden.",
+]
+
+[feld."*"]
+name   = "Dunkelwald"
+fern   = "dichten Wald"
+farbe  = "gruen"
+sicht  = -1              # wer im Wald steht, sieht weniger weit
+sichtbehinderung = 2     # und jedes Waldfeld dazwischen kostet 2 Felder Sicht
+beschreibungen = [
+  "Alte Eichen und Buchen stehen dicht an dicht. Es riecht nach Moos.",
+  "Zwischen den Stämmen ist es dämmrig. Irgendwo knackt ein Ast.",
+  "Farne wachsen hüfthoch zwischen umgestürzten Bäumen.",
+]
+
+[feld.n]
+name   = "Hügelland"
+fern   = "sanfte Hügel"
+farbe  = "gelb"
+sicht  = 2               # von Hügeln aus sieht man weiter
+beschreibungen = [
+  "Sanfte, grüne Hügel. Von hier oben hast du einen guten Blick.",
+  "Schafe grasen an einem Hang.",
+]
+
+[feld."%"]
+name   = "Sumpf"
+fern   = "einen nebligen Sumpf"
+farbe  = "magenta"
+sicht  = -1
+sichtbehinderung = 1     # Nebel
+beschreibungen = [
+  "Deine Stiefel versinken im Morast. Nebel liegt über dem Wasser.",
+  "Fauliges Wasser blubbert zwischen Schilf und toten Bäumen.",
+]
+
+# Berge zeichnet man in karte.txt als kleine Bilder: /^\ oder /\
+# Darum bedeuten / ^ und \ alle dasselbe. (Den Rückstrich schreibt man "\\".)
+[feld."/"]
+name   = "Gebirge"
+fern   = "steile Berge"
+farbe  = "weiss"
+sicht  = 4               # oben auf dem Berg sieht man sehr weit ...
+blockiert_sicht = true   # ... aber Berge verdecken, was dahinter liegt
+hoehe  = 1               # auf einem Berg sieht man über andere Berge (Höhe 1) hinweg
+beschreibungen = [
+  "Ein steiler, steiniger Pfad windet sich über den Berghang.",
+  "Kalter Wind pfeift über den Grat. Unter dir breitet sich das Land aus.",
+]
+
+[feld."^"]
+name   = "Gebirge"
+fern   = "steile Berge"
+farbe  = "weiss"
+sicht  = 4               # oben auf dem Berg sieht man sehr weit ...
+blockiert_sicht = true   # ... aber Berge verdecken, was dahinter liegt
+hoehe  = 1               # auf einem Berg sieht man über andere Berge (Höhe 1) hinweg
+beschreibungen = [
+  "Ein steiler, steiniger Pfad windet sich über den Berghang.",
+  "Kalter Wind pfeift über den Grat. Unter dir breitet sich das Land aus.",
+]
+
+[feld."\\"]
+name   = "Gebirge"
+fern   = "steile Berge"
+farbe  = "weiss"
+sicht  = 4               # oben auf dem Berg sieht man sehr weit ...
+blockiert_sicht = true   # ... aber Berge verdecken, was dahinter liegt
+hoehe  = 1               # auf einem Berg sieht man über andere Berge (Höhe 1) hinweg
+beschreibungen = [
+  "Ein steiler, steiniger Pfad windet sich über den Berghang.",
+  "Kalter Wind pfeift über den Grat. Unter dir breitet sich das Land aus.",
+]
+
+[feld.A]
+name     = "Hochgebirge"
+fern     = "unbezwingbare Gipfel"
+symbol   = "^"                # in karte.txt "A", im Spiel als ^ zu sehen
+farbe    = "hellweiss"
+begehbar = false
+blockiert_sicht = true
+hoehe    = 2             # höher als normale Berge: verdeckt auch von dort die Sicht
+
+# ---------------------------------------------------------------------
+#  Eingänge: Städte, Dungeons, Höhlen ...
+#  Man betritt sie mit "rein". Im angegebenen Raum entsteht automatisch
+#  der Ausgang "raus", der zurück auf dieses Feld führt.
+# ---------------------------------------------------------------------
+
+[[eingang]]
+x      = 36
+y      = 11
+name   = "Eichenhain"
+raum   = "osttor"
+symbol = "O"
+farbe  = "hellgelb"
+beschreibung = "Vor dir liegt das Osttor des Dorfes Eichenhain. Rauch steigt aus den Schornsteinen."
+
+[[eingang]]
+x      = 35
+y      = 4
+name   = "Dunkelwaldpfad"
+raum   = "waldrand"
+symbol = "#"
+farbe  = "hellgruen"
+beschreibung = "Die Straße endet an einem schmalen Pfad, der tiefer in den Dunkelwald führt."
+
+# ---------------------------------------------------------------------
+#  Besondere Orte: eigene Texte, Gegenstände, Monster
+#  Mit "symbol" erscheinen sie auf der Karte und sind von weitem zu sehen.
+# ---------------------------------------------------------------------
+
+[[ort]]
+x      = 15
+y      = 4
+name   = "Der Steinkreis"
+symbol = "+"
+farbe  = "hellcyan"
+beschreibung = """
+Auf einem windumtosten Gipfel stehen zwölf uralte {hellcyan}Steine{/} im Kreis.
+Die Luft knistert vor Magie."""
+gegenstaende = ["manatrank"]
+
+[ort.details]
+steine = "In jeden Stein ist ein Sternbild gemeißelt. Einer der Steine ist umgestürzt."
+
+[[ort]]
+x      = 53
+y      = 5
+name   = "Ein verlassenes Lager"
+symbol = "x"
+farbe  = "hellrot"
+beschreibung = "Eine kalte Feuerstelle, ein zerrissenes Zelt. Wer hier gelagert hat, ist in Eile aufgebrochen."
+gegenstaende = ["heiltrank"]
+monster      = ["wolf"]
+
+[[ort]]
+x    = 35
+y    = 11
+name = "Eine Wegkreuzung"
+beschreibung = "Ein verwitterter {gelb}Wegweiser{/} steht an der Kreuzung."
+
+[ort.details]
+wegweiser = "Osten: Eichenhain.  Norden: Dunkelwald.  Westen: Steinkreis.  Süden: Küste."

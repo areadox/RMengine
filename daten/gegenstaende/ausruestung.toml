@@ -1,0 +1,40 @@
+# =====================================================================
+#  Waffen und Rüstungen
+# =====================================================================
+#  Die Eigenschaften (schaden, ruestung, ...) benutzt später das Kampfsystem.
+
+[[gegenstand]]
+id   = "kurzschwert"
+name = "ein Kurzschwert"
+schluesselwoerter = ["schwert", "kurzschwert"]
+typ  = "waffe"
+platz = "waffe"
+gewicht = 3
+wert = 30
+bodentext = "Ein Kurzschwert hängt an der Wand."
+beschreibung = "Eine einfache, aber gut geschliffene Klinge."
+eigenschaften = { schaden = 6, staerke = 1 }
+
+[[gegenstand]]
+id   = "holzschild"
+name = "ein Holzschild"
+schluesselwoerter = ["schild"]
+typ  = "ruestung"
+platz = "schild"
+gewicht = 4
+wert = 15
+beschreibung = "Ein runder Schild aus Eichenholz mit Eisenbeschlag."
+eigenschaften = { ruestung = 3 }
+
+[[gegenstand]]
+id   = "lederhelm"
+name = "ein Lederhelm"
+akkusativ = "einen Lederhelm"
+schluesselwoerter = ["helm"]
+typ  = "ruestung"
+platz = "kopf"
+gewicht = 1
+wert = 10
+bodentext = "Zwischen den Wurzeln liegt ein alter Lederhelm."
+beschreibung = "Ein abgewetzter Helm aus gehärtetem Leder."
+eigenschaften = { ruestung = 1 }

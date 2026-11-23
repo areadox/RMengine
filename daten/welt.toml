@@ -1,0 +1,135 @@
+# =====================================================================
+#  welt.toml – die Grundeinstellungen deiner Welt
+# =====================================================================
+#  Alles, was mit # beginnt, ist ein Kommentar und wird ignoriert.
+
+[welt]
+name       = "Eichenhain"
+port       = 4000                 # Mit diesem Port verbinden sich die Spieler
+startraum  = "dorfplatz"          # Hier beginnen neue Spieler
+willkommen = """
+Willkommen im kleinen Dorf {gruen}Eichenhain{/} am Rande des Dunkelwaldes.
+Hier beginnt dein Abenteuer."""
+
+# Diese Namen sind Baumeister und dürfen Baumeister-Befehle benutzen.
+# WICHTIG: Lege die Figur "Admin" sofort selbst an (oder ändere den Namen)!
+admins = ["Admin"]
+
+karte_beim_umsehen  = true        # Bei jedem "schau" die kleine Karte zeigen
+karten_radius       = 1           # Räume in jede Richtung (1 = 3x3 Räume; "karte" zeigt mehr)
+stadtkarte_stil     = "kasten"    # "kasten" = ( ) und [ ] im Rahmen, "linien" = ein Zeichen pro Raum
+karten_hintergrund  = "*"         # Füllzeichen für leere Stellen
+nur_besuchte_raeume_auf_karte = false   # true = "Nebel des Krieges"
+ausgaenge_beidseitig = true       # Rückwege automatisch anlegen
+
+takt_sekunden          = 3        # Alle 3 Sekunden "lebt" die Welt (Monster laufen ...)
+zuruecksetzen_minuten  = 10       # Dann werden Gegenstände/Monster wieder aufgefüllt
+speichern_minuten      = 5        # Automatisches Speichern
+regeneration_lp        = 1        # Erholung pro Takt
+regeneration_mp        = 1
+
+# ---------------------------------------------------------------------
+# Damit beginnen neue Spieler
+# ---------------------------------------------------------------------
+[start]
+lebenspunkte = 100
+mana         = 50
+gegenstaende = ["brot", "fackel", "landkarte"]
+zauber       = ["kleine_heilung", "heimkehr", "feuerpfeil"]
+
+[start.fertigkeiten]       # Fertigkeit = Stufe
+magie        = 1
+heilkunde    = 1
+schwertkampf = 1
+
+[start.werte]              # Frei wählbare Grundwerte
+staerke      = 10
+geschick     = 10
+ausdauer     = 10
+intelligenz  = 10
+weisheit     = 10
+
+# ---------------------------------------------------------------------
+# Geländearten: So sehen Räume auf der Karte aus
+# klammern: Kästchen auf der Stadtkarte, z.B. "()" draußen, "[]" Gebäude
+# symbol:   nur für den Stil "linien" (im Kästchen steht das symbol des Raums)
+# Farben: rot gruen gelb blau magenta cyan weiss grau schwarz
+#         hellrot hellgruen hellgelb hellblau hellmagenta hellcyan hellweiss
+# ---------------------------------------------------------------------
+[gelaende.platz]
+name   = "Platz"
+symbol = "+"
+farbe  = "hellgelb"
+klammern = "()"
+
+[gelaende.strasse]
+name   = "Straße"
+symbol = "."
+farbe  = "weiss"
+klammern = "()"
+
+[gelaende.haus]
+name   = "Gebäude"
+symbol = "#"
+farbe  = "hellweiss"
+klammern = "[]"
+
+[gelaende.tempel]
+name   = "Tempel"
+symbol = "T"
+farbe  = "hellcyan"
+klammern = "[]"
+
+[gelaende.wald]
+name   = "Wald"
+symbol = "♣"
+farbe  = "gruen"
+klammern = "{}"
+deko     = "o&"          # Bäume rund um Waldräume
+deko_dichte = 60
+
+[gelaende.lichtung]
+name   = "Wiese"
+symbol = "\""
+farbe  = "hellgruen"
+klammern = "()"
+deko     = "o"
+deko_dichte = 25
+
+[gelaende.garten]
+name     = "Garten"
+symbol   = "%"
+farbe    = "hellgruen"
+klammern = "()"
+deko     = "o&"            # verstreute Bäume und Büsche
+deko_dichte = 45           # Prozent der freien Stellen rund um den Raum
+
+[gelaende.wasser]
+name   = "Wasser"
+symbol = "~"
+farbe  = "hellblau"
+klammern = "()"
+
+[gelaende.berg]
+name   = "Fels"
+symbol = "^"
+farbe  = "grau"
+klammern = "<>"
+
+[gelaende.hoehle]
+name   = "Höhle"
+symbol = "o"
+farbe  = "grau"
+klammern = "<>"
+
+# ---------------------------------------------------------------------
+# Farben der Verzierungen auf der Stadtkarte (Zeichen = Farbe)
+# Verzierungen setzt man bei Geländearten oder Räumen mit
+#   deko = "o&"                  verstreut um das Kästchen
+#   deko_richtung = { sued = "~" }  eine ganze Seite, z.B. ein Bach
+# ---------------------------------------------------------------------
+[deko]
+"o" = "gruen"
+"&" = "hellgruen"
+"~" = "hellblau"
+"^" = "grau"
