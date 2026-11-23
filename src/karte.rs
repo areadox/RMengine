@@ -1,10 +1,15 @@
 //! Zeichnet die Karte rund um einen Spieler.
 //!
-//! Jeder Raum ist ein Zeichen. Verbindungen werden mit - | / \ gezeichnet:
+//! Stil "kasten" (Standard): Jeder Raum ist ein Kästchen, ( ) für draußen,
+//! [ ] für Gebäude, mit einem Buchstaben für besondere Orte. X = du.
 //!
-//!     T---T
-//!     |  /
-//!     #---@---~
+//!     +-------------+
+//!     |*(K)*(P)*( )*|
+//!     |**|***|*****~|
+//!     |-[ ]-[X]-(T)*|
+//!     +-------------+
+//!
+//! Stil "linien": Jeder Raum ist ein Zeichen, verbunden mit - | / \
 
 use crate::daten::Richtung;
 use crate::spieler::SpielerDaten;
@@ -12,9 +17,9 @@ use crate::welt::Welt;
 use std::collections::BTreeSet;
 
 #[derive(Clone)]
-struct Zelle {
-    zeichen: char,
-    farbe: String,
+pub struct Zelle {
+    pub zeichen: char,
+    pub farbe: String,
 }
 
 pub fn zeichnen(w: &Welt, sp: &SpielerDaten, radius: i32, mit_legende: bool) -> String {
@@ -28,6 +33,9 @@ pub fn zeichnen(w: &Welt, sp: &SpielerDaten, radius: i32, mit_legende: bool) -> 
             .filter_map(|s| crate::oberwelt::aus_id(&s.sp.raum))
             .collect();
         return ow.karte_zeichnen(x, y, &andere, mit_legende);
+    }
+    if d.welt.stadtkarte_stil == "kasten" {
+        return zeichnen_kasten(w, sp, radius, mit_legende);
     }
     let Some(hier) = d.raeume.get(&sp.raum) else { return String::new() };
     let radius = radius.clamp(1, 15);
@@ -177,5 +185,165 @@ pub fn zeichnen(w: &Welt, sp: &SpielerDaten, radius: i32, mit_legende: bool) -> 
         }
         aus.push_str(&format!("\n  {}\n", teile.join("   ")));
     }
+    aus
+}
+
+/// Die Stadtkarte im Kästchen-Stil.
+fn zeichnen_kasten(w: &Welt, sp: &SpielerDaten, radius: i32, mit_legende: bool) -> String {
+    let d = &w.d;
+    let Some(hier) = d.raeume.get(&sp.raum) else { return String::new() };
+    let r = radius.clamp(1, 10);
+    let n = 2 * r + 1;
+    let breite = (4 * n + 1) as usize;
+    let hoehe = (2 * n + 1) as usize;
+    let hg = d.welt.karten_hintergrund.chars().next().unwrap_or(' ');
+    let mut gitter = vec![vec![Zelle { zeichen: hg, farbe: "grau".into() }; breite]; hoehe];
+    let sichtbar = |id: &str| !d.welt.nur_besuchte_raeume_auf_karte || sp.besucht.contains(id) || id == sp.raum;
+    let mut legende: Vec<(char, String)> = Vec::new();
+
+    // Wer ist wo?
+    let andere: Vec<&str> =
+        w.spieler.values().filter(|s| s.sp.name != sp.name).map(|s| s.sp.raum.as_str()).collect();
+
+    for dy in -r..=r {
+        for dx in -r..=r {
+            let (x, y) = (hier.x + dx, hier.y + dy);
+            let Some(id) = d.koordinaten.get(&(x, y, hier.z)) else { continue };
+            let Some(raum) = d.raeume.get(id) else { continue };
+            if !sichtbar(id) {
+                continue;
+            }
+            let zeile = (2 * (r - dy) + 1) as usize;
+            let mitte = (4 * (dx + r) + 2) as usize;
+
+            // Klammern und Farbe aus dem Raum oder seinem Gelände
+            let g = d.gelaende.get(&raum.gelaende);
+            let klammern = if raum.klammern.chars().count() == 2 {
+                raum.klammern.clone()
+            } else {
+                g.map(|g| g.klammern.clone()).unwrap_or_else(|| "[]".into())
+            };
+            let mut k = klammern.chars();
+            let (auf, zu) = (k.next().unwrap_or('['), k.next().unwrap_or(']'));
+            let farbe = if raum.farbe.is_empty() { g.map(|g| g.farbe.clone()).unwrap_or_default() } else { raum.farbe.clone() };
+            gitter[zeile][mitte - 1] = Zelle { zeichen: auf, farbe: farbe.clone() };
+            gitter[zeile][mitte + 1] = Zelle { zeichen: zu, farbe };
+
+            let innen = raum.symbol.chars().next();
+            let (zeichen, farbe) = if id == &sp.raum {
+                ('X', "hellgelb".to_string())
+            } else if andere.contains(&id.as_str()) {
+                ('@', "hellmagenta".to_string())
+            } else {
+                (innen.unwrap_or(' '), "hellweiss".to_string())
+            };
+            gitter[zeile][mitte] = Zelle { zeichen, farbe };
+            if let Some(c) = innen {
+                if !legende.iter().any(|(z, _)| *z == c) {
+                    legende.push((c, raum.name.clone()));
+                }
+            }
+
+            // Wege: auch solche, die aus dem Ausschnitt hinausführen
+            for (richt, ziel) in &raum.ausgaenge {
+                let (ox, oy, oz) = richt.versatz();
+                if oz != 0 || (ox, oy) == (0, 0) {
+                    continue;
+                }
+                let Some(z) = d.raeume.get(ziel) else { continue };
+                if (z.x, z.y, z.z) != (x + ox, y + oy, hier.z) {
+                    continue;
+                }
+                let (zl, sp_) = match richt {
+                    Richtung::Ost => (zeile, mitte + 2),
+                    Richtung::West => (zeile, mitte - 2),
+                    Richtung::Nord => (zeile - 1, mitte),
+                    Richtung::Sued => (zeile + 1, mitte),
+                    Richtung::Nordost => (zeile - 1, mitte + 2),
+                    Richtung::Suedwest => (zeile + 1, mitte - 2),
+                    Richtung::Nordwest => (zeile - 1, mitte - 2),
+                    Richtung::Suedost => (zeile + 1, mitte + 2),
+                    _ => continue,
+                };
+                let zeichen = match richt {
+                    Richtung::Ost | Richtung::West => '-',
+                    Richtung::Nord | Richtung::Sued => '|',
+                    Richtung::Nordost | Richtung::Suedwest => '/',
+                    _ => '\\',
+                };
+                let zelle = &mut gitter[zl][sp_];
+                zelle.zeichen = match (zelle.zeichen, zeichen) {
+                    ('/', '\\') | ('\\', '/') | ('x', _) => 'x',
+                    _ => zeichen,
+                };
+                zelle.farbe = String::new();
+            }
+        }
+    }
+
+    let mut aus = String::new();
+    if !hier.gebiet.is_empty() || hier.z != 0 {
+        let mut kopf = crate::text::gross(&hier.gebiet.replace('_', " "));
+        if hier.z != 0 {
+            if !kopf.is_empty() {
+                kopf.push_str(", ");
+            }
+            kopf.push_str(&format!("Ebene {}", hier.z));
+        }
+        aus.push_str(&format!("{{grau}}[{kopf}]{{/}}\n"));
+    }
+    aus.push_str(&rahmen(&gitter));
+
+    let mut ebenen = Vec::new();
+    for (ri, t) in [(Richtung::Hoch, "nach oben"), (Richtung::Runter, "nach unten"), (Richtung::Raus, "hinaus")] {
+        if hier.ausgaenge.contains_key(&ri) {
+            ebenen.push(t);
+        }
+    }
+    if !ebenen.is_empty() {
+        aus.push_str(&format!("{{grau}}(Hier geht es auch {}.){{/}}\n", ebenen.join(" und ")));
+    }
+    if mit_legende {
+        let mut teile = vec!["{hellgelb}X{/} du".to_string(), "{hellmagenta}@{/} andere".to_string()];
+        let mut klammern_gesehen = BTreeSet::new();
+        for g in d.gelaende.values() {
+            if g.klammern.chars().count() == 2 && klammern_gesehen.insert(g.klammern.clone()) {
+                let k: Vec<char> = g.klammern.chars().collect();
+                let namen: Vec<String> = d
+                    .gelaende
+                    .values()
+                    .filter(|x| x.klammern == g.klammern)
+                    .map(|x| x.name.clone())
+                    .collect();
+                teile.push(format!("{} {} {}", k[0], k[1], namen.join("/")));
+            }
+        }
+        for (c, name) in legende {
+            teile.push(format!("{c} {name}"));
+        }
+        for t in teile.chunks(4) {
+            aus.push_str(&format!("{}\n", t.join("   ")));
+        }
+    }
+    aus
+}
+
+/// Setzt ein Zeichengitter in einen Rahmen aus + - |.
+pub fn rahmen(gitter: &[Vec<Zelle>]) -> String {
+    let breite = gitter.first().map(|z| z.len()).unwrap_or(0);
+    let linie = format!("+{}+\n", "-".repeat(breite));
+    let mut aus = linie.clone();
+    for zeile in gitter {
+        aus.push('|');
+        for z in zeile {
+            if z.farbe.is_empty() || z.zeichen == ' ' {
+                aus.push(z.zeichen);
+            } else {
+                aus.push_str(&format!("{{{}}}{}{{/}}", z.farbe, z.zeichen));
+            }
+        }
+        aus.push_str("|\n");
+    }
+    aus.push_str(&linie);
     aus
 }

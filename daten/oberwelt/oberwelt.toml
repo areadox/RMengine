@@ -12,8 +12,10 @@
 name           = "Das Land Velmar"
 karte          = "karte.txt"
 sicht          = 6        # normale Sichtweite in Feldern
-anzeige_breite = 16       # so viele Felder links und rechts zeigt die Karte
-anzeige_hoehe  = 8        # so viele Felder oben und unten
+anzeige_breite = 8        # so viele Felder links und rechts zeigt die Karte
+anzeige_hoehe  = 4        # so viele Felder oben und unten  (8/4 = 17x9 Felder)
+stil           = "kompakt"  # "kompakt" = ein Zeichen pro Feld im Rahmen, X = du
+                            # "weit"    = mit Leerzeichen zwischen den Feldern
 gebiet         = "oberwelt"
 
 # ---------------------------------------------------------------------
@@ -47,7 +49,7 @@ beschreibungen = [
   "Angespültes Treibholz liegt zwischen Muscheln und Tang.",
 ]
 
-[feld.","]
+[feld."."]
 name   = "Grasland"
 fern   = "weites Grasland"
 farbe  = "hellgruen"
@@ -58,7 +60,7 @@ beschreibungen = [
   "Ein einzelner, knorriger Apfelbaum steht mitten in der Wiese.",
 ]
 
-[feld."."]
+[feld."="]
 name   = "Landstraße"
 fern   = "eine Straße"
 farbe  = "gelb"
@@ -68,10 +70,9 @@ beschreibungen = [
   "Die Straße ist hier mit groben Steinen ausgebessert worden.",
 ]
 
-[feld.W]
+[feld."*"]
 name   = "Dunkelwald"
 fern   = "dichten Wald"
-symbol = "♣"
 farbe  = "gruen"
 sicht  = -1              # wer im Wald steht, sieht weniger weit
 sichtbehinderung = 2     # und jedes Waldfeld dazwischen kostet 2 Felder Sicht
@@ -102,7 +103,33 @@ beschreibungen = [
   "Fauliges Wasser blubbert zwischen Schilf und toten Bäumen.",
 ]
 
+# Berge zeichnet man in karte.txt als kleine Bilder: /^\ oder /\
+# Darum bedeuten / ^ und \ alle dasselbe. (Den Rückstrich schreibt man "\\".)
+[feld."/"]
+name   = "Gebirge"
+fern   = "steile Berge"
+farbe  = "weiss"
+sicht  = 4               # oben auf dem Berg sieht man sehr weit ...
+blockiert_sicht = true   # ... aber Berge verdecken, was dahinter liegt
+hoehe  = 1               # auf einem Berg sieht man über andere Berge (Höhe 1) hinweg
+beschreibungen = [
+  "Ein steiler, steiniger Pfad windet sich über den Berghang.",
+  "Kalter Wind pfeift über den Grat. Unter dir breitet sich das Land aus.",
+]
+
 [feld."^"]
+name   = "Gebirge"
+fern   = "steile Berge"
+farbe  = "weiss"
+sicht  = 4               # oben auf dem Berg sieht man sehr weit ...
+blockiert_sicht = true   # ... aber Berge verdecken, was dahinter liegt
+hoehe  = 1               # auf einem Berg sieht man über andere Berge (Höhe 1) hinweg
+beschreibungen = [
+  "Ein steiler, steiniger Pfad windet sich über den Berghang.",
+  "Kalter Wind pfeift über den Grat. Unter dir breitet sich das Land aus.",
+]
+
+[feld."\\"]
 name   = "Gebirge"
 fern   = "steile Berge"
 farbe  = "weiss"
@@ -117,7 +144,7 @@ beschreibungen = [
 [feld.A]
 name     = "Hochgebirge"
 fern     = "unbezwingbare Gipfel"
-symbol   = "A"
+symbol   = "^"                # in karte.txt "A", im Spiel als ^ zu sehen
 farbe    = "hellweiss"
 begehbar = false
 blockiert_sicht = true
@@ -156,7 +183,7 @@ beschreibung = "Die Straße endet an einem schmalen Pfad, der tiefer in den Dunk
 x      = 15
 y      = 4
 name   = "Der Steinkreis"
-symbol = "*"
+symbol = "+"
 farbe  = "hellcyan"
 beschreibung = """
 Auf einem windumtosten Gipfel stehen zwölf uralte {hellcyan}Steine{/} im Kreis.

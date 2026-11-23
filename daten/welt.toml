@@ -16,7 +16,9 @@ Hier beginnt dein Abenteuer."""
 admins = ["Admin"]
 
 karte_beim_umsehen  = true        # Bei jedem "schau" die kleine Karte zeigen
-karten_radius       = 3           # Wie viele Räume in jede Richtung zu sehen sind
+karten_radius       = 1           # Räume in jede Richtung (1 = 3x3 Räume; "karte" zeigt mehr)
+stadtkarte_stil     = "kasten"    # "kasten" = ( ) und [ ] im Rahmen, "linien" = ein Zeichen pro Raum
+karten_hintergrund  = "*"         # Füllzeichen für leere Stellen
 nur_besuchte_raeume_auf_karte = false   # true = "Nebel des Krieges"
 ausgaenge_beidseitig = true       # Rückwege automatisch anlegen
 
@@ -49,6 +51,8 @@ weisheit     = 10
 
 # ---------------------------------------------------------------------
 # Geländearten: So sehen Räume auf der Karte aus
+# klammern: Kästchen auf der Stadtkarte, z.B. "()" draußen, "[]" Gebäude
+# symbol:   nur für den Stil "linien" (im Kästchen steht das symbol des Raums)
 # Farben: rot gruen gelb blau magenta cyan weiss grau schwarz
 #         hellrot hellgruen hellgelb hellblau hellmagenta hellcyan hellweiss
 # ---------------------------------------------------------------------
@@ -56,43 +60,52 @@ weisheit     = 10
 name   = "Platz"
 symbol = "+"
 farbe  = "hellgelb"
+klammern = "()"
 
 [gelaende.strasse]
 name   = "Straße"
 symbol = "."
 farbe  = "weiss"
+klammern = "()"
 
 [gelaende.haus]
 name   = "Gebäude"
 symbol = "#"
 farbe  = "hellweiss"
+klammern = "[]"
 
 [gelaende.tempel]
 name   = "Tempel"
 symbol = "T"
 farbe  = "hellcyan"
+klammern = "[]"
 
 [gelaende.wald]
 name   = "Wald"
 symbol = "♣"
 farbe  = "gruen"
+klammern = "{}"
 
 [gelaende.lichtung]
 name   = "Wiese"
 symbol = "\""
 farbe  = "hellgruen"
+klammern = "()"
 
 [gelaende.wasser]
 name   = "Wasser"
 symbol = "~"
 farbe  = "hellblau"
+klammern = "()"
 
 [gelaende.berg]
 name   = "Fels"
 symbol = "^"
 farbe  = "grau"
+klammern = "<>"
 
 [gelaende.hoehle]
 name   = "Höhle"
 symbol = "o"
 farbe  = "grau"
+klammern = "<>"

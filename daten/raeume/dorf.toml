@@ -1,6 +1,7 @@
 # =====================================================================
 #  Das Dorf Eichenhain
 # =====================================================================
+#  symbol: Buchstabe im Kästchen auf der Karte, z.B. K = Kneipe, T = Tempel
 #  Koordinaten: x wird nach OSTEN größer, y nach NORDEN, z nach OBEN.
 #  Ausgänge: nord, nordost, ost, suedost, sued, suedwest, west, nordwest, hoch, runter
 #  Der Rückweg wird automatisch angelegt (siehe welt.toml).
@@ -39,6 +40,7 @@ ausgaenge = { nord = "nordtor" }
 [[raum]]
 id       = "marktstand"
 name     = "Ein Marktstand"
+symbol   = "M"
 x = 1
 y = 1
 gebiet   = "dorf"
@@ -64,6 +66,7 @@ ausgaenge = { nord = "waldrand" }
 [[raum]]
 id       = "taverne"
 name     = "Taverne 'Zum Goldenen Eber'"
+symbol   = "K"
 x = 1
 y = 0
 gebiet   = "dorf"
@@ -77,6 +80,7 @@ monster   = ["wirt"]
 [[raum]]
 id       = "gaestezimmer"
 name     = "Ein Gästezimmer"
+symbol   = "Z"
 x = 1
 y = 0
 z = 1
@@ -113,6 +117,7 @@ monster   = ["ratte"]
 [[raum]]
 id       = "schmiede"
 name     = "Die Schmiede"
+symbol   = "S"
 x = -1
 y = 0
 gebiet   = "dorf"
@@ -126,6 +131,7 @@ gegenstaende = ["kurzschwert", "holzschild", "amboss"]
 [[raum]]
 id       = "tempel"
 name     = "Der kleine Tempel"
+symbol   = "T"
 x = 0
 y = -1
 gebiet   = "dorf"
@@ -142,6 +148,7 @@ fenster = "Das Fenster zeigt eine Eiche unter einem goldenen Sonnenaufgang."
 [[raum]]
 id       = "osttor"
 name     = "Das Osttor"
+symbol   = "E"
 x = 2
 y = 1
 gebiet   = "dorf"

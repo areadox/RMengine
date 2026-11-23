@@ -123,17 +123,44 @@ Passt ein Ausgang nicht zu den Koordinaten (Ausgang `ost`, aber der Zielraum lie
 nicht genau östlich), bekommst du eine Warnung. Der Ausgang funktioniert trotzdem,
 nur die Linie fehlt auf der Karte.
 
+### Die Stadtkarte
+
+Jeder Raum ist ein Kästchen. In der Mitte steht das `symbol` des Raums, `X` bist
+du, `@` sind andere Spieler:
+
+```
++-------------+
+|******|******|
+|*****( )*(M)-|
+|******|*/****|
+|*[S]-(X)-[K]*|
+|******|******|
+|*****[T]*****|
+|*************|
++-------------+
+```
+
+In `welt.toml` stellst du ein:
+
+```toml
+karten_radius      = 1          # 1 = 3x3 Räume; der Befehl "karte" zeigt mehr
+stadtkarte_stil    = "kasten"   # oder "linien": ein Zeichen pro Raum, ohne Rahmen
+karten_hintergrund = "*"        # Füllzeichen, z.B. "*" oder " "
+```
+
 ### Geländearten (in welt.toml)
 
 ```toml
-[gelaende.wald]
-name   = "Wald"      # erscheint in der Legende
-symbol = "♣"         # genau ein Zeichen
-farbe  = "gruen"
+[gelaende.haus]
+name     = "Gebäude"   # erscheint in der Legende
+klammern = "[]"        # Kästchen auf der Karte: "()" draußen, "[]" Gebäude, "{}" Wald ...
+symbol   = "#"         # nur für den Stil "linien"
+farbe    = "hellweiss"
 ```
 
-Auf der Karte steht `@` für dich selbst und `*` für andere Spieler. Verbindungen
-werden als `- | / \` gezeichnet.
+Den Buchstaben im Kästchen bestimmt der Raum selbst, zum Beispiel
+`symbol = "K"` für die Kneipe. Mit `klammern = "<>"` kann ein einzelner Raum auch
+eigene Klammern bekommen.
 
 ---
 
@@ -149,16 +176,39 @@ daten/oberwelt/
   oberwelt.toml    was die Zeichen bedeuten, Eingänge, besondere Orte
 ```
 
-`karte.txt` sieht so aus (Norden ist oben):
+`karte.txt` ist ein ASCII-Bild der Landschaft, und so erscheint sie auch im Spiel
+(Norden ist oben):
 
 ```
-~~~~AAAA^^^^,,,,,WWWWWWW,,,,~~~
-~~~AAA^^^.^,,,,,,WWW.WWW,,,,,~~
-~~~~~^^,,....,,,,,,,.,,,,,,,,~~
-~~~~~,,,,,,,..........,,,%%%,~~
+~~~~AAAA/^\/^.....*******....~~~
+~~~AAA/^\=\/......***=***.....~~
+~~~~~/\..====.......=........~~
+~~~~~...........=======...%%%.~~
 ```
 
-Ein Leerzeichen bedeutet: Hier ist nichts.
+Ein Leerzeichen bedeutet: Hier ist nichts. Berge kannst du als kleine Bilder
+zeichnen (`/^\`, `/\`): Du erklärst einfach `/`, `^` und `\` alle als
+„Gebirge“.
+
+Im Spiel sieht man einen Ausschnitt im Rahmen. `X` bist du, Felder außer Sicht
+bleiben leer:
+
+```
++-----------------+
+|        ~~~~~~~~~|
+|    ^^^^/^\/^....|
+|  ^/^\/+\/.....**|
+|^\/^\/=\X.....** |
+|/^\..=..........*|
++-----------------+
+```
+
+```toml
+[oberwelt]
+anzeige_breite = 8          # Felder links und rechts (8 und 4 ergeben 17x9)
+anzeige_hoehe  = 4          # Felder oben und unten
+stil           = "kompakt"  # oder "weit": Leerzeichen zwischen den Feldern, ohne Rahmen
+```
 
 ### Zeichen erklären
 
@@ -177,6 +227,7 @@ beschreibungen = ["Alte Eichen ...", "Farne wachsen ..."]  # Abwechslung
 ```
 
 Zeichen wie `~`, `.` oder `%` müssen in Anführungszeichen stehen: `[feld."~"]`.
+Den Rückstrich schreibt man doppelt: `[feld."\\"]`.
 
 ### Sicht
 

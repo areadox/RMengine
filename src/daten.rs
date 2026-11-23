@@ -179,6 +179,10 @@ pub struct WeltConfig {
     pub regeneration_lp: i32,
     pub regeneration_mp: i32,
     pub spieler_verzeichnis: String,
+    /// "kasten" = Räume als ( ) und [ ] in einem Rahmen, "linien" = ein Zeichen pro Raum
+    pub stadtkarte_stil: String,
+    /// Füllzeichen für leere Stellen der Stadtkarte
+    pub karten_hintergrund: String,
 }
 
 impl Default for WeltConfig {
@@ -199,6 +203,8 @@ impl Default for WeltConfig {
             regeneration_lp: 1,
             regeneration_mp: 1,
             spieler_verzeichnis: "spieler".into(),
+            stadtkarte_stil: "kasten".into(),
+            karten_hintergrund: "*".into(),
         }
     }
 }
@@ -235,11 +241,13 @@ pub struct GelaendeDef {
     pub name: String,
     pub symbol: String,
     pub farbe: String,
+    /// Klammern um den Raum auf der Stadtkarte, z.B. "()" draußen, "[]" Gebäude
+    pub klammern: String,
 }
 
 impl Default for GelaendeDef {
     fn default() -> Self {
-        GelaendeDef { name: String::new(), symbol: "#".into(), farbe: String::new() }
+        GelaendeDef { name: String::new(), symbol: "#".into(), farbe: String::new(), klammern: "[]".into() }
     }
 }
 
@@ -276,6 +284,8 @@ pub struct RaumDef {
     pub symbol: String,
     #[serde(default)]
     pub farbe: String,
+    #[serde(default)]
+    pub klammern: String,
     #[serde(default, rename = "ausgaenge")]
     pub ausgaenge_roh: BTreeMap<String, String>,
     #[serde(default)]
@@ -763,6 +773,12 @@ fn pruefen(d: &mut Daten, fehler: &mut Vec<String>, warn: &mut Vec<String>) {
     } else {
         raum_verweis(d, &d.welt.startraum, "welt.toml (startraum)", fehler);
     }
+    if !["kasten", "linien"].contains(&d.welt.stadtkarte_stil.as_str()) {
+        fehler.push("welt.toml: 'stadtkarte_stil' muss \"kasten\" oder \"linien\" sein.".into());
+    }
+    if d.welt.karten_hintergrund.chars().count() != 1 {
+        fehler.push("welt.toml: 'karten_hintergrund' muss genau ein Zeichen sein (z.B. \"*\" oder \" \").".into());
+    }
     if d.welt.takt_sekunden == 0 {
         fehler.push("welt.toml: 'takt_sekunden' muss mindestens 1 sein.".into());
     }
@@ -779,6 +795,9 @@ fn pruefen(d: &mut Daten, fehler: &mut Vec<String>, warn: &mut Vec<String>) {
         let wo = format!("welt.toml [gelaende.{id}]");
         if g.symbol.chars().count() != 1 {
             fehler.push(format!("{wo}: 'symbol' muss genau ein Zeichen sein."));
+        }
+        if g.klammern.chars().count() != 2 {
+            fehler.push(format!("{wo}: 'klammern' müssen genau zwei Zeichen sein, z.B. \"()\" oder \"[]\"."));
         }
         farbe_pruefen(&g.farbe, &wo, fehler);
     }
@@ -812,6 +831,9 @@ fn pruefen(d: &mut Daten, fehler: &mut Vec<String>, warn: &mut Vec<String>) {
         }
         if r.symbol.chars().count() > 1 {
             fehler.push(format!("{wo}: 'symbol' muss genau ein Zeichen sein."));
+        }
+        if !r.klammern.is_empty() && r.klammern.chars().count() != 2 {
+            fehler.push(format!("{wo}: 'klammern' müssen genau zwei Zeichen sein, z.B. \"()\"."));
         }
         farbe_pruefen(&r.farbe, &wo, fehler);
         for g in &r.gegenstaende {

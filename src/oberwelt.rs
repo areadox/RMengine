@@ -13,6 +13,7 @@
 //! Norden ist oben.
 
 use crate::daten::{RaumDef, Richtung};
+use crate::karte::Zelle;
 use crate::text::{self, aufzaehlen};
 use serde::Deserialize;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -64,6 +65,8 @@ pub struct OberweltConfig {
     pub anzeige_breite: i32,
     pub anzeige_hoehe: i32,
     pub gebiet: String,
+    /// "kompakt" = ein Zeichen pro Feld im Rahmen, "weit" = mit Abständen
+    pub stil: String,
 }
 
 impl Default for OberweltConfig {
@@ -72,9 +75,10 @@ impl Default for OberweltConfig {
             name: "Oberwelt".into(),
             karte: "karte.txt".into(),
             sicht: 6,
-            anzeige_breite: 16,
-            anzeige_hoehe: 8,
+            anzeige_breite: 8,
+            anzeige_hoehe: 4,
             gebiet: "oberwelt".into(),
+            stil: "kompakt".into(),
         }
     }
 }
@@ -269,6 +273,9 @@ pub fn laden(ordner: &Path, fehler: &mut Vec<String>) -> Option<Oberwelt> {
         hoehe,
     };
 
+    if !["kompakt", "weit"].contains(&ow.cfg.stil.as_str()) {
+        fehler.push("oberwelt.toml: 'stil' muss \"kompakt\" oder \"weit\" sein.".into());
+    }
     let mut belegt = BTreeSet::new();
     for e in &ow.eingaenge {
         let wo = format!("oberwelt.toml, Eingang '{}' ({}, {})", e.name, e.x, e.y);
@@ -456,6 +463,7 @@ impl Oberwelt {
             gelaende: String::new(),
             symbol: symbol.to_string(),
             farbe,
+            klammern: String::new(),
             ausgaenge_roh: BTreeMap::new(),
             details: ort
                 .map(|o| o.details.iter().map(|(k, v)| (text::normalisieren(k), v.clone())).collect())
@@ -469,26 +477,24 @@ impl Oberwelt {
 
     /// "Im Norden und Nordosten siehst du hohe Berge."
     fn umgebung_text(&self, x: i32, y: i32) -> String {
-        let hier = self.zeichen(x, y);
-        let mut gruppen: Vec<(char, Vec<String>)> = Vec::new();
+        // Nach Geländename gruppieren, damit z.B. / ^ \ zusammen "Gebirge" sind.
+        let hier = self.feld(x, y).map(|f| f.name.clone());
+        let mut gruppen: Vec<(String, Vec<String>)> = Vec::new();
         for r in ACHT {
             let (nx, ny) = nachbar(x, y, r);
-            let Some(c) = self.zeichen(nx, ny) else { continue };
-            if Some(c) == hier {
+            let Some(f) = self.feld(nx, ny) else { continue };
+            if Some(&f.name) == hier.as_ref() {
                 continue;
             }
-            match gruppen.iter_mut().find(|(g, _)| *g == c) {
+            let was = if f.fern.is_empty() { f.name.clone() } else { f.fern.clone() };
+            match gruppen.iter_mut().find(|(g, _)| *g == was) {
                 Some((_, liste)) => liste.push(r.anzeige().to_string()),
-                None => gruppen.push((c, vec![r.anzeige().to_string()])),
+                None => gruppen.push((was, vec![r.anzeige().to_string()])),
             }
         }
         let saetze: Vec<String> = gruppen
             .into_iter()
-            .filter_map(|(c, richtungen)| {
-                let f = self.felder.get(&c)?;
-                let was = if f.fern.is_empty() { f.name.clone() } else { f.fern.clone() };
-                Some(format!("Im {} siehst du {}.", aufzaehlen(&richtungen), was))
-            })
+            .map(|(was, richtungen)| format!("Im {} siehst du {}.", aufzaehlen(&richtungen), was))
             .collect();
         saetze.join(" ")
     }
@@ -519,67 +525,82 @@ impl Oberwelt {
     // -----------------------------------------------------------------------
 
     /// Der Ausschnitt rund um den Spieler, so weit er sehen kann.
+    /// Stil "kompakt": ein Zeichen pro Feld im Rahmen, X = du.
+    /// Stil "weit": ein Zeichen und ein Leerzeichen pro Feld, ohne Rahmen.
     pub fn karte_zeichnen(&self, x: i32, y: i32, andere: &[(i32, i32)], mit_legende: bool) -> String {
         let (rx, ry) = (self.cfg.anzeige_breite.max(1), self.cfg.anzeige_hoehe.max(1));
+        let kompakt = self.cfg.stil != "weit";
         let weite = self.sichtweite(x, y);
         let mut gesehen: BTreeSet<char> = BTreeSet::new();
         let mut orte_gesehen: Vec<(char, String, String)> = Vec::new();
+        let ich = if kompakt { 'X' } else { '@' };
 
-        let mut zeilen = Vec::new();
+        let mut gitter: Vec<Vec<Zelle>> = Vec::new();
         for ty in y - ry..=y + ry {
-            let mut z = String::new();
+            let mut z = Vec::new();
             for tx in x - rx..=x + rx {
-                if (tx, ty) == (x, y) {
-                    z.push_str("{hellgelb}{fett}@{/} ");
-                    continue;
-                }
-                if !self.sieht(x, y, tx, ty, weite) {
-                    z.push_str("  ");
-                    continue;
-                }
-                if andere.contains(&(tx, ty)) {
-                    z.push_str("{hellmagenta}*{/} ");
-                    continue;
-                }
-                let Some((sym, farbe)) = self.symbol(tx, ty) else {
-                    z.push_str("  ");
-                    continue;
+                let zelle = if (tx, ty) == (x, y) {
+                    Zelle { zeichen: ich, farbe: "hellgelb".into() }
+                } else if !self.sieht(x, y, tx, ty, weite) {
+                    Zelle { zeichen: ' ', farbe: String::new() }
+                } else if andere.contains(&(tx, ty)) {
+                    Zelle { zeichen: '@', farbe: "hellmagenta".into() }
+                } else if let Some((sym, farbe)) = self.symbol(tx, ty) {
+                    if let Some(e) = self.eingang_bei(tx, ty) {
+                        orte_gesehen.push((sym, e.farbe.clone(), e.name.clone()));
+                    } else if let Some(o) = self.ort_bei(tx, ty).filter(|o| !o.symbol.is_empty()) {
+                        orte_gesehen.push((sym, farbe.clone(), o.name.clone()));
+                    } else if let Some(c) = self.zeichen(tx, ty) {
+                        gesehen.insert(c);
+                    }
+                    Zelle { zeichen: sym, farbe }
+                } else {
+                    Zelle { zeichen: ' ', farbe: String::new() }
                 };
-                if let Some(e) = self.eingang_bei(tx, ty) {
-                    orte_gesehen.push((sym, e.farbe.clone(), e.name.clone()));
-                } else if let Some(c) = self.zeichen(tx, ty) {
-                    gesehen.insert(c);
+                z.push(zelle);
+                if !kompakt {
+                    z.push(Zelle { zeichen: ' ', farbe: String::new() });
                 }
-                z.push_str(&farbig(sym, &farbe));
-                z.push(' ');
             }
-            zeilen.push(z.trim_end().to_string());
+            gitter.push(z);
         }
-        let erste = zeilen.iter().position(|z| !z.is_empty()).unwrap_or(0);
-        let letzte = zeilen.iter().rposition(|z| !z.is_empty()).unwrap_or(0);
 
         let feldname = self.feld(x, y).map(|f| f.name.clone()).unwrap_or_default();
         let mut aus = format!("{{grau}}[{} – {feldname} – Sicht {weite}]{{/}}\n", self.cfg.name);
-        for z in &zeilen[erste..=letzte] {
-            aus.push_str("  ");
-            aus.push_str(z);
-            aus.push('\n');
+        if kompakt {
+            aus.push_str(&crate::karte::rahmen(&gitter));
+        } else {
+            for z in &gitter {
+                let mut t = String::from("  ");
+                for c in z {
+                    t.push_str(&farbig(c.zeichen, &c.farbe));
+                }
+                aus.push_str(t.trim_end());
+                aus.push('\n');
+            }
         }
         if mit_legende {
-            let mut teile = vec!["{hellgelb}@{/} du".to_string(), "{hellmagenta}*{/} andere".to_string()];
+            let mut teile = vec![format!("{{hellgelb}}{ich}{{/}} du"), "{hellmagenta}@{/} andere".to_string()];
             for (sym, farbe, name) in orte_gesehen {
                 let eintrag = format!("{} {name}", farbig(sym, &farbe));
                 if !teile.contains(&eintrag) {
                     teile.push(eintrag);
                 }
             }
+            // Gleichnamige Felder (z.B. / ^ \ = Gebirge) zusammenfassen
+            let mut nach_name: Vec<(String, String)> = Vec::new();
             for c in gesehen {
                 if let Some(f) = self.felder.get(&c) {
-                    teile.push(format!("{} {}", farbig(f.symbol.chars().next().unwrap_or(c), &f.farbe), f.name));
+                    let sym = farbig(f.symbol.chars().next().unwrap_or(c), &f.farbe);
+                    match nach_name.iter_mut().find(|(n, _)| *n == f.name) {
+                        Some((_, s)) => s.push_str(&sym),
+                        None => nach_name.push((f.name.clone(), sym)),
+                    }
                 }
             }
-            for teil in teile.chunks(6) {
-                aus.push_str(&format!("  {}\n", teil.join("   ")));
+            teile.extend(nach_name.into_iter().map(|(n, s)| format!("{s} {n}")));
+            for teil in teile.chunks(5) {
+                aus.push_str(&format!("{}\n", teil.join("   ")));
             }
         }
         aus
@@ -587,12 +608,12 @@ impl Oberwelt {
 
     /// Die ganze Oberwelt auf einen Blick (ein Zeichen pro Feld).
     pub fn weltkarte(&self, x: i32, y: i32) -> String {
-        let mut aus = format!("{{fett}}{}{{/}}  {{grau}}(Norden ist oben, @ = du){{/}}\n", self.cfg.name);
+        let mut aus = format!("{{fett}}{}{{/}}  {{grau}}(Norden ist oben, X = du){{/}}\n", self.cfg.name);
         for ty in 1..=self.hoehe {
             let mut z = String::new();
             for tx in 1..=self.breite {
                 if (tx, ty) == (x, y) {
-                    z.push_str("{hellgelb}{fett}@{/}");
+                    z.push_str("{hellgelb}{fett}X{/}");
                 } else if let Some((sym, farbe)) = self.symbol(tx, ty) {
                     z.push_str(&farbig(sym, &farbe));
                 } else {
