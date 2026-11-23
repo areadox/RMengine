@@ -19,6 +19,15 @@ pub struct Sitzung {
     /// Die tatsächliche Rolle: gespeicherte Rolle oder welt.toml, je nachdem was höher ist
     pub rolle: Rolle,
     pub abklingzeiten: HashMap<String, Instant>,
+    /// Das Monster, das man gerade angreift
+    pub kampf_ziel: Option<u64>,
+    /// Ab wann man wieder angreifen kann
+    pub bereit_ab: Instant,
+    pub haltung: crate::kampf::Haltung,
+    /// Solange weicht man Angriffen besser aus
+    pub ausweichen_bis: Option<Instant>,
+    /// Tot: bis dahin können andere helfen, danach Wiederbelebung im Tempel
+    pub tot_bis: Option<Instant>,
 }
 
 impl Sitzung {
@@ -43,6 +52,10 @@ pub struct Monster {
     pub heimat: String,
     pub lebenspunkte: i32,
     pub mana: i32,
+    /// Spieler, gegen die das Monster kämpft
+    pub ziele: Vec<u64>,
+    /// Ab wann es wieder angreifen kann
+    pub bereit_ab: Instant,
 }
 
 /// Gespeicherte Rolle – aber wer in welt.toml unter admins/baumeister steht,
@@ -114,6 +127,8 @@ impl Welt {
             heimat: raum.to_string(),
             lebenspunkte: m.lebenspunkte,
             mana: m.mana,
+            ziele: Vec::new(),
+            bereit_ab: Instant::now(),
         };
         let id = self.neue_id();
         self.monster.insert(id, monster);
@@ -217,6 +232,16 @@ impl Welt {
         rolle_berechnen(&self.d, sp)
     }
 
+    /// Hier erwacht man nach dem Tod.
+    pub fn wiederbelebungsraum(&self) -> String {
+        let r = &self.d.kampf.wiederbelebung_raum;
+        if !r.is_empty() && self.d.raum_existiert(r) {
+            r.clone()
+        } else {
+            self.d.welt.startraum.clone()
+        }
+    }
+
     pub fn ist_online(&self, name: &str) -> bool {
         self.spieler.values().any(|s| s.sp.name.eq_ignore_ascii_case(name))
     }
@@ -234,6 +259,8 @@ impl Welt {
             fertigkeiten: st.fertigkeiten.clone(),
             zauber: st.zauber.clone(),
             werte: st.werte.clone(),
+            ausdauer: self.d.kampf.ausdauer,
+            max_ausdauer: self.d.kampf.ausdauer,
             erstellt: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .map(|d| d.as_secs())
@@ -251,6 +278,12 @@ impl Welt {
         if !self.d.raum_existiert(&sp.raum) {
             sp.raum = self.d.welt.startraum.clone();
         }
+        // Wer tot ausgeloggt hat, erwacht im Tempel
+        if sp.ist_tot {
+            sp.ist_tot = false;
+            sp.raum = self.wiederbelebungsraum();
+            sp.lebenspunkte = (sp.max_lebenspunkte * self.d.kampf.wiederbelebung_lp_prozent / 100).max(1);
+        }
         if !crate::oberwelt::ist_oberwelt(&sp.raum) {
             sp.besucht.insert(sp.raum.clone());
         }
@@ -258,7 +291,17 @@ impl Welt {
         let name = sp.name.clone();
         let raum = sp.raum.clone();
         let id = self.neue_id();
-        self.spieler.insert(id, Sitzung { sp, sender, rolle, abklingzeiten: HashMap::new() });
+        self.spieler.insert(id, Sitzung {
+                sp,
+                sender,
+                rolle,
+                abklingzeiten: HashMap::new(),
+                kampf_ziel: None,
+                bereit_ab: Instant::now(),
+                haltung: crate::kampf::Haltung::Ausgewogen,
+                ausweichen_bis: None,
+                tot_bis: None,
+            });
         self.sende_raum(&raum, &format!("{name} erscheint."), &[id]);
         self.sende_ankuendigung(&format!("{{grau}}[{name} hat die Welt betreten.]{{/}}"), &[id]);
         println!("Anmeldung: {name}");
@@ -297,10 +340,26 @@ impl Welt {
         // Erholung
         let (lp, mp) = (self.d.welt.regeneration_lp, self.d.welt.regeneration_mp);
         let takt = self.d.welt.takt_sekunden;
+        let ausdauer = self.d.kampf.ausdauer_erholung;
         for s in self.spieler.values_mut() {
             s.sp.spielzeit += takt;
+            if s.tot_bis.is_some() {
+                continue; // Tote erholen sich nicht
+            }
+            s.sp.ausdauer = (s.sp.ausdauer + ausdauer).min(s.sp.max_ausdauer);
             s.sp.lebenspunkte = (s.sp.lebenspunkte + lp).min(s.sp.max_lebenspunkte);
             s.sp.mana = (s.sp.mana + mp).min(s.sp.max_mana);
+        }
+
+        // Monster erholen sich, wenn sie nicht kämpfen
+        let prozent = self.d.kampf.monster_erholung_prozent;
+        for m in self.monster.values_mut() {
+            if m.ziele.is_empty() {
+                if let Some(def) = self.d.monster.get(&m.def) {
+                    let plus = (def.lebenspunkte * prozent / 100).max(1);
+                    m.lebenspunkte = (m.lebenspunkte + plus).min(def.lebenspunkte);
+                }
+            }
         }
 
         self.monster_handeln();
@@ -325,6 +384,9 @@ impl Welt {
 
         for (id, m) in &self.monster {
             let Some(def) = self.d.monster.get(&m.def) else { continue };
+            if !m.ziele.is_empty() {
+                continue; // wer kämpft, wandert nicht und plaudert nicht
+            }
             let ausgaenge = self.d.ausgaenge(&m.raum);
 
             if def.wandert && rng.gen_range(0..100) < def.wander_chance {

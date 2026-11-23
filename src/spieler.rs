@@ -76,6 +76,17 @@ pub struct SpielerDaten {
     /// Erstellt am (Sekunden seit 1970)
     pub erstellt: u64,
     pub einstellungen: Einstellungen,
+    /// Stufe und Erfahrung in der aktuellen Stufe
+    pub stufe: u32,
+    pub erfahrung: u64,
+    /// Noch zu verteilende Punkte (Befehl: steigere)
+    pub freie_punkte: u32,
+    pub ausdauer: i32,
+    pub max_ausdauer: i32,
+    pub tode: u32,
+    pub siege: u32,
+    /// Liegt gerade tot am Boden und wartet auf Wiederbelebung
+    pub ist_tot: bool,
 }
 
 /// Alles, was man im Spielerbuch einstellen kann.
@@ -89,6 +100,10 @@ pub struct Einstellungen {
     pub prompt: bool,
     pub ankuendigungen: bool,
     pub npc_sprueche: bool,
+    /// Im Kampf automatisch weiter angreifen
+    pub autoangriff: bool,
+    /// Schadenszahlen im Kampf anzeigen
+    pub kampfzahlen: bool,
 }
 
 impl Default for Einstellungen {
@@ -101,6 +116,8 @@ impl Default for Einstellungen {
             prompt: true,
             ankuendigungen: true,
             npc_sprueche: true,
+            autoangriff: true,
+            kampfzahlen: true,
         }
     }
 }
@@ -129,6 +146,14 @@ impl Default for SpielerDaten {
             spielzeit: 0,
             erstellt: 0,
             einstellungen: Einstellungen::default(),
+            stufe: 1,
+            erfahrung: 0,
+            freie_punkte: 0,
+            ausdauer: 100,
+            max_ausdauer: 100,
+            tode: 0,
+            siege: 0,
+            ist_tot: false,
         }
     }
 }

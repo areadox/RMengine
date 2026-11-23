@@ -664,7 +664,115 @@ Antwort, die mit `*` beginnt, ist eine Handlung („*nickt.“).
 
 ---
 
-## 10. Fertigkeiten
+## 10. Kampf, Stufen und Tod
+
+Gekämpft wird **in Echtzeit, ohne Runden**. Jeder Angriff hat eine
+**Erholungszeit**: Mit einem Dolch schlägt man alle 1,3 Sekunden zu, mit einer
+schweren Axt nur alle 4 Sekunden, dafür viel härter. Monster handeln nach ihrem
+eigenen Takt. Bewegen, Tränke trinken, Reden und Zaubern geht jederzeit. Nur
+aus dem Raum gehen kann man nicht einfach, dafür muss man **fliehen**.
+Gegen andere Spieler wird nicht gekämpft.
+
+### Für Spieler
+
+| Befehl                  | Wirkung                                                         |
+|-------------------------|------------------------------------------------------------------|
+| `toete <monster>`       | angreifen; danach geht es automatisch weiter (abschaltbar im Spielerbuch) |
+| `schaetze <monster>`    | Wie gefährlich ist es im Vergleich zu dir?                       |
+| `ausweichen`            | 2,5 Sekunden lang treffen Angriffe viel seltener (kostet Ausdauer) |
+| `haltung <art>`         | `angriffslustig` (mehr Schaden, mehr einstecken), `ausgewogen`, `defensiv` |
+| `flieh`                 | in eine zufällige Richtung fliehen; klappt nicht immer           |
+| `stopp`                 | nicht mehr angreifen                                             |
+| `steigere <wert>`       | Punkte aus dem Stufenaufstieg verteilen, z.B. `steigere staerke` |
+| `wiederbeleben <name>`  | einen toten Mitspieler zurückholen                               |
+| `aufgeben`              | als Toter sofort im Tempel erwachen                              |
+
+Der Prompt zeigt Lebenspunkte (LP), Mana (MP), Ausdauer (AP) und den Zustand
+des Gegners: `LP 80/100 MP 50/50 AP 85/100 [Eine fette Ratte: schwer verletzt]`.
+
+**So wird gerechnet:**
+- **Treffer:** Geschick, die Fertigkeit der Waffe und der Stufenunterschied zählen.
+- **Schaden:** Waffenschaden plus Stärke und Fertigkeit, minus Rüstung des Gegners.
+- **Erholungszeit:** Hohes Geschick verkürzt sie.
+- **Ausdauer:** Jeder Angriff kostet etwas. Wer erschöpft ist, trifft schwächer und braucht länger.
+- **Kampfzauber:** Die Wirkung `schaden` trifft Monster. Intelligenz verstärkt sie.
+- **Übung:** Durch Benutzen steigt die Fertigkeit der Waffe.
+
+### Stufen und Erfahrung
+
+Für besiegte Monster gibt es Erfahrungspunkte, und zwar für jeden, der
+mitgekämpft hat. Mit jeder neuen Stufe bekommt man mehr Lebenspunkte, Mana und
+Ausdauer, wird ganz geheilt und erhält Punkte, die man mit `steigere` auf die
+Werte verteilt. Die Fertigkeiten steigen zusätzlich durch Benutzen.
+
+### Tod und Wiederbelebung
+
+Wer stirbt, bleibt leblos liegen. Alle Spieler erfahren, wo jemand Hilfe
+braucht. Innerhalb von 5 Minuten kann ein anderer Spieler am selben Ort
+`wiederbeleben <name>` eingeben, dann geht es dort weiter. Sonst, oder sofort
+mit `aufgeben`, erwacht man im Tempel. Es geht nichts verloren. Solange man
+tot ist, kann man nur reden, schauen und aufgeben.
+
+### Einstellungen in welt.toml
+
+```toml
+[kampf]
+auto_angriff         = true
+waffenlos_schaden    = 2
+waffenlos_erholung   = 2.5      # Sekunden
+zauber_erholung      = 2.0
+ausdauer             = 100
+ausdauer_pro_angriff = 5
+ausdauer_erholung    = 3        # pro Takt
+ep_basis             = 100      # Erfahrung für Stufe 2: 100, dann 283, 520 ...
+ep_faktor            = 1.5
+lp_pro_stufe         = 10
+mp_pro_stufe         = 5
+ausdauer_pro_stufe   = 5
+punkte_pro_stufe     = 2
+wiederbelebung_raum  = "tempel"
+tod_wartezeit        = 300      # Sekunden, in denen andere helfen können
+wiederbelebung_lp_prozent = 50
+tod_ep_verlust_prozent    = 0   # später z.B. 10
+tod_gegenstaende     = "behalten"   # oder "fallen_lassen"
+monster_erholung_prozent  = 5
+```
+
+### Waffen und Rüstungen
+
+```toml
+[[gegenstand]]
+id    = "kurzschwert"
+platz = "waffe"
+eigenschaften = { schaden = 6, staerke = 1 }   # staerke = Bonus, solange angelegt
+erholung   = 2.0             # Sekunden zwischen zwei Angriffen
+fertigkeit = "schwertkampf"  # wird benutzt und geübt
+
+[[gegenstand]]
+id    = "holzschild"
+platz = "schild"
+eigenschaften = { ruestung = 3 }   # zieht 3 von jedem Treffer ab
+```
+
+### Monster im Kampf
+
+```toml
+aggressiv  = true                   # greift von selbst an
+schaden    = 8                      # ohne Angabe: 2 + 2 * stufe
+ruestung   = 1
+erholung   = 2.8                    # Sekunden zwischen zwei Angriffen
+angriffe   = ["beißt", "springt"]  # "Der Wolf beißt dich."
+erfahrung  = 120                    # ohne Angabe: aus Stufe und Lebenspunkten
+todestext  = "*jault auf und bricht zusammen."
+zauber     = ["feuerpfeil"]         # Kampfzauber, wenn das Mana reicht
+angreifbar = false                  # z.B. für friedliche Tiere (NPCs: Standard)
+```
+
+Admins können mit `erfahrung <spieler> <menge>` zum Testen Erfahrung vergeben.
+
+---
+
+## 11. Fertigkeiten
 
 ```toml
 [[fertigkeit]]
@@ -680,7 +788,7 @@ beschreibung = "Wunden heilen."
 
 ---
 
-## 11. Zauber
+## 12. Zauber
 
 ```toml
 [[zauber]]
@@ -715,7 +823,7 @@ Mit dem Zaubern übt man die zugehörige Fertigkeit und kann dabei aufsteigen.
 
 ---
 
-## 12. Rollen: Spieler, Baumeister, Admin
+## 13. Rollen: Spieler, Baumeister, Admin
 
 Jede Figur hat eine von drei Rollen:
 
@@ -766,11 +874,12 @@ technische Werte sowie Unterdetails und Sinne eines Details.
 | `rauswerfen <spieler> [grund]`    | Spieler vom Server werfen               |
 | `verkuende <text>`                | Nachricht an alle                       |
 | `lehre <spieler> <id> [stufe]`    | Fertigkeit oder Zauber beibringen       |
+| `erfahrung <spieler> <menge>`     | Erfahrung geben (zum Testen)            |
 | `speichernalle`                   | alle Spieler sofort speichern           |
 
 ---
 
-## 13. Wenn etwas nicht stimmt
+## 14. Wenn etwas nicht stimmt
 
 Der Treiber prüft beim Laden alles und meldet Fehler mit Datei und Ort, oft mit
 einem Vorschlag:

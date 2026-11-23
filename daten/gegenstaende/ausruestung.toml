@@ -1,7 +1,13 @@
 # =====================================================================
 #  Waffen und Rüstungen
 # =====================================================================
-#  Die Eigenschaften (schaden, ruestung, ...) benutzt später das Kampfsystem.
+#  Kampfwerte:
+#    eigenschaften = { schaden = 6 }   Grundschaden einer Waffe
+#    eigenschaften = { ruestung = 3 }  zieht so viel von jedem Treffer ab
+#    erholung   = 2.0                  Sekunden zwischen zwei Angriffen (Waffe)
+#    fertigkeit = "schwertkampf"       Fertigkeit, die benutzt und geübt wird
+#  Weitere Eigenschaften mit dem Namen eines Werts (staerke, geschick ...)
+#  erhöhen diesen Wert, solange man den Gegenstand trägt.
 
 [[gegenstand]]
 id   = "kurzschwert"
@@ -14,6 +20,8 @@ wert = 30
 bodentext = "Ein Kurzschwert hängt an der Wand."
 beschreibung = "Eine einfache, aber gut geschliffene Klinge."
 eigenschaften = { schaden = 6, staerke = 1 }
+erholung   = 2.0
+fertigkeit = "schwertkampf"
 
 [gegenstand.details]
 klinge = "Die Klinge ist zweischneidig und eine knappe Elle lang. Kleine Scharten zeugen von Benutzung."
@@ -42,3 +50,29 @@ wert = 10
 bodentext = "Zwischen den Wurzeln liegt ein alter Lederhelm."
 beschreibung = "Ein abgewetzter Helm aus gehärtetem Leder."
 eigenschaften = { ruestung = 1 }
+
+[[gegenstand]]
+id   = "dolch"
+name = "ein Dolch"
+schluesselwoerter = ["dolch", "messer"]
+typ  = "waffe"
+platz = "waffe"
+gewicht = 1
+wert = 12
+beschreibung = "Ein schmaler Dolch. Schnell, aber nicht sehr gefährlich."
+eigenschaften = { schaden = 3, geschick = 1 }
+erholung   = 1.3
+fertigkeit = "schwertkampf"
+
+[[gegenstand]]
+id   = "streitaxt"
+name = "eine schwere Streitaxt"
+akkusativ = "eine schwere Streitaxt"
+schluesselwoerter = ["axt", "streitaxt"]
+typ  = "waffe"
+platz = "waffe"
+gewicht = 6
+wert = 60
+beschreibung = "Eine zweischneidige Axt, so schwer, dass man sie mit beiden Händen führen muss."
+eigenschaften = { schaden = 14 }
+erholung   = 3.8

@@ -158,7 +158,7 @@ beschreibung = """
 Hitze schlägt dir entgegen. An der Esse arbeitet ein muskulöser Schmied.
 An den Wänden hängen Werkzeuge und ein paar einfache Waffen."""
 npcs      = ["schmied"]
-gegenstaende = ["kurzschwert", "holzschild", "amboss"]
+gegenstaende = ["kurzschwert", "dolch", "streitaxt", "holzschild", "amboss"]
 nutzt        = ["feuer"]
 geruch       = "Es riecht nach heißem Eisen, Kohle und Schweiß."
 geraeusch    = "Der Hammer klingt hell auf dem Amboss, das Feuer faucht im Blasebalg."
