@@ -18,3 +18,8 @@ ureq = { version = "2", default-features = false, features = ["tls", "native-cer
 strip = true
 lto = true
 codegen-units = 1
+
+# Der grafische Welteditor liegt in editor/ (eigenes Programm: rmeditor).
+# `cargo build` im Hauptordner baut weiterhin nur den Server.
+[workspace]
+members = [".", "editor"]

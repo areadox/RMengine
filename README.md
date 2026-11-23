@@ -37,7 +37,12 @@ Mudlet oder ein anderes MUD-Programm funktioniert genauso.
 ```bash
 cargo run --release              # Server starten (Port 4000)
 cargo run --release -- --pruefen # nur die Weltdaten prüfen
+cargo run --release -p rmeditor  # grafischer Welteditor (öffnet ./daten)
 ```
+
+Der Welteditor liegt in `editor/` als eigenes Programm im selben Cargo-Workspace.
+Ein einfaches `cargo build` baut weiterhin nur den Server.
+Wie man den Editor bedient, steht in der [ANLEITUNG.md](ANLEITUNG.md#der-grafische-welteditor).
 
 ## Eine neue Version veröffentlichen
 
@@ -74,6 +79,7 @@ das Update und veröffentlicht alles als Release.
 - **Bibliothek allgemeiner Beschreibungen** (Bäume, Himmel, Wasser, Möbel …), die Räume, Geländearten und Oberwelt-Felder mit `nutzt = [...]` verwenden
 - **NPCs in eigenen Dateien** mit Gesprächen: Standardfragen (Gruß, Beruf, Aufgabe, Neuigkeiten …) und eigene Themen
 - **Rollen:** Spieler, Baumeister und Admin, mit eigenen Befehlen
+- **Grafischer Welteditor** (`rmeditor`): Räume auf einer Karte anlegen, verschieben, verbinden und beschreiben. Kommentare in den TOML-Dateien bleiben beim Speichern erhalten.
 
 ## Code-Überblick (`src/`)
 
@@ -90,6 +96,14 @@ das Update und veröffentlicht alles als Release.
 | `update.rs`  | Update-Funktion über GitHub Releases                         |
 | `beschreibung.rs` | Details, Sinne und Bibliothek                          |
 | `gespraech.rs` | NPC-Gespräche                                              |
+
+Der Welteditor (`editor/src/`):
+
+| Datei     | Inhalt                                                                |
+|-----------|-----------------------------------------------------------------------|
+| `main.rs` | Programmstart, Suche nach dem Datenordner                             |
+| `welt.rs` | Räume laden, prüfen und kommentarerhaltend speichern (`toml_edit`)    |
+| `app.rs`  | Oberfläche: Karte, Raumliste, Eigenschaften, Rückgängig (`egui`)      |
 
 ## Vorbereitet für das Kampfsystem
 

@@ -17,3 +17,4 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo build --locked
       - run: ./target/debug/rmengine daten --pruefen
+      - run: cargo test --locked -p rmeditor

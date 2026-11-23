@@ -335,6 +335,44 @@ Die Farben der Verzierungen legst du in `welt.toml` fest:
 Verzierungen kommen nur an Stellen, an denen kein Weg verläuft, und sie stehen
 immer an derselben Stelle. Die Karte sieht deshalb bei jedem Umsehen gleich aus.
 
+### Der grafische Welteditor
+
+Statt Räume von Hand in die TOML-Dateien zu schreiben, kannst du sie auch mit dem
+**Welteditor** (`rmeditor`) auf einer Karte bauen. Er liest und schreibt genau
+dieselben Dateien wie der Server.
+
+```bash
+cargo run --release -p rmeditor              # öffnet ./daten
+cargo run --release -p rmeditor -- pfad/zu/daten
+```
+
+- **Links:** Karte und Ebene (`z`) wählen, Räume suchen und anspringen.
+- **Mitte:** die Karte. Ein Klick wählt einen Raum aus. Ziehen verschiebt ihn.
+  Ein Doppelklick auf ein leeres Feld legt einen neuen Raum an. Liegt das Feld
+  neben dem ausgewählten Raum, werden beide gleich verbunden.
+- **Verbinden:** Wähle links das Werkzeug *Verbinden* oder halte Shift. Dann ziehst
+  du von einem Raum zu einem anderen. Lässt du auf einem leeren Feld los, entsteht
+  dort ein neuer, verbundener Raum.
+- **Rechts:** alle Eigenschaften des Raums: Name, Beschreibung, Gelände, Ausgänge,
+  Sinne, Gegenstände, Monster, NPCs und `nutzt`. Grau angezeigte Ausgänge sind die
+  Rückwege, die der Server automatisch anlegt.
+- **Rechtsklick:** Startraum festlegen, Verbindung trennen, Raum löschen.
+- **Prüfung:** Oben steht, wie viele Fehler und Hinweise es gibt. Ein Klick darauf
+  zeigt die Liste, und ein Klick auf einen Eintrag springt zum Raum. *Mit Engine
+  prüfen* startet `rmengine --pruefen` für den gespeicherten Stand.
+- **Oberwelt:** Unter *Karte* gibt es den Eintrag *🌍 Oberwelt*. Er zeigt
+  `karte.txt` mit allen Feldern, Eingängen und Orten. Die Koordinate unter der Maus
+  steht im Lineal und in der Statuszeile, genau wie in `oberwelt.toml` gezählt
+  (`x` = Spalte, `y` = Zeile, ab 1). Ein Klick auf ein Feld zeigt rechts die Details.
+  Dort kannst du `ow:x:y` oder `x = … / y = …` kopieren oder das Feld direkt als
+  Ausgang `raus` des zuletzt gewählten Raums eintragen.
+- **Strg+S** speichert, **Strg+Z** macht rückgängig, **Strg+Y** stellt wieder her.
+
+Beim Speichern ändert der Editor nur, was du wirklich geändert hast. Kommentare,
+Leerzeilen, `details` und alles andere, was der Editor nicht kennt, bleiben in den
+Dateien erhalten. Benennst du einen Raum um, passt er alle Verweise an: Ausgänge,
+`startraum`, Oberwelt-Eingänge und Teleport-Zauber.
+
 ---
 
 ## 5. Ausführlich beschreiben
