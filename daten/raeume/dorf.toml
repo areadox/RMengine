@@ -140,6 +140,7 @@ beschreibung = """
 Ein stiller Raum aus weißem Stein. Durch ein buntes Glasfenster fällt
 farbiges Licht auf einen schlichten Altar."""
 gegenstaende = ["manatrank"]
+deko_richtung = { sued = "~", suedost = "~", suedwest = "~" }   # der Dorfbach
 
 [raum.details]
 altar   = "Auf dem Altar liegen frische Blumen."
@@ -157,3 +158,77 @@ beschreibung = """
 Ein gedrungenes Tor aus Bruchstein. Draußen beginnt die Landstraße, die
 hinaus ins weite Land führt."""
 # Der Ausgang "raus" auf die Oberwelt entsteht automatisch (siehe oberwelt/oberwelt.toml).
+
+# ---------------------------------------------------------------------
+#  Besondere Orte: Der Buchstabe (symbol) erscheint im Kästchen auf der Karte.
+# ---------------------------------------------------------------------
+
+[[raum]]
+id       = "kraemerladen"
+name     = "Der Krämerladen"
+symbol   = "L"
+x = -1
+y = 1
+gebiet   = "dorf"
+gelaende = "haus"
+beschreibung = """
+Ein enger Laden, vollgestopft bis unter die Decke: Seile, Kerzen, Töpfe,
+Säcke mit Mehl. Hinter dem Tresen wartet die Krämerin."""
+ausgaenge = { ost = "hauptstrasse" }
+monster   = ["kraemerin"]
+
+[[raum]]
+id       = "gartentor"
+name     = "Vor dem Kräutergarten"
+symbol   = "G"
+x = -1
+y = -1
+gebiet   = "dorf"
+gelaende = "garten"
+beschreibung = """
+Eine niedrige Hecke umschließt einen Garten. Ein kleines, grün gestrichenes
+Tor steht offen – du könntest hineingehen."""
+ausgaenge = { nordost = "dorfplatz", rein = "kraeutergarten" }
+deko_richtung = { sued = "~" }
+
+# ---------------------------------------------------------------------
+#  Ein betretbares Gebiet mit EIGENER Karte (karte = "kraeutergarten").
+#  Seine Koordinaten überschneiden sich darum nicht mit dem Dorf.
+#  Der Rückweg "raus" zum Gartentor entsteht automatisch.
+# ---------------------------------------------------------------------
+
+[[raum]]
+id       = "kraeutergarten"
+name     = "Im Kräutergarten"
+karte    = "kraeutergarten"
+x = 0
+y = 0
+gebiet   = "kraeutergarten"
+gelaende = "garten"
+beschreibung = """
+Beete voller Salbei, Thymian und Minze. Bienen summen zwischen den Blüten.
+Im Norden steht ein kleines Gewächshaus."""
+ausgaenge = { nord = "gewaechshaus", ost = "teich" }
+
+[[raum]]
+id       = "teich"
+name     = "Am Gartenteich"
+karte    = "kraeutergarten"
+x = 1
+y = 0
+gebiet   = "kraeutergarten"
+gelaende = "garten"
+beschreibung = "Ein kleiner Teich mit Seerosen. Ein Frosch quakt empört."
+deko_richtung = { ost = "~", nordost = "~", suedost = "~" }
+
+[[raum]]
+id       = "gewaechshaus"
+name     = "Das Gewächshaus"
+symbol   = "H"
+karte    = "kraeutergarten"
+x = 0
+y = 1
+gebiet   = "kraeutergarten"
+gelaende = "haus"
+beschreibung = "Warm und feucht. Auf einem Tisch liegen frisch geerntete Pilze."
+gegenstaende = ["pilz"]

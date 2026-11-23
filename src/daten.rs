@@ -243,11 +243,22 @@ pub struct GelaendeDef {
     pub farbe: String,
     /// Klammern um den Raum auf der Stadtkarte, z.B. "()" draußen, "[]" Gebäude
     pub klammern: String,
+    /// Verzierung rund um die Kästchen, z.B. "o&" für Bäume
+    pub deko: String,
+    /// Wie dicht die Verzierung ist (Prozent)
+    pub deko_dichte: u32,
 }
 
 impl Default for GelaendeDef {
     fn default() -> Self {
-        GelaendeDef { name: String::new(), symbol: "#".into(), farbe: String::new(), klammern: "[]".into() }
+        GelaendeDef {
+            name: String::new(),
+            symbol: "#".into(),
+            farbe: String::new(),
+            klammern: "[]".into(),
+            deko: String::new(),
+            deko_dichte: 30,
+        }
     }
 }
 
@@ -259,6 +270,8 @@ struct WeltDatei {
     start: StartWerte,
     #[serde(default)]
     gelaende: BTreeMap<String, GelaendeDef>,
+    #[serde(default)]
+    deko: BTreeMap<String, String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -286,6 +299,16 @@ pub struct RaumDef {
     pub farbe: String,
     #[serde(default)]
     pub klammern: String,
+    /// Eigene Karte, z.B. für das Innere eines Hauses (leer = gemeinsame Karte)
+    #[serde(default)]
+    pub karte: String,
+    #[serde(default)]
+    pub deko: String,
+    #[serde(default)]
+    pub deko_dichte: Option<u32>,
+    /// Verzierung an bestimmten Seiten, z.B. { sued = "~" } für einen Bach
+    #[serde(default)]
+    pub deko_richtung: BTreeMap<String, String>,
     #[serde(default, rename = "ausgaenge")]
     pub ausgaenge_roh: BTreeMap<String, String>,
     #[serde(default)]
@@ -514,7 +537,10 @@ pub struct Daten {
     pub fertigkeiten: BTreeMap<String, FertigkeitDef>,
     pub zauber: BTreeMap<String, ZauberDef>,
     /// Welcher Raum liegt an welcher Koordinate?
-    pub koordinaten: HashMap<(i32, i32, i32), String>,
+    /// (karte, x, y, z) -> Raum
+    pub koordinaten: HashMap<(String, i32, i32, i32), String>,
+    /// Farben der Verzierungen: Zeichen -> Farbe
+    pub deko_farben: BTreeMap<String, String>,
     pub oberwelt: Option<Oberwelt>,
     pub warnungen: Vec<String>,
 }
@@ -624,6 +650,7 @@ pub fn laden(ordner: &Path) -> Result<Daten, Vec<String>> {
         fertigkeiten: BTreeMap::new(),
         zauber: BTreeMap::new(),
         koordinaten: HashMap::new(),
+        deko_farben: wd.deko,
         oberwelt: None,
         warnungen: Vec::new(),
     };
@@ -779,6 +806,12 @@ fn pruefen(d: &mut Daten, fehler: &mut Vec<String>, warn: &mut Vec<String>) {
     if d.welt.karten_hintergrund.chars().count() != 1 {
         fehler.push("welt.toml: 'karten_hintergrund' muss genau ein Zeichen sein (z.B. \"*\" oder \" \").".into());
     }
+    for (zeichen, farbe) in &d.deko_farben {
+        if zeichen.chars().count() != 1 {
+            fehler.push(format!("welt.toml [deko]: '{zeichen}' muss genau ein Zeichen sein."));
+        }
+        farbe_pruefen(farbe, &format!("welt.toml [deko] '{zeichen}'"), fehler);
+    }
     if d.welt.takt_sekunden == 0 {
         fehler.push("welt.toml: 'takt_sekunden' muss mindestens 1 sein.".into());
     }
@@ -832,6 +865,15 @@ fn pruefen(d: &mut Daten, fehler: &mut Vec<String>, warn: &mut Vec<String>) {
         if r.symbol.chars().count() > 1 {
             fehler.push(format!("{wo}: 'symbol' muss genau ein Zeichen sein."));
         }
+        for richt in r.deko_richtung.keys() {
+            match Richtung::aus_text(richt) {
+                Some(ri) if ri.versatz().2 == 0 && ri.versatz() != (0, 0, 0) => {}
+                _ => fehler.push(format!("{wo}: deko_richtung '{richt}' – erlaubt sind nur Himmelsrichtungen (nord, nordost, ...).")),
+            }
+        }
+        if r.deko_dichte.is_some_and(|x| x > 100) {
+            fehler.push(format!("{wo}: 'deko_dichte' ist eine Prozentzahl (0 bis 100)."));
+        }
         if !r.klammern.is_empty() && r.klammern.chars().count() != 2 {
             fehler.push(format!("{wo}: 'klammern' müssen genau zwei Zeichen sein, z.B. \"()\"."));
         }
@@ -884,9 +926,6 @@ fn pruefen(d: &mut Daten, fehler: &mut Vec<String>, warn: &mut Vec<String>) {
         let mut neu = Vec::new();
         for r in d.raeume.values() {
             for (richt, ziel) in &r.ausgaenge {
-                if matches!(richt, Richtung::Rein | Richtung::Raus) {
-                    continue;
-                }
                 if let Some(z) = d.raeume.get(ziel) {
                     if !z.ausgaenge.contains_key(&richt.gegenteil()) {
                         neu.push((ziel.clone(), richt.gegenteil(), r.id.clone()));
@@ -903,7 +942,7 @@ fn pruefen(d: &mut Daten, fehler: &mut Vec<String>, warn: &mut Vec<String>) {
 
     // Koordinaten
     for r in d.raeume.values() {
-        let k = (r.x, r.y, r.z);
+        let k = (r.karte.clone(), r.x, r.y, r.z);
         if let Some(anderer) = d.koordinaten.get(&k) {
             warn.push(format!(
                 "[{}] Raum '{}' liegt auf denselben Koordinaten ({}, {}, {}) wie '{}'. Auf der Karte ist nur einer zu sehen.",
@@ -915,7 +954,7 @@ fn pruefen(d: &mut Daten, fehler: &mut Vec<String>, warn: &mut Vec<String>) {
         for (richt, ziel) in &r.ausgaenge {
             if let Some(z) = d.raeume.get(ziel) {
                 let (dx, dy, dz) = richt.versatz();
-                if (dx, dy, dz) == (0, 0, 0) {
+                if (dx, dy, dz) == (0, 0, 0) || z.karte != r.karte {
                     continue;
                 }
                 if (z.x, z.y, z.z) != (r.x + dx, r.y + dy, r.z + dz) {

@@ -85,12 +85,24 @@ name   = "Wald"
 symbol = "♣"
 farbe  = "gruen"
 klammern = "{}"
+deko     = "o&"          # Bäume rund um Waldräume
+deko_dichte = 60
 
 [gelaende.lichtung]
 name   = "Wiese"
 symbol = "\""
 farbe  = "hellgruen"
 klammern = "()"
+deko     = "o"
+deko_dichte = 25
+
+[gelaende.garten]
+name     = "Garten"
+symbol   = "%"
+farbe    = "hellgruen"
+klammern = "()"
+deko     = "o&"            # verstreute Bäume und Büsche
+deko_dichte = 45           # Prozent der freien Stellen rund um den Raum
 
 [gelaende.wasser]
 name   = "Wasser"
@@ -109,3 +121,15 @@ name   = "Höhle"
 symbol = "o"
 farbe  = "grau"
 klammern = "<>"
+
+# ---------------------------------------------------------------------
+# Farben der Verzierungen auf der Stadtkarte (Zeichen = Farbe)
+# Verzierungen setzt man bei Geländearten oder Räumen mit
+#   deko = "o&"                  verstreut um das Kästchen
+#   deko_richtung = { sued = "~" }  eine ganze Seite, z.B. ein Bach
+# ---------------------------------------------------------------------
+[deko]
+"o" = "gruen"
+"&" = "hellgruen"
+"~" = "hellblau"
+"^" = "grau"

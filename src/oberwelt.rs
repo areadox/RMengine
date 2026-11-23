@@ -464,6 +464,10 @@ impl Oberwelt {
             symbol: symbol.to_string(),
             farbe,
             klammern: String::new(),
+            karte: String::new(),
+            deko: String::new(),
+            deko_dichte: None,
+            deko_richtung: BTreeMap::new(),
             ausgaenge_roh: BTreeMap::new(),
             details: ort
                 .map(|o| o.details.iter().map(|(k, v)| (text::normalisieren(k), v.clone())).collect())

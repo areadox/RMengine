@@ -48,3 +48,14 @@ wander_chance = 15
 aggressiv = true
 sprueche = ["*fiept.", "*nagt an einem Fass."]
 beute = [ { gegenstand = "rattenschwanz", chance = 50 } ]
+
+[[monster]]
+id   = "kraemerin"
+name = "die Krämerin"
+akkusativ = "die Krämerin"
+schluesselwoerter = ["kraemerin", "frau"]
+raumtext = "Die Krämerin zählt hinter dem Tresen ihre Münzen."
+beschreibung = "Eine hagere Frau mit flinken Augen und einem Bleistift hinter dem Ohr."
+stufe = 3
+lebenspunkte = 40
+sprueche = ["Seile, Kerzen, Proviant – alles da!", "*rückt ihre Brille zurecht."]

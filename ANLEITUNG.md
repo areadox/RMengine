@@ -162,6 +162,68 @@ Den Buchstaben im Kästchen bestimmt der Raum selbst, zum Beispiel
 `symbol = "K"` für die Kneipe. Mit `klammern = "<>"` kann ein einzelner Raum auch
 eigene Klammern bekommen.
 
+### Besondere Orte, Häuser und betretbare Gebiete
+
+Ein **Buchstabe** im Kästchen kennzeichnet einen besonderen Ort, etwa einen Laden,
+eine Stelle mit einem NPC oder ein Gebäude, das man betreten kann:
+
+```toml
+[[raum]]
+id     = "gartentor"
+name   = "Vor dem Kräutergarten"
+symbol = "G"
+x = -1
+y = -1
+ausgaenge = { nordost = "dorfplatz", rein = "kraeutergarten" }
+```
+
+Mit `rein` geht man hinein. Der Rückweg `raus` entsteht im Zielraum automatisch.
+Das Innere bekommt eine **eigene Karte**, damit es sich nicht mit dem Stadtplan
+überschneidet:
+
+```toml
+[[raum]]
+id    = "kraeutergarten"
+name  = "Im Kräutergarten"
+karte = "kraeutergarten"    # alle Räume mit gleicher karte bilden einen Plan
+x = 0
+y = 0
+```
+
+Räume ohne `karte` liegen alle zusammen auf dem gemeinsamen Plan.
+
+### Bäume, Wasser und andere Verzierungen
+
+Rund um die Kästchen kannst du Verzierungen setzen:
+
+```
+|*o**/*|******|
+|o(G)&[T]*****|
+|~~~~~~~~~****|
+```
+
+```toml
+# bei einer Geländeart (gilt für alle Räume dieser Art)
+[gelaende.garten]
+deko        = "o&"     # diese Zeichen werden verstreut
+deko_dichte = 45       # Prozent der freien Stellen
+
+# oder bei einem einzelnen Raum
+deko_richtung = { sued = "~", suedost = "~" }   # eine ganze Seite: ein Bach
+```
+
+Die Farben der Verzierungen legst du in `welt.toml` fest:
+
+```toml
+[deko]
+"o" = "gruen"
+"&" = "hellgruen"
+"~" = "hellblau"
+```
+
+Verzierungen kommen nur an Stellen, an denen kein Weg verläuft, und sie stehen
+immer an derselben Stelle. Die Karte sieht deshalb bei jedem Umsehen gleich aus.
+
 ---
 
 ## 4. Die Oberwelt (Landschaft)

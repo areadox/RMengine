@@ -11,7 +11,7 @@
 //!
 //! Stil "linien": Jeder Raum ist ein Zeichen, verbunden mit - | / \
 
-use crate::daten::Richtung;
+use crate::daten::{Daten, RaumDef, Richtung};
 use crate::spieler::SpielerDaten;
 use crate::welt::Welt;
 use std::collections::BTreeSet;
@@ -50,7 +50,7 @@ pub fn zeichnen(w: &Welt, sp: &SpielerDaten, radius: i32, mit_legende: bool) -> 
     for dy in -radius..=radius {
         for dx in -radius..=radius {
             let (x, y) = (hier.x + dx, hier.y + dy);
-            let Some(id) = d.koordinaten.get(&(x, y, hier.z)) else { continue };
+            let Some(id) = d.koordinaten.get(&(hier.karte.clone(), x, y, hier.z)) else { continue };
             let Some(raum) = d.raeume.get(id) else { continue };
             if !sichtbar(id) {
                 continue;
@@ -200,6 +200,9 @@ fn zeichnen_kasten(w: &Welt, sp: &SpielerDaten, radius: i32, mit_legende: bool) 
     let mut gitter = vec![vec![Zelle { zeichen: hg, farbe: "grau".into() }; breite]; hoehe];
     let sichtbar = |id: &str| !d.welt.nur_besuchte_raeume_auf_karte || sp.besucht.contains(id) || id == sp.raum;
     let mut legende: Vec<(char, String)> = Vec::new();
+    // Welche Stellen sind noch Hintergrund (dürfen verziert werden)?
+    let mut frei = vec![vec![true; breite]; hoehe];
+    let mut gezeichnet: Vec<(&RaumDef, usize, usize)> = Vec::new();
 
     // Wer ist wo?
     let andere: Vec<&str> =
@@ -208,7 +211,7 @@ fn zeichnen_kasten(w: &Welt, sp: &SpielerDaten, radius: i32, mit_legende: bool) 
     for dy in -r..=r {
         for dx in -r..=r {
             let (x, y) = (hier.x + dx, hier.y + dy);
-            let Some(id) = d.koordinaten.get(&(x, y, hier.z)) else { continue };
+            let Some(id) = d.koordinaten.get(&(hier.karte.clone(), x, y, hier.z)) else { continue };
             let Some(raum) = d.raeume.get(id) else { continue };
             if !sichtbar(id) {
                 continue;
@@ -228,6 +231,10 @@ fn zeichnen_kasten(w: &Welt, sp: &SpielerDaten, radius: i32, mit_legende: bool) 
             let farbe = if raum.farbe.is_empty() { g.map(|g| g.farbe.clone()).unwrap_or_default() } else { raum.farbe.clone() };
             gitter[zeile][mitte - 1] = Zelle { zeichen: auf, farbe: farbe.clone() };
             gitter[zeile][mitte + 1] = Zelle { zeichen: zu, farbe };
+            for s in mitte - 1..=mitte + 1 {
+                frei[zeile][s] = false;
+            }
+            gezeichnet.push((raum, zeile, mitte));
 
             let innen = raum.symbol.chars().next();
             let (zeichen, farbe) = if id == &sp.raum {
@@ -271,6 +278,7 @@ fn zeichnen_kasten(w: &Welt, sp: &SpielerDaten, radius: i32, mit_legende: bool) 
                     Richtung::Nordost | Richtung::Suedwest => '/',
                     _ => '\\',
                 };
+                frei[zl][sp_] = false;
                 let zelle = &mut gitter[zl][sp_];
                 zelle.zeichen = match (zelle.zeichen, zeichen) {
                     ('/', '\\') | ('\\', '/') | ('x', _) => 'x',
@@ -280,6 +288,8 @@ fn zeichnen_kasten(w: &Welt, sp: &SpielerDaten, radius: i32, mit_legende: bool) 
             }
         }
     }
+
+    verzieren(d, &gezeichnet, &mut gitter, &frei);
 
     let mut aus = String::new();
     if !hier.gebiet.is_empty() || hier.z != 0 {
@@ -326,6 +336,67 @@ fn zeichnen_kasten(w: &Welt, sp: &SpielerDaten, radius: i32, mit_legende: bool) 
         }
     }
     aus
+}
+
+/// Bäume, Wasser und andere Verzierungen in die freien Stellen rund um die Räume.
+///
+/// Rund um jedes Kästchen gibt es 12 Stellen (5 darüber, 5 darunter, je eine
+/// links und rechts). `deko_richtung` füllt eine ganze Seite, `deko` verstreut
+/// Zeichen zufällig – aber immer gleich, damit die Karte nicht flackert.
+fn verzieren(d: &Daten, raeume: &[(&RaumDef, usize, usize)], gitter: &mut [Vec<Zelle>], frei: &[Vec<bool>]) {
+    let mut belegt = vec![vec![false; frei.first().map(|z| z.len()).unwrap_or(0)]; frei.len()];
+    for (raum, zeile, mitte) in raeume {
+        let g = d.gelaende.get(&raum.gelaende);
+        let deko: Vec<char> =
+            if raum.deko.is_empty() { g.map(|g| g.deko.chars().collect()).unwrap_or_default() } else { raum.deko.chars().collect() };
+        let dichte = raum.deko_dichte.unwrap_or_else(|| g.map(|g| g.deko_dichte).unwrap_or(30));
+        let seiten: Vec<((i32, i32), Vec<char>)> = raum
+            .deko_richtung
+            .iter()
+            .filter_map(|(r, z)| Richtung::aus_text(r).map(|r| ((r.versatz().0, r.versatz().1), z.chars().collect())))
+            .collect();
+
+        for dy in -1i32..=1 {
+            for dx in -2i32..=2 {
+                if dy == 0 && dx.abs() < 2 {
+                    continue; // das Kästchen selbst
+                }
+                let (zl, sp) = (*zeile as i32 + dy, *mitte as i32 + dx);
+                if zl < 0 || sp < 0 || zl as usize >= gitter.len() || sp as usize >= gitter[0].len() {
+                    continue;
+                }
+                let (zl, sp) = (zl as usize, sp as usize);
+                if !frei[zl][sp] || belegt[zl][sp] {
+                    continue;
+                }
+                // Stelle in der ganzen Welt -> gleiche Stelle, gleiches Zeichen
+                let welt_sp = 4 * raum.x as i64 + dx as i64;
+                let welt_zl = -2 * raum.y as i64 + dy as i64;
+                let h = streuwert(welt_sp, welt_zl, raum.z as i64);
+
+                let seite = seiten.iter().find(|((ox, oy), _)| {
+                    (*oy == 0 || dy == -oy) && (*ox == 0 || dx == 2 * ox)
+                });
+                let zeichen = match seite {
+                    Some((_, z)) if !z.is_empty() => Some(z[(h as usize) % z.len()]),
+                    _ if !deko.is_empty() && (h % 100) < dichte as u64 => Some(deko[((h / 100) as usize) % deko.len()]),
+                    _ => None,
+                };
+                if let Some(c) = zeichen {
+                    let farbe = d.deko_farben.get(&c.to_string()).cloned().unwrap_or_default();
+                    gitter[zl][sp] = Zelle { zeichen: c, farbe };
+                    belegt[zl][sp] = true;
+                }
+            }
+        }
+    }
+}
+
+fn streuwert(x: i64, y: i64, z: i64) -> u64 {
+    let mut h = (x.wrapping_mul(73_856_093) ^ y.wrapping_mul(19_349_663) ^ z.wrapping_mul(83_492_791)) as u64;
+    h ^= h >> 13;
+    h = h.wrapping_mul(0x5bd1_e995);
+    h ^ (h >> 15)
 }
 
 /// Setzt ein Zeichengitter in einen Rahmen aus + - |.
