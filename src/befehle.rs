@@ -57,6 +57,7 @@ pub fn ausfuehren(w: &mut Welt, sid: u64, eingabe: &str) -> Folge {
             let k = karte::zeichnen(w, &w.spieler[&sid].sp, radius, true);
             w.sende(sid, &k);
         }
+        "weltkarte" | "landkarte" | "worldmap" => weltkarte(w, sid, admin),
         "nimm" | "nehme" | "take" | "get" => nehmen(w, sid, rest),
         "lege" | "leg" | "ablegen" | "drop" | "fallenlassen" => fallenlassen(w, sid, rest),
         "inventar" | "i" | "inv" => inventar(w, sid),
@@ -107,12 +108,43 @@ pub fn prompt(w: &Welt, sid: u64) {
     }
 }
 
+/// Die ganze Oberwelt. Dafür braucht man eine Landkarte (Gegenstand mit
+/// der Eigenschaft `landkarte`) – Baumeister brauchen keine.
+fn weltkarte(w: &Welt, sid: u64, admin: bool) {
+    let Some(ow) = &w.d.oberwelt else {
+        w.sende(sid, "Diese Welt hat keine Oberwelt.");
+        return;
+    };
+    let sp = &w.spieler[&sid].sp;
+    let hat_karte = sp
+        .inventar
+        .iter()
+        .chain(sp.ausruestung.values())
+        .any(|g| w.d.gegenstaende.get(g).is_some_and(|g| g.eigenschaften.get("landkarte").copied().unwrap_or(0) > 0));
+    if !hat_karte && !admin {
+        w.sende(sid, "Du hast keine Landkarte dabei.");
+        return;
+    }
+    // Wo ist man? Auf der Oberwelt direkt, sonst am Eingang des Ortes, in dem man ist.
+    let pos = crate::oberwelt::aus_id(&sp.raum).or_else(|| {
+        let gebiet = w.d.gebiet(&sp.raum);
+        ow.eingaenge
+            .iter()
+            .find(|e| e.raum == sp.raum || (!gebiet.is_empty() && w.d.gebiet(&e.raum) == gebiet))
+            .map(|e| (e.x, e.y))
+    });
+    let (x, y) = pos.unwrap_or((-1, -1));
+    w.sende(sid, &ow.weltkarte(x, y));
+}
+
 fn hilfe(w: &Welt, sid: u64, admin: bool) {
     let mut t = String::from(
         "{fett}Befehle{/}
   {gelb}schau{/} [etwas]        Umsehen oder etwas genauer ansehen (kurz: l)
   {gelb}n o s w no nw so sw{/}  In eine Richtung gehen; {gelb}h{/}och / {gelb}r{/}unter
   {gelb}karte{/} [größe]        Die Karte der Umgebung zeigen
+  {gelb}weltkarte{/}            Die ganze Oberwelt (mit einer Landkarte)
+  {gelb}rein{/} / {gelb}raus{/}           Eine Stadt betreten oder verlassen
   {gelb}nimm{/} <ding|alles>    Etwas aufheben
   {gelb}lege{/} <ding|alles>    Etwas fallen lassen
   {gelb}inventar{/}             Zeigen, was du bei dir hast (kurz: i)
@@ -206,7 +238,7 @@ fn gruppieren(ids: &[String]) -> Vec<(String, usize)> {
 
 pub fn raum_anzeigen(w: &Welt, sid: u64) {
     let Some(s) = w.spieler.get(&sid) else { return };
-    let Some(raum) = w.d.raeume.get(&s.sp.raum) else { return };
+    let Some(raum) = w.d.raum(&s.sp.raum) else { return };
     let mut aus = String::new();
 
     if w.d.welt.karte_beim_umsehen {
@@ -214,14 +246,21 @@ pub fn raum_anzeigen(w: &Welt, sid: u64) {
         aus.push('\n');
     }
     aus.push_str(&format!("{{fett}}{{gelb}}{}{{/}}", raum.name));
-    if s.admin {
+    if crate::oberwelt::ist_oberwelt(&raum.id) {
+        aus.push_str(&format!(" {{grau}}({}, {}){{/}}", raum.x, raum.y));
+    } else if s.admin {
         aus.push_str(&format!(" {{grau}}[{}]{{/}}", raum.id));
     }
     aus.push('\n');
     aus.push_str(&umbrechen(&raum.beschreibung, BREITE));
     aus.push('\n');
 
-    let ausgaenge: Vec<String> = raum.ausgaenge.keys().map(|r| r.anzeige().to_string()).collect();
+    let mut ausgaenge: Vec<String> = raum.ausgaenge.keys().map(|r| r.anzeige().to_string()).collect();
+    let himmelsrichtungen = raum.ausgaenge.keys().filter(|r| r.versatz().2 == 0 && r.versatz() != (0, 0, 0)).count();
+    if himmelsrichtungen == 8 {
+        ausgaenge.retain(|a| a == "hinein" || a == "hinaus");
+        ausgaenge.insert(0, "in alle Richtungen".into());
+    }
     if ausgaenge.is_empty() {
         aus.push_str("{cyan}Es gibt keine sichtbaren Ausgänge.{/}\n");
     } else {
@@ -255,16 +294,23 @@ fn gehen(w: &mut Welt, sid: u64, richt: Richtung) {
     let s = &w.spieler[&sid];
     let alt = s.sp.raum.clone();
     let name = s.sp.name.clone();
-    let Some(ziel) = w.d.raeume.get(&alt).and_then(|r| r.ausgaenge.get(&richt)).cloned() else {
-        w.sende(sid, "Dorthin kannst du nicht gehen.");
+    let Some(ziel) = w.d.ausgaenge(&alt).get(&richt).cloned() else {
+        let t = match richt {
+            Richtung::Rein => "Hier gibt es nichts, das du betreten könntest.",
+            Richtung::Raus => "Von hier aus kommst du nicht hinaus.",
+            _ => "Dorthin kannst du nicht gehen.",
+        };
+        w.sende(sid, t);
         return;
     };
-    w.sende_raum(&alt, &format!("{name} geht nach {}.", richt.anzeige()), &[sid]);
+    w.sende_raum(&alt, &format!("{name} {}.", richt.geht()), &[sid]);
     if let Some(s) = w.spieler.get_mut(&sid) {
         s.sp.raum = ziel.clone();
-        s.sp.besucht.insert(ziel.clone());
+        if !crate::oberwelt::ist_oberwelt(&ziel) {
+            s.sp.besucht.insert(ziel.clone());
+        }
     }
-    w.sende_raum(&ziel, &format!("{name} kommt von {} herein.", richt.gegenteil().anzeige()), &[sid]);
+    w.sende_raum(&ziel, &format!("{name} {}.", richt.kommt()), &[sid]);
     raum_anzeigen(w, sid);
 }
 
@@ -274,7 +320,7 @@ fn untersuchen(w: &Welt, sid: u64, such: &str) {
     let such = such.strip_prefix("an ").unwrap_or(such);
 
     // 1. Details im Raum (z.B. "brunnen")
-    if let Some(r) = w.d.raeume.get(raum_id) {
+    if let Some(r) = w.d.raum(raum_id) {
         if let Some(t) = r.details.get(&normalisieren(such)) {
             w.sende(sid, &umbrechen(t, BREITE));
             return;
@@ -781,7 +827,9 @@ fn wirkung_anwenden(w: &mut Welt, sid: u64, art: &str, wert: i32, raum: &str) {
         }
         "teleport" => {
             let alt = std::mem::replace(&mut s.sp.raum, raum.to_string());
-            s.sp.besucht.insert(raum.to_string());
+            if !crate::oberwelt::ist_oberwelt(raum) {
+                s.sp.besucht.insert(raum.to_string());
+            }
             let name = s.sp.name.clone();
             w.sende_raum(&alt, &format!("{name} verschwindet in einem Lichtblitz."), &[sid]);
             w.sende_raum(raum, &format!("{name} erscheint in einem Lichtblitz."), &[sid]);
@@ -845,7 +893,18 @@ fn admin_befehl(w: &mut Welt, sid: u64, befehl: &str, rest: &str) -> bool {
         },
         "wo" => {
             let sp = &w.spieler[&sid].sp;
-            if let Some(r) = w.d.raeume.get(&sp.raum) {
+            if let (Some((x, y)), Some(ow)) = (crate::oberwelt::aus_id(&sp.raum), &w.d.oberwelt) {
+                let zeichen = ow.zeichen(x, y).unwrap_or(' ');
+                let feld = ow.feld(x, y).map(|f| f.name.clone()).unwrap_or_default();
+                w.sende(
+                    sid,
+                    &format!(
+                        "Oberwelt, Spalte x={x}, Zeile y={y} (so auch in karte.txt)\nZeichen '{zeichen}' = {feld}, Sichtweite {}\nRaum-ID für Ausgänge/Teleport: {}",
+                        ow.sichtweite(x, y),
+                        sp.raum
+                    ),
+                );
+            } else if let Some(r) = w.d.raeume.get(&sp.raum) {
                 let aus: Vec<String> =
                     r.ausgaenge.iter().map(|(ri, z)| format!("{}→{}", ri.schluessel(), z)).collect();
                 w.sende(
@@ -858,7 +917,7 @@ fn admin_befehl(w: &mut Welt, sid: u64, befehl: &str, rest: &str) -> bool {
             }
         }
         "springe" | "goto" => {
-            if !w.d.raeume.contains_key(rest) {
+            if !w.d.raum_existiert(rest) {
                 let tipp = text::vorschlag(rest, w.d.raeume.keys()).map(|v| format!(" Meintest du '{v}'?")).unwrap_or_default();
                 w.sende(sid, &format!("Raum '{rest}' gibt es nicht.{tipp}"));
                 return true;

@@ -18,7 +18,8 @@ telnet localhost 4000
 ## Funktionen
 
 - Telnet-Server für mehrere Spieler gleichzeitig, mit Farben und verdeckter Passworteingabe
-- ASCII-Karte, die automatisch aus den Raumkoordinaten entsteht, mit Stockwerken, Geländearten, Legende und Diagonalen
+- **Oberwelt:** eine Landschaft, die man als Textbild zeichnet, mit geländeabhängiger Sicht (Wald dämpft, Berge verdecken, Gipfel geben Weitblick), Städten und Dungeons als Eingängen, besonderen Orten, automatischen Beschreibungen und `weltkarte`
+- ASCII-Stadtkarte, die automatisch aus den Raumkoordinaten entsteht, mit Stockwerken, Geländearten, Legende und Diagonalen
 - zentrale Verwaltung von Items, Monstern, Fertigkeiten und Zaubern, alles in TOML
 - gründliche Prüfung der Daten mit deutschen Fehlermeldungen und Tippfehler-Vorschlägen
 - `neuladen` im laufenden Spiel
@@ -35,7 +36,8 @@ telnet localhost 4000
 | `daten.rs`   | Datenformate, Laden und Prüfen der Weltdaten                 |
 | `welt.rs`    | laufender Zustand: Spieler, Monster, Takt, Zurücksetzen      |
 | `befehle.rs` | alle Spielerbefehle                                          |
-| `karte.rs`   | Kartendarstellung                                            |
+| `karte.rs`   | Kartendarstellung für Städte und Dungeons                    |
+| `oberwelt.rs`| Oberwelt: Kartenbild laden, Sicht, Felder als Räume, Karten  |
 | `netz.rs`    | Telnet-Server und Login                                      |
 | `spieler.rs` | Speichern, Laden, Passwörter                                 |
 | `text.rs`    | Farben, Zeilenumbruch, Tippfehler-Vorschläge                 |

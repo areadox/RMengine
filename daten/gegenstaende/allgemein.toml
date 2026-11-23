@@ -94,3 +94,11 @@ platz = "umhang"
 beschreibung = "Ein dichter, warmer Pelz."
 eigenschaften = { ruestung = 2 }
 wert = 40
+
+[[gegenstand]]
+id   = "landkarte"
+name = "eine Landkarte"
+akkusativ = "eine Landkarte"
+schluesselwoerter = ["karte", "landkarte"]
+beschreibung = "Eine abgegriffene Karte des Landes. Mit 'weltkarte' kannst du sie ansehen."
+eigenschaften = { landkarte = 1 }

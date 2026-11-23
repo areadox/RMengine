@@ -19,6 +19,16 @@ struct Zelle {
 
 pub fn zeichnen(w: &Welt, sp: &SpielerDaten, radius: i32, mit_legende: bool) -> String {
     let d = &w.d;
+    // Auf der Oberwelt gibt es eine eigene Darstellung.
+    if let (Some((x, y)), Some(ow)) = (crate::oberwelt::aus_id(&sp.raum), &d.oberwelt) {
+        let andere: Vec<(i32, i32)> = w
+            .spieler
+            .values()
+            .filter(|s| s.sp.name != sp.name)
+            .filter_map(|s| crate::oberwelt::aus_id(&s.sp.raum))
+            .collect();
+        return ow.karte_zeichnen(x, y, &andere, mit_legende);
+    }
     let Some(hier) = d.raeume.get(&sp.raum) else { return String::new() };
     let radius = radius.clamp(1, 15);
     let breite = (radius * 2 * 4 + 1) as usize;
@@ -144,6 +154,9 @@ pub fn zeichnen(w: &Welt, sp: &SpielerDaten, radius: i32, mit_legende: bool) -> 
     }
     if hier.ausgaenge.contains_key(&Richtung::Runter) {
         ebenen.push("nach unten");
+    }
+    if hier.ausgaenge.contains_key(&Richtung::Raus) {
+        ebenen.push("hinaus");
     }
     if !ebenen.is_empty() {
         aus.push_str(&format!("  {{grau}}(Hier geht es auch {}.){{/}}\n", ebenen.join(" und ")));

@@ -8,6 +8,7 @@ mod befehle;
 mod daten;
 mod karte;
 mod netz;
+mod oberwelt;
 mod spieler;
 mod text;
 mod welt;

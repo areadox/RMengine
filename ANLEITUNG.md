@@ -43,6 +43,7 @@ daten/
   monster/*.toml       Monster und Bewohner
   fertigkeiten/*.toml  Fertigkeiten
   zauber/*.toml        Zaubersprüche
+  oberwelt/            die Landschaft (siehe Abschnitt 4)
 ```
 
 Die Ordner sind nur eine Ordnungshilfe. Der Treiber liest **alle** `.toml`-Dateien
@@ -110,7 +111,10 @@ brunnen = "Ein alter Brunnen aus Stein."
 **oben**. Ein Raum nördlich von (0,0) liegt also auf (0,1). Die Karte ergibt sich
 automatisch aus den Koordinaten.
 
-**Richtungen:** `nord nordost ost suedost sued suedwest west nordwest hoch runter`
+**Richtungen:** `nord nordost ost suedost sued suedwest west nordwest hoch runter rein raus`
+
+Ein Ausgang darf auch direkt auf ein Feld der Oberwelt zeigen, zum Beispiel
+`raus = "ow:36:11"`.
 
 **Rückwege:** Wenn A nach Norden zu B führt, bekommt B automatisch einen Ausgang
 nach Süden zu A (abschaltbar mit `ausgaenge_beidseitig = false` in `welt.toml`).
@@ -133,7 +137,108 @@ werden als `- | / \` gezeichnet.
 
 ---
 
-## 4. Gegenstände
+## 4. Die Oberwelt (Landschaft)
+
+Für Städte, Häuser und Höhlen baust du einzelne Räume wie oben. Für das **weite
+Land dazwischen** zeichnest du stattdessen eine Landkarte. Jedes Zeichen darin ist
+ein Feld, auf dem man laufen kann:
+
+```
+daten/oberwelt/
+  karte.txt        die gezeichnete Landschaft
+  oberwelt.toml    was die Zeichen bedeuten, Eingänge, besondere Orte
+```
+
+`karte.txt` sieht so aus (Norden ist oben):
+
+```
+~~~~AAAA^^^^,,,,,WWWWWWW,,,,~~~
+~~~AAA^^^.^,,,,,,WWW.WWW,,,,,~~
+~~~~~^^,,....,,,,,,,.,,,,,,,,~~
+~~~~~,,,,,,,..........,,,%%%,~~
+```
+
+Ein Leerzeichen bedeutet: Hier ist nichts.
+
+### Zeichen erklären
+
+```toml
+[feld.W]
+name   = "Dunkelwald"        # Titel des Feldes und Name in der Legende
+fern   = "dichten Wald"      # "Im Norden siehst du dichten Wald."
+symbol = "♣"                 # Anzeige im Spiel (ohne Angabe: das Zeichen selbst)
+farbe  = "gruen"
+begehbar = true              # false: Meer, Felswand ...
+sicht  = -1                  # wer hier steht, sieht 1 Feld weniger weit
+sichtbehinderung = 2         # jedes Waldfeld dazwischen kostet 2 Felder Sicht
+blockiert_sicht = false      # true: dahinter sieht man nichts (Berge)
+hoehe  = 0                   # siehe unten
+beschreibungen = ["Alte Eichen ...", "Farne wachsen ..."]  # Abwechslung
+```
+
+Zeichen wie `~`, `.` oder `%` müssen in Anführungszeichen stehen: `[feld."~"]`.
+
+### Sicht
+
+Die Karte im Spiel zeigt nur, was die Figur sehen kann:
+
+- **Grundsichtweite:** `sicht` unter `[oberwelt]`. Das Feld, auf dem man steht,
+  verändert sie: Berge und Hügel erhöhen sie, Wald verringert sie.
+- **Wald und Nebel** (`sichtbehinderung`) verkürzen den Blick durch sie hindurch.
+  Auf einer Straße durch den Wald sieht man deshalb entlang der Straße weit, zur
+  Seite aber kaum.
+- **Berge** (`blockiert_sicht = true`) verdecken alles dahinter. Wer selbst auf
+  einem Berg steht, sieht über Berge gleicher oder geringerer `hoehe` hinweg.
+  Höhere Gipfel verdecken auch dann noch die Sicht.
+
+### Eingänge zu Städten und Dungeons
+
+```toml
+[[eingang]]
+x      = 36              # Spalte in karte.txt (ab 1)
+y      = 11              # Zeile in karte.txt (ab 1)
+name   = "Eichenhain"
+raum   = "osttor"        # dieser Raum wird mit "rein" betreten
+symbol = "O"
+farbe  = "hellgelb"
+beschreibung = "Vor dir liegt das Osttor von Eichenhain."
+```
+
+Im Raum `osttor` entsteht automatisch der Ausgang `raus`. Er führt zurück auf
+dieses Feld. Eingänge sieht man auf der Karte schon von Weitem, und die
+Beschreibung nennt sie: „In der Ferne im Osten liegt Eichenhain.“
+
+### Besondere Orte
+
+```toml
+[[ort]]
+x = 15
+y = 4
+name   = "Der Steinkreis"
+symbol = "*"             # optional: auf der Karte zu sehen und von Weitem erkennbar
+beschreibung = "Zwölf uralte Steine ..."
+gegenstaende = ["manatrank"]
+monster      = ["wolf"]
+
+[ort.details]
+steine = "In jeden Stein ist ein Sternbild gemeißelt."
+```
+
+### Koordinaten finden
+
+- Texteditoren zeigen Zeile und Spalte meist unten in der Statusleiste an.
+- Im Spiel nennt der Baumeister-Befehl `wo` die Koordinaten des Feldes.
+- Jedes Feld hat die Raum-ID `ow:x:y`. Damit kannst du springen
+  (`springe ow:15:4`) oder einen Zauber dorthin teleportieren lassen.
+
+### Weltkarte
+
+`weltkarte` zeigt die ganze Oberwelt. Spieler brauchen dafür einen Gegenstand mit
+der Eigenschaft `landkarte = 1`, Baumeister nicht.
+
+---
+
+## 5. Gegenstände
 
 ```toml
 [[gegenstand]]
@@ -161,7 +266,7 @@ benutzen_text = "Du trinkst den Trank."
 
 ---
 
-## 5. Monster
+## 6. Monster
 
 ```toml
 [[monster]]
@@ -191,7 +296,7 @@ aufgefüllt.
 
 ---
 
-## 6. Fertigkeiten
+## 7. Fertigkeiten
 
 ```toml
 [[fertigkeit]]
@@ -207,7 +312,7 @@ beschreibung = "Wunden heilen."
 
 ---
 
-## 7. Zauber
+## 8. Zauber
 
 ```toml
 [[zauber]]
@@ -242,7 +347,7 @@ Mit dem Zaubern übt man die zugehörige Fertigkeit und kann dabei aufsteigen.
 
 ---
 
-## 8. Baumeister-Befehle im Spiel
+## 9. Baumeister-Befehle im Spiel
 
 | Befehl                         | Wirkung                                      |
 |--------------------------------|----------------------------------------------|
@@ -261,7 +366,7 @@ technische Werte zu Gegenständen und Monstern.
 
 ---
 
-## 9. Wenn etwas nicht stimmt
+## 10. Wenn etwas nicht stimmt
 
 Der Treiber prüft beim Laden alles und meldet Fehler mit Datei und Ort, oft mit
 einem Vorschlag:

@@ -75,10 +75,10 @@ impl Welt {
         self.boden.clear();
         self.monster.clear();
         let mut monster = Vec::new();
-        for r in self.d.raeume.values() {
-            self.boden.insert(r.id.clone(), r.gegenstaende.clone());
-            for m in &r.monster {
-                monster.push((m.clone(), r.id.clone()));
+        for (raum, gegenstaende, liste) in self.d.bevoelkerung() {
+            self.boden.insert(raum.clone(), gegenstaende);
+            for m in liste {
+                monster.push((m, raum.clone()));
             }
         }
         for (m, raum) in monster {
@@ -124,7 +124,7 @@ impl Welt {
         let start = self.d.welt.startraum.clone();
         let d = &self.d;
         for s in self.spieler.values_mut() {
-            if !d.raeume.contains_key(&s.sp.raum) {
+            if !d.raum_existiert(&s.sp.raum) {
                 s.sp.raum = start.clone();
             }
             s.sp.inventar.retain(|g| d.gegenstaende.contains_key(g));
@@ -215,10 +215,12 @@ impl Welt {
         if self.ist_online(&sp.name) {
             return Err("Diese Figur ist bereits in der Welt unterwegs.".into());
         }
-        if !self.d.raeume.contains_key(&sp.raum) {
+        if !self.d.raum_existiert(&sp.raum) {
             sp.raum = self.d.welt.startraum.clone();
         }
-        sp.besucht.insert(sp.raum.clone());
+        if !crate::oberwelt::ist_oberwelt(&sp.raum) {
+            sp.besucht.insert(sp.raum.clone());
+        }
         let admin = self.ist_admin(&sp.name);
         let name = sp.name.clone();
         let raum = sp.raum.clone();
@@ -288,17 +290,14 @@ impl Welt {
 
         for (id, m) in &self.monster {
             let Some(def) = self.d.monster.get(&m.def) else { continue };
-            let Some(raum) = self.d.raeume.get(&m.raum) else { continue };
+            let ausgaenge = self.d.ausgaenge(&m.raum);
 
             if def.wandert && rng.gen_range(0..100) < def.wander_chance {
                 // Monster bleiben in ihrem Gebiet (falls ihr Heimatraum eines hat).
-                let gebiet = self.d.raeume.get(&m.heimat).map(|r| r.gebiet.as_str()).unwrap_or("");
-                let moeglich: Vec<_> = raum
-                    .ausgaenge
+                let gebiet = self.d.gebiet(&m.heimat);
+                let moeglich: Vec<_> = ausgaenge
                     .iter()
-                    .filter(|(_, ziel)| {
-                        gebiet.is_empty() || self.d.raeume.get(*ziel).is_some_and(|z| z.gebiet == gebiet)
-                    })
+                    .filter(|(_, ziel)| gebiet.is_empty() || self.d.gebiet(ziel) == gebiet)
                     .collect();
                 if let Some((richt, ziel)) = moeglich.choose(&mut rng) {
                     aktionen.push(Aktion::Gehen(*id, **richt, (*ziel).clone()));
@@ -327,8 +326,8 @@ impl Welt {
                     let name = gross(&self.monster_name(id));
                     let Some(m) = self.monster.get_mut(&id) else { continue };
                     let alt = std::mem::replace(&mut m.raum, ziel.clone());
-                    self.sende_raum(&alt, &format!("{name} geht nach {}.", richt.anzeige()), &[]);
-                    self.sende_raum(&ziel, &format!("{name} kommt von {} herein.", richt.gegenteil().anzeige()), &[]);
+                    self.sende_raum(&alt, &format!("{name} {}.", richt.geht()), &[]);
+                    self.sende_raum(&ziel, &format!("{name} {}.", richt.kommt()), &[]);
                 }
                 Aktion::Sagen(raum, t) => self.sende_raum(&raum, &t, &[]),
             }
@@ -338,10 +337,10 @@ impl Welt {
     /// Fehlende Gegenstände und Monster wieder auffüllen.
     pub fn zuruecksetzen(&mut self) {
         let mut neue_monster = Vec::new();
-        for r in self.d.raeume.values() {
-            let boden = self.boden.entry(r.id.clone()).or_default();
+        for (raum_id, gegenstaende, monster) in self.d.bevoelkerung() {
+            let boden = self.boden.entry(raum_id.clone()).or_default();
             let mut vorhanden = boden.clone();
-            for g in &r.gegenstaende {
+            for g in &gegenstaende {
                 if let Some(pos) = vorhanden.iter().position(|x| x == g) {
                     vorhanden.remove(pos);
                 } else {
@@ -349,12 +348,12 @@ impl Welt {
                 }
             }
             let mut lebend: Vec<&String> =
-                self.monster.values().filter(|m| m.heimat == r.id).map(|m| &m.def).collect();
-            for m in &r.monster {
+                self.monster.values().filter(|m| m.heimat == raum_id).map(|m| &m.def).collect();
+            for m in &monster {
                 if let Some(pos) = lebend.iter().position(|x| *x == m) {
                     lebend.remove(pos);
                 } else {
-                    neue_monster.push((m.clone(), r.id.clone()));
+                    neue_monster.push((m.clone(), raum_id.clone()));
                 }
             }
         }

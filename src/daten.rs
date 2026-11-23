@@ -4,7 +4,9 @@
 //! in den TOML-Dateien aussehen. Beim Laden wird alles gründlich geprüft, damit
 //! Tippfehler sofort mit einer verständlichen Meldung auffallen.
 
+use crate::oberwelt::{self, Oberwelt};
 use crate::text;
+use std::borrow::Cow;
 use serde::Deserialize;
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::fs;
@@ -26,10 +28,14 @@ pub enum Richtung {
     Nordwest,
     Hoch,
     Runter,
+    /// Eine Stadt oder einen Dungeon betreten (von der Oberwelt aus)
+    Rein,
+    /// Zurück auf die Oberwelt
+    Raus,
 }
 
 impl Richtung {
-    pub const ALLE: [Richtung; 10] = [
+    pub const ALLE: [Richtung; 12] = [
         Richtung::Nord,
         Richtung::Nordost,
         Richtung::Ost,
@@ -40,6 +46,8 @@ impl Richtung {
         Richtung::Nordwest,
         Richtung::Hoch,
         Richtung::Runter,
+        Richtung::Rein,
+        Richtung::Raus,
     ];
 
     /// Der Name, der in den Dateien verwendet wird.
@@ -55,6 +63,8 @@ impl Richtung {
             Richtung::Nordwest => "nordwest",
             Richtung::Hoch => "hoch",
             Richtung::Runter => "runter",
+            Richtung::Rein => "rein",
+            Richtung::Raus => "raus",
         }
     }
 
@@ -71,6 +81,8 @@ impl Richtung {
             Richtung::Nordwest => "Nordwesten",
             Richtung::Hoch => "oben",
             Richtung::Runter => "unten",
+            Richtung::Rein => "hinein",
+            Richtung::Raus => "hinaus",
         }
     }
 
@@ -86,6 +98,8 @@ impl Richtung {
             "nw" | "nordwest" | "nordwesten" | "northwest" => Richtung::Nordwest,
             "h" | "hoch" | "oben" | "rauf" | "u" | "up" => Richtung::Hoch,
             "r" | "runter" | "unten" | "d" | "down" => Richtung::Runter,
+            "rein" | "hinein" | "betreten" | "betrete" | "enter" | "in" => Richtung::Rein,
+            "raus" | "hinaus" | "verlassen" | "verlasse" | "leave" | "out" => Richtung::Raus,
             _ => return None,
         })
     }
@@ -102,6 +116,8 @@ impl Richtung {
             Richtung::Nordwest => Richtung::Suedost,
             Richtung::Hoch => Richtung::Runter,
             Richtung::Runter => Richtung::Hoch,
+            Richtung::Rein => Richtung::Raus,
+            Richtung::Raus => Richtung::Rein,
         }
     }
 
@@ -118,6 +134,25 @@ impl Richtung {
             Richtung::Nordwest => (-1, 1, 0),
             Richtung::Hoch => (0, 0, 1),
             Richtung::Runter => (0, 0, -1),
+            Richtung::Rein | Richtung::Raus => (0, 0, 0),
+        }
+    }
+
+    /// "geht nach Norden" / "geht hinein"
+    pub fn geht(self) -> String {
+        match self {
+            Richtung::Rein => "geht hinein".into(),
+            Richtung::Raus => "geht hinaus".into(),
+            _ => format!("geht nach {}", self.anzeige()),
+        }
+    }
+
+    /// Meldung im Zielraum, wenn jemand in diese Richtung gegangen ist.
+    pub fn kommt(self) -> String {
+        match self {
+            Richtung::Rein => "kommt von draußen herein".into(),
+            Richtung::Raus => "kommt heraus".into(),
+            _ => format!("kommt von {} herein", self.gegenteil().anzeige()),
         }
     }
 }
@@ -470,10 +505,66 @@ pub struct Daten {
     pub zauber: BTreeMap<String, ZauberDef>,
     /// Welcher Raum liegt an welcher Koordinate?
     pub koordinaten: HashMap<(i32, i32, i32), String>,
+    pub oberwelt: Option<Oberwelt>,
     pub warnungen: Vec<String>,
 }
 
 impl Daten {
+    /// Holt einen Raum – einen gebauten oder ein Feld der Oberwelt ("ow:x:y").
+    pub fn raum(&self, id: &str) -> Option<Cow<'_, RaumDef>> {
+        if let Some(r) = self.raeume.get(id) {
+            return Some(Cow::Borrowed(r));
+        }
+        let (x, y) = oberwelt::aus_id(id)?;
+        self.oberwelt.as_ref()?.raum_bauen(x, y).map(Cow::Owned)
+    }
+
+    pub fn raum_existiert(&self, id: &str) -> bool {
+        if self.raeume.contains_key(id) {
+            return true;
+        }
+        match (oberwelt::aus_id(id), &self.oberwelt) {
+            (Some((x, y)), Some(ow)) => ow.begehbar(x, y),
+            _ => false,
+        }
+    }
+
+    /// Die Ausgänge eines Raums (schnell, auch für Oberweltfelder).
+    pub fn ausgaenge(&self, id: &str) -> BTreeMap<Richtung, String> {
+        if let Some(r) = self.raeume.get(id) {
+            return r.ausgaenge.clone();
+        }
+        match (oberwelt::aus_id(id), &self.oberwelt) {
+            (Some((x, y)), Some(ow)) => ow.ausgaenge(x, y),
+            _ => BTreeMap::new(),
+        }
+    }
+
+    pub fn gebiet(&self, id: &str) -> String {
+        if let Some(r) = self.raeume.get(id) {
+            return r.gebiet.clone();
+        }
+        match &self.oberwelt {
+            Some(ow) if oberwelt::ist_oberwelt(id) => ow.cfg.gebiet.clone(),
+            _ => String::new(),
+        }
+    }
+
+    /// Alle Orte, an denen von Anfang an Gegenstände oder Monster sind.
+    pub fn bevoelkerung(&self) -> Vec<(String, Vec<String>, Vec<String>)> {
+        let mut aus: Vec<_> = self
+            .raeume
+            .values()
+            .map(|r| (r.id.clone(), r.gegenstaende.clone(), r.monster.clone()))
+            .collect();
+        if let Some(ow) = &self.oberwelt {
+            for o in &ow.orte {
+                aus.push((oberwelt::id(o.x, o.y), o.gegenstaende.clone(), o.monster.clone()));
+            }
+        }
+        aus
+    }
+
     /// Kartensymbol und Farbe eines Raums.
     pub fn raum_symbol(&self, r: &RaumDef) -> (char, String) {
         let g = self.gelaende.get(&r.gelaende);
@@ -523,6 +614,7 @@ pub fn laden(ordner: &Path) -> Result<Daten, Vec<String>> {
         fertigkeiten: BTreeMap::new(),
         zauber: BTreeMap::new(),
         koordinaten: HashMap::new(),
+        oberwelt: None,
         warnungen: Vec::new(),
     };
     let mut fehler = Vec::new();
@@ -572,6 +664,7 @@ pub fn laden(ordner: &Path) -> Result<Daten, Vec<String>> {
         einsortieren!(inh.zauber, d.zauber, "Zauber", datei, &mut fehler);
     }
 
+    d.oberwelt = oberwelt::laden(ordner, &mut fehler);
     pruefen(&mut d, &mut fehler, &mut warnungen);
 
     if fehler.is_empty() {
@@ -583,7 +676,7 @@ pub fn laden(ordner: &Path) -> Result<Daten, Vec<String>> {
 }
 
 /// Macht die englischen Meldungen des TOML-Lesers verständlicher.
-fn toml_fehler_uebersetzen(e: &toml::de::Error) -> String {
+pub fn toml_fehler_uebersetzen(e: &toml::de::Error) -> String {
     let mut t = e.to_string();
     for (en, de) in [
         ("TOML parse error at line", "Fehler in Zeile"),
@@ -618,7 +711,7 @@ fn toml_dateien_sammeln(ordner: &Path, liste: &mut Vec<PathBuf>) {
         let p = e.path();
         if p.is_dir() {
             toml_dateien_sammeln(&p, liste);
-        } else if p.extension().is_some_and(|x| x == "toml") {
+        } else if p.extension().is_some_and(|x| x == "toml") && !p.ends_with("oberwelt/oberwelt.toml") {
             liste.push(p);
         }
     }
@@ -645,6 +738,17 @@ fn verweis<T>(map: &BTreeMap<String, T>, id: &str, wo: &str, art: &str, fehler: 
     fehler.push(m);
 }
 
+/// Wie `verweis`, aber Räume dürfen auch Oberweltfelder ("ow:x:y") sein.
+fn raum_verweis(d: &Daten, id: &str, wo: &str, fehler: &mut Vec<String>) {
+    if oberwelt::ist_oberwelt(id) {
+        if !d.raum_existiert(id) {
+            fehler.push(format!("{wo}: '{id}' ist kein begehbares Feld der Oberwelt."));
+        }
+    } else {
+        verweis(&d.raeume, id, wo, "Raum", fehler);
+    }
+}
+
 fn farbe_pruefen(farbe: &str, wo: &str, fehler: &mut Vec<String>) {
     if !farbe.is_empty() && !text::ist_farbe(farbe) {
         let namen: Vec<String> = text::FARBEN.iter().skip(2).map(|(n, _)| n.to_string()).collect();
@@ -657,7 +761,7 @@ fn pruefen(d: &mut Daten, fehler: &mut Vec<String>, warn: &mut Vec<String>) {
     if d.welt.startraum.is_empty() {
         fehler.push("welt.toml: 'startraum' fehlt.".into());
     } else {
-        verweis(&d.raeume, &d.welt.startraum, "welt.toml (startraum)", "Raum", fehler);
+        raum_verweis(d, &d.welt.startraum, "welt.toml (startraum)", fehler);
     }
     if d.welt.takt_sekunden == 0 {
         fehler.push("welt.toml: 'takt_sekunden' muss mindestens 1 sein.".into());
@@ -687,7 +791,7 @@ fn pruefen(d: &mut Daten, fehler: &mut Vec<String>, warn: &mut Vec<String>) {
         for (richt, ziel) in &r.ausgaenge_roh {
             match Richtung::aus_text(richt) {
                 Some(ri) => {
-                    verweis(&d.raeume, ziel, &format!("{wo}, Ausgang '{richt}'"), "Raum", fehler);
+                    raum_verweis(d, ziel, &format!("{wo}, Ausgang '{richt}'"), fehler);
                     aus.insert(ri, ziel.clone());
                 }
                 None => {
@@ -730,11 +834,37 @@ fn pruefen(d: &mut Daten, fehler: &mut Vec<String>, warn: &mut Vec<String>) {
         }
     }
 
+    // Eingänge der Oberwelt: Die Stadt bekommt automatisch den Ausgang "raus".
+    if let Some(ow) = &d.oberwelt {
+        let mut neu = Vec::new();
+        for e in &ow.eingaenge {
+            verweis(&d.raeume, &e.raum, &format!("oberwelt.toml, Eingang '{}'", e.name), "Raum", fehler);
+            neu.push((e.raum.clone(), oberwelt::id(e.x, e.y)));
+        }
+        for o in &ow.orte {
+            let wo = format!("oberwelt.toml, Ort '{}'", o.name);
+            for g in &o.gegenstaende {
+                verweis(&d.gegenstaende, g, &wo, "Gegenstand", fehler);
+            }
+            for m in &o.monster {
+                verweis(&d.monster, m, &wo, "Monster", fehler);
+            }
+        }
+        for (raum, feld) in neu {
+            if let Some(r) = d.raeume.get_mut(&raum) {
+                r.ausgaenge.entry(Richtung::Raus).or_insert(feld);
+            }
+        }
+    }
+
     // Rückwege automatisch anlegen
     if d.welt.ausgaenge_beidseitig {
         let mut neu = Vec::new();
         for r in d.raeume.values() {
             for (richt, ziel) in &r.ausgaenge {
+                if matches!(richt, Richtung::Rein | Richtung::Raus) {
+                    continue;
+                }
                 if let Some(z) = d.raeume.get(ziel) {
                     if !z.ausgaenge.contains_key(&richt.gegenteil()) {
                         neu.push((ziel.clone(), richt.gegenteil(), r.id.clone()));
@@ -763,6 +893,9 @@ fn pruefen(d: &mut Daten, fehler: &mut Vec<String>, warn: &mut Vec<String>) {
         for (richt, ziel) in &r.ausgaenge {
             if let Some(z) = d.raeume.get(ziel) {
                 let (dx, dy, dz) = richt.versatz();
+                if (dx, dy, dz) == (0, 0, 0) {
+                    continue;
+                }
                 if (z.x, z.y, z.z) != (r.x + dx, r.y + dy, r.z + dz) {
                     warn.push(format!(
                         "[{}] Raum '{}': Ausgang {} führt zu '{}' ({}, {}, {}), der dort nicht liegt. Erwartet: ({}, {}, {}). Die Verbindung fehlt deshalb auf der Karte.",
@@ -774,16 +907,14 @@ fn pruefen(d: &mut Daten, fehler: &mut Vec<String>, warn: &mut Vec<String>) {
     }
 
     // Erreichbarkeit vom Startraum
-    if d.raeume.contains_key(&d.welt.startraum) {
+    if d.raum_existiert(&d.welt.startraum) {
         let mut gesehen = HashSet::new();
         let mut schlange = VecDeque::from([d.welt.startraum.clone()]);
         while let Some(id) = schlange.pop_front() {
             if !gesehen.insert(id.clone()) {
                 continue;
             }
-            if let Some(r) = d.raeume.get(&id) {
-                schlange.extend(r.ausgaenge.values().cloned());
-            }
+            schlange.extend(d.ausgaenge(&id).into_values());
         }
         for r in d.raeume.values() {
             if !gesehen.contains(&r.id) {
@@ -863,7 +994,7 @@ fn pruefen(d: &mut Daten, fehler: &mut Vec<String>, warn: &mut Vec<String>) {
                 fehler.push(format!("{wo}: Wirkung '{}' gibt es nicht. Erlaubt: {}", w.art, WIRKUNGEN.join(", ")));
             }
             if w.art == "teleport" {
-                verweis(&d.raeume, &w.raum, &format!("{wo}, Wirkung teleport"), "Raum", fehler);
+                raum_verweis(d, &w.raum, &format!("{wo}, Wirkung teleport"), fehler);
             }
         }
     }

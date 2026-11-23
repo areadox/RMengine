@@ -32,7 +32,7 @@ regeneration_mp        = 1
 [start]
 lebenspunkte = 100
 mana         = 50
-gegenstaende = ["brot", "fackel"]
+gegenstaende = ["brot", "fackel", "landkarte"]
 zauber       = ["kleine_heilung", "heimkehr", "feuerpfeil"]
 
 [start.fertigkeiten]       # Fertigkeit = Stufe

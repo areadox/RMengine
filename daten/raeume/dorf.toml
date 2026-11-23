@@ -47,6 +47,7 @@ beschreibung = """
 Ein bunter Marktstand mit Körben voller Obst und Gemüse. Die Händlerin ist
 gerade nicht da."""
 gegenstaende = ["apfel", "apfel"]
+ausgaenge = { ost = "osttor" }
 
 [[raum]]
 id       = "nordtor"
@@ -137,3 +138,15 @@ gegenstaende = ["manatrank"]
 [raum.details]
 altar   = "Auf dem Altar liegen frische Blumen."
 fenster = "Das Fenster zeigt eine Eiche unter einem goldenen Sonnenaufgang."
+
+[[raum]]
+id       = "osttor"
+name     = "Das Osttor"
+x = 2
+y = 1
+gebiet   = "dorf"
+gelaende = "haus"
+beschreibung = """
+Ein gedrungenes Tor aus Bruchstein. Draußen beginnt die Landstraße, die
+hinaus ins weite Land führt."""
+# Der Ausgang "raus" auf die Oberwelt entsteht automatisch (siehe oberwelt/oberwelt.toml).
