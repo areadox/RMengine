@@ -1,0 +1,28 @@
+# =====================================================================
+#  Vorlagen für Monster und NPCs (Aufbau: siehe vorlagen/gegenstaende.toml)
+# =====================================================================
+#  NPCs ([npc]) dürfen auch von Monster-Vorlagen erben.
+
+[[monster]]
+id        = "vorlage_raubtier"
+vorlage   = true
+name      = "ein Raubtier"
+aggressiv = true
+wandert   = true
+wander_chance = 10
+angriffe  = ["beißt", "kratzt"]
+
+[[monster]]
+id           = "vorlage_dorfbewohner"
+vorlage      = true
+name         = "ein Dorfbewohner"
+stufe        = 4
+lebenspunkte = 60
+sprech_chance = 8
+
+# Antworten, die alle Dorfbewohner gemeinsam haben. Jeder NPC kann
+# einzelne davon in seiner Datei überschreiben.
+[monster.gespraech]
+ort       = "Du bist in Eichenhain, einem ruhigen Dorf am Rand des Dunkelwalds."
+abschied  = ["Mach's gut, {spieler}!", "Bis bald!"]
+unbekannt = ["Davon weiß ich nichts.", "*zuckt mit den Schultern."]

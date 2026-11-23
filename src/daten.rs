@@ -677,19 +677,6 @@ fn wahr() -> bool {
     true
 }
 
-/// Eine Inhaltsdatei darf beliebig viele Einträge jeder Art enthalten.
-#[derive(Debug, Default, Deserialize)]
-#[serde(deny_unknown_fields, default)]
-struct InhaltsDatei {
-    raum: Vec<RaumDef>,
-    gegenstand: Vec<GegenstandDef>,
-    monster: Vec<MonsterDef>,
-    fertigkeit: Vec<FertigkeitDef>,
-    zauber: Vec<ZauberDef>,
-    beschreibung: Vec<BeschreibungDef>,
-    /// Ein NPC pro Datei: [npc]
-    npc: Option<MonsterDef>,
-}
 
 // ---------------------------------------------------------------------------
 // Die geladenen Daten
@@ -905,20 +892,9 @@ pub fn laden(ordner: &Path) -> Result<Daten, Vec<String>> {
     toml_dateien_sammeln(ordner, &mut dateien);
     dateien.sort();
 
-    macro_rules! einsortieren {
-        ($liste:expr, $ziel:expr, $art:expr, $datei:expr, $fehler:expr) => {
-            for mut e in $liste {
-                e.quelle = $datei.clone();
-                id_pruefen(&e.id, $art, &$datei, $fehler);
-                if $ziel.contains_key(&e.id) {
-                    $fehler.push(format!("[{}] {} '{}' gibt es doppelt.", $datei, $art, e.id));
-                } else {
-                    $ziel.insert(e.id.clone(), e);
-                }
-            }
-        };
-    }
 
+    // 1. Alle Dateien als rohe Tabellen einlesen
+    let mut roh: Vec<Roh> = Vec::new();
     for pfad in dateien {
         if pfad == welt_pfad {
             continue;
@@ -931,25 +907,77 @@ pub fn laden(ordner: &Path) -> Result<Daten, Vec<String>> {
                 continue;
             }
         };
-        let inh: InhaltsDatei = match toml::from_str(&inhalt) {
-            Ok(i) => i,
+        let tabelle: toml::Table = match toml::from_str(&inhalt) {
+            Ok(t) => t,
             Err(e) => {
                 fehler.push(format!("Fehler in '{datei}':\n{}", toml_fehler_uebersetzen(&e)));
                 continue;
             }
         };
-        einsortieren!(inh.raum, d.raeume, "Raum", datei, &mut fehler);
-        einsortieren!(inh.gegenstand, d.gegenstaende, "Gegenstand", datei, &mut fehler);
-        einsortieren!(inh.monster, d.monster, "Monster", datei, &mut fehler);
-        let npcs: Vec<MonsterDef> = inh.npc.into_iter().map(|mut n| {
-            n.ist_npc = true;
-            n
-        }).collect();
-        einsortieren!(npcs, d.monster, "NPC", datei, &mut fehler);
-        einsortieren!(inh.fertigkeit, d.fertigkeiten, "Fertigkeit", datei, &mut fehler);
-        einsortieren!(inh.zauber, d.zauber, "Zauber", datei, &mut fehler);
-        einsortieren!(inh.beschreibung, d.bibliothek, "Beschreibung", datei, &mut fehler);
+        roh_einlesen(tabelle, &datei, &mut roh, &mut fehler);
     }
+
+    // 2. Vererbung auflösen (erbt = "..."), Vorlagen aussortieren
+    let fertig = vererbung_aufloesen(&roh, &mut fehler);
+
+    // 3. In die richtigen Typen umwandeln und prüfen
+    let mut raeume: Vec<(String, RaumDef)> = Vec::new();
+    let mut gegenstaende: Vec<(String, GegenstandDef)> = Vec::new();
+    let mut monster: Vec<(String, MonsterDef)> = Vec::new();
+    let mut npcs: Vec<(String, MonsterDef)> = Vec::new();
+    let mut fertigkeiten: Vec<(String, FertigkeitDef)> = Vec::new();
+    let mut zauber: Vec<(String, ZauberDef)> = Vec::new();
+    let mut bibliothek: Vec<(String, BeschreibungDef)> = Vec::new();
+    for (i, t) in fertig {
+        let r = &roh[i];
+        let id = t.get("id").and_then(|v| v.as_str()).unwrap_or("?").to_string();
+        let wo = format!("[{}] {} '{}'", r.datei, art_anzeige(r.art), id);
+        let wert = toml::Value::Table(t);
+        macro_rules! umwandeln {
+            ($liste:expr) => {
+                match wert.try_into() {
+                    Ok(e) => $liste.push((r.datei.clone(), e)),
+                    Err(e) => fehler.push(format!("{wo}: {}", toml_fehler_uebersetzen(&e))),
+                }
+            };
+        }
+        match r.art {
+            "raum" => umwandeln!(raeume),
+            "gegenstand" => umwandeln!(gegenstaende),
+            "monster" => umwandeln!(monster),
+            "npc" => umwandeln!(npcs),
+            "fertigkeit" => umwandeln!(fertigkeiten),
+            "zauber" => umwandeln!(zauber),
+            _ => umwandeln!(bibliothek),
+        }
+    }
+    macro_rules! einsortieren {
+        ($liste:expr, $ziel:expr, $art:expr) => {
+            for (datei, mut e) in $liste {
+                e.quelle = datei.clone();
+                id_pruefen(&e.id, $art, &datei, &mut fehler);
+                if $ziel.contains_key(&e.id) {
+                    fehler.push(format!("[{}] {} '{}' gibt es doppelt.", datei, $art, e.id));
+                } else {
+                    $ziel.insert(e.id.clone(), e);
+                }
+            }
+        };
+    }
+    let npcs: Vec<(String, MonsterDef)> = npcs
+        .into_iter()
+        .map(|(d, mut n)| {
+            n.ist_npc = true;
+            (d, n)
+        })
+        .collect();
+    einsortieren!(raeume, d.raeume, "Raum");
+    einsortieren!(gegenstaende, d.gegenstaende, "Gegenstand");
+    einsortieren!(monster, d.monster, "Monster");
+    einsortieren!(npcs, d.monster, "NPC");
+    einsortieren!(fertigkeiten, d.fertigkeiten, "Fertigkeit");
+    einsortieren!(zauber, d.zauber, "Zauber");
+    einsortieren!(bibliothek, d.bibliothek, "Beschreibung");
 
     d.oberwelt = oberwelt::laden(ordner, &mut fehler);
     d.befehle = crate::befehlskonfig::laden(ordner, &mut fehler, &mut warnungen);
@@ -966,6 +994,19 @@ pub fn laden(ordner: &Path) -> Result<Daten, Vec<String>> {
 /// Macht die englischen Meldungen des TOML-Lesers verständlicher.
 pub fn toml_fehler_uebersetzen(e: &toml::de::Error) -> String {
     let mut t = e.to_string();
+    // Bei einem vertippten Feldnamen das passende Feld vorschlagen
+    if let Some(rest) = t.split("unknown field `").nth(1) {
+        if let Some((falsch, erlaubt)) = rest.split_once("`, expected one of ") {
+            let felder: Vec<String> = erlaubt
+                .split(',')
+                .map(|f| f.trim().trim_matches('`').to_string())
+                .filter(|f| !f.is_empty())
+                .collect();
+            if let Some(v) = text::vorschlag(falsch, felder.iter()) {
+                t = format!("Meintest du '{v}'? {t}");
+            }
+        }
+    }
     for (en, de) in [
         ("TOML parse error at line", "Fehler in Zeile"),
         (", column", ", Spalte"),
@@ -991,6 +1032,161 @@ pub fn toml_fehler_uebersetzen(e: &toml::de::Error) -> String {
         t = t.replace(en, de);
     }
     t
+}
+
+// ---------------------------------------------------------------------------
+// Rohe Einträge und Vererbung
+// ---------------------------------------------------------------------------
+
+/// Ein Eintrag, wie er in der Datei steht – noch ohne Vererbung.
+struct Roh {
+    art: &'static str,
+    datei: String,
+    t: toml::Table,
+}
+
+const ARTEN: &[&str] = &["raum", "gegenstand", "monster", "npc", "fertigkeit", "zauber", "beschreibung"];
+
+fn art_anzeige(art: &str) -> &'static str {
+    match art {
+        "raum" => "Raum",
+        "gegenstand" => "Gegenstand",
+        "monster" => "Monster",
+        "npc" => "NPC",
+        "fertigkeit" => "Fertigkeit",
+        "zauber" => "Zauber",
+        _ => "Beschreibung",
+    }
+}
+
+/// NPCs dürfen von Monstern erben (und umgekehrt): Sie teilen sich einen Namensraum.
+fn art_gruppe(art: &str) -> &str {
+    if art == "npc" {
+        "monster"
+    } else {
+        art
+    }
+}
+
+fn roh_einlesen(tabelle: toml::Table, datei: &str, roh: &mut Vec<Roh>, fehler: &mut Vec<String>) {
+    for (schluessel, wert) in tabelle {
+        let Some(art) = ARTEN.iter().copied().find(|a| *a == schluessel) else {
+            let namen: Vec<String> = ARTEN.iter().map(|a| a.to_string()).collect();
+            let tipp = text::vorschlag(&schluessel, namen.iter()).map(|v| format!(" Meintest du [[{v}]]?")).unwrap_or_default();
+            fehler.push(format!("[{datei}] Unbekannter Abschnitt '{schluessel}'.{tipp}"));
+            continue;
+        };
+        match (art, wert) {
+            ("npc", toml::Value::Table(t)) => roh.push(Roh { art, datei: datei.to_string(), t }),
+            ("npc", _) => fehler.push(format!("[{datei}] Ein NPC steht als [npc] in seiner eigenen Datei.")),
+            (_, toml::Value::Array(liste)) => {
+                for e in liste {
+                    match e {
+                        toml::Value::Table(t) => roh.push(Roh { art, datei: datei.to_string(), t }),
+                        _ => fehler.push(format!("[{datei}] Einträge müssen als [[{art}]] geschrieben werden.")),
+                    }
+                }
+            }
+            _ => fehler.push(format!("[{datei}] Bitte [[{art}]] (mit doppelten Klammern) schreiben.")),
+        }
+    }
+}
+
+/// Mischt eine Tabelle in eine andere: Werte des Kindes gewinnen,
+/// Untertabellen (z.B. eigenschaften, gespraech) werden zusammengeführt.
+fn mischen(mut eltern: toml::Table, kind: toml::Table) -> toml::Table {
+    for (k, v) in kind {
+        match (eltern.remove(&k), v) {
+            (Some(toml::Value::Table(a)), toml::Value::Table(b)) => {
+                eltern.insert(k, toml::Value::Table(mischen(a, b)));
+            }
+            (_, v) => {
+                eltern.insert(k, v);
+            }
+        }
+    }
+    eltern
+}
+
+/// Löst `erbt = "..."` auf. Gibt (Index, fertige Tabelle) aller echten Einträge zurück;
+/// Vorlagen (`vorlage = true`) werden nur zum Erben benutzt.
+fn vererbung_aufloesen(roh: &[Roh], fehler: &mut Vec<String>) -> Vec<(usize, toml::Table)> {
+    let id_von = |r: &Roh| r.t.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let mut index: HashMap<(String, String), usize> = HashMap::new();
+    for (i, r) in roh.iter().enumerate() {
+        index.entry((art_gruppe(r.art).to_string(), id_von(r))).or_insert(i);
+    }
+
+    fn aufloesen(
+        i: usize,
+        roh: &[Roh],
+        index: &HashMap<(String, String), usize>,
+        fertig: &mut Vec<Option<toml::Table>>,
+        kette: &mut Vec<usize>,
+        fehler: &mut Vec<String>,
+    ) -> Option<toml::Table> {
+        if let Some(t) = &fertig[i] {
+            return Some(t.clone());
+        }
+        let r = &roh[i];
+        let id = r.t.get("id").and_then(|v| v.as_str()).unwrap_or("?").to_string();
+        let wo = format!("[{}] {} '{}'", r.datei, art_anzeige(r.art), id);
+        let mut t = r.t.clone();
+        let erbt = t.remove("erbt");
+        let ergebnis = match erbt {
+            None => t,
+            Some(toml::Value::String(eltern_id)) => {
+                if r.art == "raum" {
+                    fehler.push(format!("{wo}: Räume können nicht erben."));
+                    return None;
+                }
+                let Some(&j) = index.get(&(art_gruppe(r.art).to_string(), eltern_id.clone())) else {
+                    let kandidaten: Vec<String> = index
+                        .keys()
+                        .filter(|(g, _)| g == art_gruppe(r.art))
+                        .map(|(_, id)| id.clone())
+                        .collect();
+                    let tipp = text::vorschlag(&eltern_id, kandidaten.iter())
+                        .map(|v| format!(" Meintest du '{v}'?"))
+                        .unwrap_or_default();
+                    fehler.push(format!("{wo}: erbt von '{eltern_id}', den es nicht gibt.{tipp}"));
+                    return None;
+                };
+                if kette.contains(&j) || j == i {
+                    fehler.push(format!("{wo}: Die Vererbung dreht sich im Kreis (über '{eltern_id}')."));
+                    return None;
+                }
+                kette.push(i);
+                let eltern = aufloesen(j, roh, index, fertig, kette, fehler);
+                kette.pop();
+                let mut eltern = eltern?;
+                eltern.remove("vorlage");
+                mischen(eltern, t)
+            }
+            Some(_) => {
+                fehler.push(format!("{wo}: 'erbt' muss eine ID in Anführungszeichen sein."));
+                return None;
+            }
+        };
+        fertig[i] = Some(ergebnis.clone());
+        Some(ergebnis)
+    }
+
+    let mut fertig: Vec<Option<toml::Table>> = vec![None; roh.len()];
+    let mut aus = Vec::new();
+    for i in 0..roh.len() {
+        let Some(mut t) = aufloesen(i, roh, &index, &mut fertig, &mut Vec::new(), fehler) else { continue };
+        match t.remove("vorlage") {
+            Some(toml::Value::Boolean(true)) => continue, // nur zum Erben da
+            Some(toml::Value::Boolean(false)) | None => {}
+            Some(_) => {
+                fehler.push(format!("[{}] 'vorlage' muss true oder false sein.", roh[i].datei));
+                continue;
+            }
+        }
+        aus.push((i, t));
+    }
+    aus
 }
 
 fn toml_dateien_sammeln(ordner: &Path, liste: &mut Vec<PathBuf>) {
@@ -1381,5 +1577,33 @@ fn pruefen(d: &mut Daten, fehler: &mut Vec<String>, warn: &mut Vec<String>) {
                 raum_verweis(d, &w.raum, &format!("{wo}, Wirkung teleport"), fehler);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn beispiel() -> Daten {
+        laden(&Path::new(env!("CARGO_MANIFEST_DIR")).join("daten")).expect("Beispielwelt lädt")
+    }
+
+    #[test]
+    fn vererbung_aus_vorlagen() {
+        let d = beispiel();
+        // Vorlagen selbst gibt es nicht in der Welt
+        assert!(!d.gegenstaende.contains_key("vorlage_waffe"));
+        assert!(!d.monster.contains_key("vorlage_dorfbewohner"));
+        // Geerbte Werte
+        let dolch = &d.gegenstaende["dolch"];
+        assert_eq!((dolch.typ.as_str(), dolch.platz.as_str(), dolch.fertigkeit.as_str()), ("waffe", "waffe", "schwertkampf"));
+        assert_eq!(dolch.erholung, Some(1.3)); // eigener Wert schlägt Vorlage
+        let wirt = &d.monster["wirt"];
+        assert!(wirt.ist_npc && !wirt.ist_angreifbar());
+        assert!(!wirt.gespraech.ort.ist_leer()); // aus der Vorlage
+        assert!(!wirt.gespraech.beruf.ist_leer()); // eigene Antwort
+        assert!(d.monster["ratte"].aggressiv);
+        let segen = &d.zauber["segen"];
+        assert_eq!((segen.ziel.as_str(), segen.fertigkeit.as_str()), ("raum", "heilkunde"));
     }
 }

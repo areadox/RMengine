@@ -1,0 +1,49 @@
+# =====================================================================
+#  Vorlagen für Gegenstände
+# =====================================================================
+#  Eine Vorlage (vorlage = true) erscheint nicht selbst in der Welt.
+#  Andere Einträge übernehmen mit  erbt = "<id>"  alle ihre Werte und
+#  geben nur noch an, was anders ist. Beispiel:
+#
+#    [[gegenstand]]
+#    id    = "dolch"
+#    erbt  = "vorlage_waffe"    # typ, platz, fertigkeit ... kommen von hier
+#    name  = "ein Dolch"
+#    erholung = 1.3             # überschreibt den Wert der Vorlage
+#
+#  Tabellen wie eigenschaften werden zusammengeführt, Listen ersetzt.
+#  Auch eine Vorlage kann von einer anderen erben.
+# =====================================================================
+
+[[gegenstand]]
+id         = "vorlage_waffe"
+vorlage    = true
+name       = "eine Waffe"
+typ        = "waffe"
+platz      = "waffe"
+fertigkeit = "schwertkampf"
+erholung   = 2.0
+gewicht    = 2
+
+[[gegenstand]]
+id         = "vorlage_ruestung"
+vorlage    = true
+name       = "ein Rüstungsteil"
+typ        = "ruestung"
+gewicht    = 2
+
+[[gegenstand]]
+id      = "vorlage_trank"
+vorlage = true
+name    = "ein Trank"
+typ     = "trank"
+gewicht = 1
+wert    = 25
+
+[[gegenstand]]
+id      = "vorlage_essen"
+vorlage = true
+name    = "etwas zu essen"
+typ     = "nahrung"
+gewicht = 1
+wert    = 2

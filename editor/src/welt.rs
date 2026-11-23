@@ -195,13 +195,13 @@ pub struct Welt {
     tabellen: HashMap<String, (String, Table)>,
 }
 
-fn s(t: &Table, k: &str) -> String {
+pub(crate) fn s(t: &Table, k: &str) -> String {
     t.get(k).and_then(|i| i.as_str()).unwrap_or_default().to_string()
 }
 fn n(t: &Table, k: &str) -> i32 {
     t.get(k).and_then(|i| i.as_integer()).unwrap_or(0) as i32
 }
-fn liste(t: &Table, k: &str) -> Vec<String> {
+pub(crate) fn liste(t: &Table, k: &str) -> Vec<String> {
     t.get(k)
         .and_then(|i| i.as_array())
         .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
@@ -219,7 +219,7 @@ fn tabelle_als_map(i: Option<&Item>) -> BTreeMap<String, String> {
     m
 }
 
-fn dateien_sammeln(ordner: &Path, basis: &Path, liste: &mut Vec<String>) {
+pub(crate) fn dateien_sammeln(ordner: &Path, basis: &Path, liste: &mut Vec<String>) {
     let Ok(eintraege) = fs::read_dir(ordner) else { return };
     for e in eintraege.flatten() {
         let p = e.path();
@@ -227,7 +227,7 @@ fn dateien_sammeln(ordner: &Path, basis: &Path, liste: &mut Vec<String>) {
             dateien_sammeln(&p, basis, liste);
         } else if p.extension().is_some_and(|x| x == "toml") {
             let rel = p.strip_prefix(basis).unwrap_or(&p).to_string_lossy().replace('\\', "/");
-            if rel != "welt.toml" && rel != "oberwelt/oberwelt.toml" {
+            if rel != "welt.toml" && rel != "oberwelt/oberwelt.toml" && rel != "befehle.toml" && !rel.starts_with("befehle/") {
                 liste.push(rel);
             }
         }
@@ -235,9 +235,10 @@ fn dateien_sammeln(ordner: &Path, basis: &Path, liste: &mut Vec<String>) {
 }
 
 fn ids_aus(doc: &DocumentMut, art: &str) -> Vec<String> {
+    let echt = |t: &&Table| t.get("vorlage").and_then(|v| v.as_bool()) != Some(true);
     match doc.get(art) {
-        Some(Item::ArrayOfTables(a)) => a.iter().map(|t| s(t, "id")).filter(|i| !i.is_empty()).collect(),
-        Some(Item::Table(t)) => vec![s(t, "id")].into_iter().filter(|i| !i.is_empty()).collect(),
+        Some(Item::ArrayOfTables(a)) => a.iter().filter(echt).map(|t| s(t, "id")).filter(|i| !i.is_empty()).collect(),
+        Some(Item::Table(t)) => Some(t).filter(echt).map(|t| s(t, "id")).into_iter().filter(|i| !i.is_empty()).collect(),
         _ => Vec::new(),
     }
 }
@@ -699,6 +700,16 @@ impl Welt {
             let alt = self.docs.get(&datei);
             let mut doc = alt.cloned().unwrap_or_default();
             let raeume = nach_datei.get(&datei).cloned().unwrap_or_default();
+            // Kommentare vor gelöschten oder verschobenen Räumen retten
+            let alte: Vec<Table> = match doc.get("raum") {
+                Some(Item::ArrayOfTables(a)) => a.iter().cloned().collect(),
+                _ => Vec::new(),
+            };
+            let bleibt: Vec<bool> = alte
+                .iter()
+                .map(|t| raeume.iter().any(|r| r.herkunft.as_deref() == Some(s(t, "id").as_str())))
+                .collect();
+            let (extra, rest) = kommentare_umverteilen(&alte, &bleibt);
             let mut aot = ArrayOfTables::new();
             for r in &raeume {
                 let mut t = match r.herkunft.as_ref().and_then(|h| self.tabellen.get(h)) {
@@ -713,8 +724,12 @@ impl Welt {
                     None => neue_tabelle(),
                 };
                 raum_schreiben(&mut t, r);
+                if let Some(p) = alte.iter().position(|a| r.herkunft.as_deref() == Some(s(a, "id").as_str())).and_then(|i| extra.get(&i)) {
+                    praefix_voranstellen(&mut t, p);
+                }
                 aot.push(t);
             }
+            kommentar_ans_ende(&mut doc, &rest);
             let hatte = matches!(doc.get("raum"), Some(Item::ArrayOfTables(_)));
             if aot.is_empty() {
                 if hatte {
@@ -919,14 +934,56 @@ fn positionen_loeschen(t: &mut Table) {
     }
 }
 
-fn neue_tabelle() -> Table {
+/// Kommentare stehen in toml_edit VOR einer Tabelle als deren "Präfix".
+/// Wird eine Tabelle gelöscht, geben wir ihren Kommentar an die nächste weiter.
+pub(crate) fn praefix(t: &Table) -> String {
+    t.decor().prefix().and_then(|p| p.as_str()).unwrap_or("").to_string()
+}
+
+pub(crate) fn praefix_voranstellen(t: &mut Table, p: &str) {
+    if p.contains('#') {
+        let alt = praefix(t);
+        t.decor_mut().set_prefix(format!("{}{}", p.trim_end_matches('\n'), if alt.starts_with('\n') { alt } else { format!("\n{alt}") }));
+    }
+}
+
+/// Nicht mehr verwendete Kommentare ans Dateiende hängen, statt sie zu verlieren.
+pub(crate) fn kommentar_ans_ende(doc: &mut DocumentMut, p: &str) {
+    if p.contains('#') {
+        let alt = doc.trailing().as_str().unwrap_or("").to_string();
+        doc.set_trailing(format!("{alt}{}\n", p.trim_end()));
+    }
+}
+
+/// Neue Liste aus alten Tabellen: `nehmen[i]` sagt, welche bleiben (und in welcher
+/// Reihenfolge sie erscheinen). Kommentare gelöschter Tabellen wandern zur nächsten
+/// bleibenden Tabelle. Rückgabe: (alte Position -> zusätzlicher Präfix, Rest).
+pub(crate) fn kommentare_umverteilen(alte: &[Table], bleibt: &[bool]) -> (HashMap<usize, String>, String) {
+    let mut extra: HashMap<usize, String> = HashMap::new();
+    let mut offen = String::new();
+    for (i, t) in alte.iter().enumerate() {
+        if bleibt.get(i).copied().unwrap_or(false) {
+            if !offen.is_empty() {
+                extra.insert(i, std::mem::take(&mut offen));
+            }
+        } else {
+            let p = praefix(t);
+            if p.contains('#') {
+                offen.push_str(&p);
+            }
+        }
+    }
+    (extra, offen)
+}
+
+pub(crate) fn neue_tabelle() -> Table {
     let mut t = Table::new();
     t.decor_mut().set_prefix("\n");
     t
 }
 
 /// Setzt einen Wert und behält dabei Kommentare/Abstände des alten Werts.
-fn wert_setzen(t: &mut Table, k: &str, mut neu: Value) {
+pub(crate) fn wert_setzen(t: &mut Table, k: &str, mut neu: Value) {
     // Vorhandenen Wert an Ort und Stelle ersetzen: So bleiben auch die
     // Ausrichtung des Schlüssels ("startraum  = ...") und Kommentare erhalten.
     if let Some(Item::Value(alt)) = t.get_mut(k) {
@@ -938,7 +995,7 @@ fn wert_setzen(t: &mut Table, k: &str, mut neu: Value) {
     t.insert(k, Item::Value(neu));
 }
 
-fn text_wert(v: &str) -> Value {
+pub(crate) fn text_wert(v: &str) -> Value {
     if v.contains('\n') {
         // Mehrzeilig wie in den Beispieldateien: """\n...\"""
         let roh = format!("\"\"\"\n{}\"\"\"", v.replace('\\', "\\\\").replace("\"\"\"", "\\\"\\\"\\\""));
@@ -951,7 +1008,7 @@ fn text_wert(v: &str) -> Value {
     Value::from(v)
 }
 
-fn setze_text(t: &mut Table, k: &str, v: &str, pflicht: bool) {
+pub(crate) fn setze_text(t: &mut Table, k: &str, v: &str, pflicht: bool) {
     let alt = t.get(k).and_then(|i| i.as_str());
     if alt == Some(v) {
         return;
@@ -975,7 +1032,7 @@ fn setze_zahl(t: &mut Table, k: &str, v: i32, pflicht: bool) {
     wert_setzen(t, k, Value::from(v as i64));
 }
 
-fn setze_liste(t: &mut Table, k: &str, v: &[String]) {
+pub(crate) fn setze_liste(t: &mut Table, k: &str, v: &[String]) {
     let alt: Option<Vec<String>> = t.get(k).and_then(|i| i.as_array()).map(|a| {
         a.iter().filter_map(|x| x.as_str().map(String::from)).collect()
     });
@@ -1178,6 +1235,19 @@ mod tests {
         let mut w3 = Welt::laden(&ordner).unwrap();
         w3.loeschen("kapelle");
         assert!(w3.pruefen().iter().any(|p| p.fehler && p.text.contains("Wiederbelebungsort")));
+        let _ = fs::remove_dir_all(ordner);
+    }
+
+    #[test]
+    fn ersten_raum_loeschen_behaelt_dateikommentar() {
+        let ordner = kopie("loeschen");
+        let mut w = Welt::laden(&ordner).unwrap();
+        w.loeschen("dorfplatz");
+        w.startraum = "hauptstrasse".into();
+        w.speichern().unwrap();
+        let text = fs::read_to_string(ordner.join("raeume/dorf.toml")).unwrap();
+        assert!(text.contains("#  Das Dorf Eichenhain"), "{text}");
+        assert!(!text.contains("id       = \"dorfplatz\""));
         let _ = fs::remove_dir_all(ordner);
     }
 }

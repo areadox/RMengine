@@ -4,6 +4,7 @@
 
 [npc]
 id        = "kraemerin"
+erbt      = "vorlage_dorfbewohner"   # siehe daten/vorlagen/wesen.toml
 name      = "die Krämerin"
 akkusativ = "die Krämerin"
 dativ     = "der Krämerin"

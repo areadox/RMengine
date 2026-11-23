@@ -170,10 +170,13 @@ pub fn laden(ordner: &Path, fehler: &mut Vec<String>, warn: &mut Vec<String>) ->
             }
         };
         for (id, a) in datei.befehl {
-            if anpassung.contains_key(&id) {
-                fehler.push(format!("[{name}] [befehl.{id}] steht in mehreren Dateien."));
-            } else {
-                anpassung.insert(id, a);
+            match anpassung.entry(id) {
+                std::collections::btree_map::Entry::Occupied(e) => {
+                    fehler.push(format!("[{name}] [befehl.{}] steht in mehreren Dateien.", e.key()));
+                }
+                std::collections::btree_map::Entry::Vacant(e) => {
+                    e.insert(a);
+                }
             }
         }
         gesten.extend(datei.geste);

@@ -7,7 +7,13 @@
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
 mod app;
+mod befehle;
+mod bereiche;
+#[allow(dead_code)]
+#[path = "../../src/befehlsliste.rs"]
+mod befehlsliste;
 mod welt;
+mod zauber;
 
 fn main() -> eframe::Result {
     let ordner = app::ordner_suchen(std::env::args().nth(1));

@@ -83,7 +83,8 @@ das Update und veröffentlicht alles als Release.
 - **Stufen und Erfahrung**, Punkte zum Verteilen, dazu steigende Fertigkeiten
 - **Tod und Wiederbelebung:** Mitspieler können 5 Minuten lang helfen, sonst (oder mit `aufgeben`) erwacht man im Tempel
 - **Befehle anpassen:** Wörter, Rollen, Hilfetexte und Abschalten über `daten/befehle/`, dazu eigene **Gesten** (`winke`, `verbeuge` …)
-- **Grafischer Welteditor** (`rmeditor`): Räume auf einer Karte anlegen, verschieben, verbinden und beschreiben. Kommentare in den TOML-Dateien bleiben beim Speichern erhalten.
+- **Vorlagen und Vererbung** (`erbt = "..."`, `vorlage = true`) für Gegenstände, Monster, NPCs, Zauber, Fertigkeiten und Beschreibungen
+- **Grafischer Welteditor** (`rmeditor`): Räume auf einer Karte anlegen, verschieben, verbinden und beschreiben; Zauber und Befehle/Gesten bearbeiten. Kommentare in den TOML-Dateien bleiben beim Speichern erhalten.
 
 ## Code-Überblick (`src/`)
 
@@ -111,3 +112,6 @@ Der Welteditor (`editor/src/`):
 | `main.rs` | Programmstart, Suche nach dem Datenordner                             |
 | `welt.rs` | Räume laden, prüfen und kommentarerhaltend speichern (`toml_edit`)    |
 | `app.rs`  | Oberfläche: Karte, Raumliste, Eigenschaften, Rückgängig (`egui`)      |
+| `zauber.rs` | Zauber laden, mit Vererbung anzeigen, prüfen und speichern          |
+| `befehle.rs` | Befehle und Gesten laden, prüfen und speichern                     |
+| `bereiche.rs` | Oberfläche der Bereiche Zauber und Befehle                        |

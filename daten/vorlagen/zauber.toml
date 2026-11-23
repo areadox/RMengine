@@ -1,0 +1,19 @@
+# =====================================================================
+#  Vorlagen für Zauber (Aufbau: siehe vorlagen/gegenstaende.toml)
+# =====================================================================
+
+[[zauber]]
+id            = "vorlage_heilzauber"
+vorlage       = true
+name          = "Heilzauber"
+ziel          = "spieler"
+fertigkeit    = "heilkunde"
+mindest_stufe = 1
+
+[[zauber]]
+id            = "vorlage_kampfzauber"
+vorlage       = true
+name          = "Kampfzauber"
+ziel          = "gegner"
+fertigkeit    = "magie"
+mindest_stufe = 1

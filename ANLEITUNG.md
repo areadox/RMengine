@@ -153,6 +153,7 @@ daten/
   npcs/*.toml          NPCs mit Gesprächen, ein NPC pro Datei
   beschreibungen/      allgemeine Beschreibungen (Bäume, Himmel, Möbel ...)
   befehle/             Befehle anpassen und eigene Gesten
+  vorlagen/            Vorlagen, von denen andere Einträge erben
   fertigkeiten/*.toml  Fertigkeiten
   zauber/*.toml        Zaubersprüche
   oberwelt/            die Landschaft (siehe Abschnitt 6)
@@ -192,6 +193,48 @@ In allen Texten kannst du Farben setzen: `"Ein {rot}gefährlicher{/} Ort"`.
 `{/}` schaltet die Farbe wieder aus.
 Verfügbar sind: `rot gruen gelb blau magenta cyan weiss grau schwarz hellrot
 hellgruen hellgelb hellblau hellmagenta hellcyan hellweiss fett`.
+
+---
+
+### Vorlagen und Vererbung
+
+Viele Einträge sehen sich ähnlich: Alle Waffen liegen am Platz `waffe`, alle
+Tränke sind vom Typ `trank`, alle Dorfbewohner sind friedlich. Statt das überall
+zu wiederholen, legst du eine **Vorlage** an und lässt andere Einträge davon
+**erben**:
+
+```toml
+# daten/vorlagen/gegenstaende.toml
+[[gegenstand]]
+id         = "vorlage_waffe"
+vorlage    = true            # nur zum Erben da, erscheint nicht in der Welt
+name       = "eine Waffe"
+typ        = "waffe"
+platz      = "waffe"
+fertigkeit = "schwertkampf"
+erholung   = 2.0
+
+# daten/gegenstaende/ausruestung.toml
+[[gegenstand]]
+id       = "dolch"
+erbt     = "vorlage_waffe"   # übernimmt typ, platz, fertigkeit, erholung ...
+name     = "ein Dolch"
+erholung = 1.3               # ... und überschreibt nur, was anders ist
+eigenschaften = { schaden = 3 }
+```
+
+- Erben können **Gegenstände, Monster, NPCs, Zauber, Fertigkeiten und
+  Beschreibungen**. NPCs dürfen auch von Monster-Vorlagen erben.
+- **Tabellen** wie `eigenschaften` oder `[npc.gespraech]` werden zusammengeführt:
+  Der Wirt erbt zum Beispiel die gemeinsamen Antworten aller Dorfbewohner und
+  ergänzt seine eigenen. **Listen** wie `schluesselwoerter` werden ersetzt.
+- Eine Vorlage kann selbst wieder erben, und sie kann in einer anderen Datei
+  stehen als die Einträge, die von ihr erben.
+- Räume erben nicht. Jeder Raum ist einzigartig.
+- Die Prüfung meldet unbekannte Vorlagen (mit Vorschlag) und Vererbung im Kreis.
+
+In der Beispielwelt stehen die Vorlagen in `daten/vorlagen/`: Waffen,
+Rüstungen, Tränke, Essen, Raubtiere, Dorfbewohner, Heil- und Kampfzauber.
 
 ---
 
@@ -371,6 +414,24 @@ automatisch mit aktualisiert.
   Dort kannst du `ow:x:y` oder `x = … / y = …` kopieren oder das Feld direkt als
   Ausgang `raus` des zuletzt gewählten Raums eintragen.
 - **Strg+S** speichert, **Strg+Z** macht rückgängig, **Strg+Y** stellt wieder her.
+
+Oben schaltest du zwischen drei Bereichen um:
+
+- **🗺 Räume:** die Karte, wie oben beschrieben.
+- **✨ Zauber:** alle Zauber und Zauber-Vorlagen. Du kannst Name, Kosten, Ziel,
+  Fertigkeit, Abklingzeit, Wirkungen und Texte bearbeiten, Zauber anlegen,
+  kopieren und löschen. Ist ein Zauber von einer Vorlage abgeleitet, sind die
+  geerbten Werte grau. Wer selbst etwas einträgt, überschreibt die Vorlage.
+  Benennst du einen Zauber um, passt der Editor die Startzauber, die Monster und
+  die Vorlagen-Verweise an.
+- **⌨ Befehle:** alle eingebauten Befehle (gelb = angepasst, durchgestrichen =
+  abgeschaltet) und alle Gesten. Bei Befehlen änderst du Wörter, Rolle,
+  Hilfetext und Aufruf; *Auf Standard zurücksetzen* nimmt alles zurück. Bei
+  Gesten siehst du unten eine Vorschau, wie die Texte im Spiel aussehen.
+  Gespeichert wird in `daten/befehle/`, und zwar nur, was vom Standard abweicht.
+
+Die Prüfung oben zählt Fehler in allen drei Bereichen, zum Beispiel ein Wort,
+das zwei Befehlen gehört, oder einen Zauber mit unbekannter Fertigkeit.
 
 Beim Speichern ändert der Editor nur, was du wirklich geändert hast. Kommentare,
 Leerzeilen, `details` und alles andere, was der Editor nicht kennt, bleiben in den
@@ -815,45 +876,45 @@ Admins können mit `erfahrung <spieler> <menge>` zum Testen Erfahrung vergeben.
 ---
 
 ## 11. Befehle anpassen und eigene Gesten
-  fertigkeiten/*.toml  Fertigkeiten
-  zauber/*.toml        Zaubersprüche
-  oberwelt/            die Landschaft (siehe Abschnitt 6)
-```
 
-Die Ordner sind nur eine Ordnungshilfe. Der Treiber liest **alle** `.toml`-Dateien
-im Datenordner und in allen Unterordnern, und jede Datei darf jede Art von
-Eintrag enthalten. Du kannst also auch ein ganzes Gebiet mit Räumen, Monstern und
-Gegenständen in eine Datei `gebiete/sumpf.toml` schreiben.
+Alle Befehle lassen sich anpassen, ohne zu programmieren. Die Dateien liegen im
+Ordner `daten/befehle/` (alternativ eine einzelne Datei `daten/befehle.toml`).
+Am bequemsten geht es im Welteditor im Bereich *⌨ Befehle*.
 
-### Grundregeln für TOML-Dateien
+### Eingebaute Befehle ändern (`befehle/anpassungen.toml`)
 
 ```toml
-# Ein Kommentar (wird ignoriert)
-text     = "In Anführungszeichen"
-zahl     = 42
-schalter = true                       # oder false
-liste    = ["eins", "zwei"]
-tabelle  = { nord = "raum_a", ost = "raum_b" }
-langtext = """
-Ein Text über
-mehrere Zeilen."""
+[befehl.toete]
+woerter = ["toete", "attacke", "kill", "k"]  # ersetzt alle Wörter, das erste ist der Hauptname
+rolle   = "spieler"                          # spieler, baumeister oder admin
+aktiv   = true                               # false = abgeschaltet
+hilfe   = "Angreifen"                        # Text in der Hilfe
+syntax  = "toete <monster>"
 ```
 
-`[[raum]]` beginnt einen **neuen** Raum, `[[gegenstand]]` einen neuen Gegenstand
-und so weiter.
+Die Namen aller Befehle (`toete`, `schau`, `nimm` …) zeigt der Welteditor im
+Bereich *Befehle*, im Spiel `hilfe <befehl>`. Die Hilfe im Spiel entsteht
+automatisch aus diesen Angaben: Umbenannte, abgeschaltete und neue Befehle
+erscheinen dort sofort richtig. Die Prüfung meldet, wenn ein Wort doppelt
+vergeben ist oder mit einer Richtung (`n`, `o` …) zusammenstößt.
 
-### IDs
+### Gesten (`befehle/gesten.toml`)
 
-Jeder Eintrag hat eine `id`. Über die ID verweisen Einträge aufeinander. IDs
-bestehen nur aus Kleinbuchstaben ohne Umlaute, Ziffern und `_`, zum Beispiel
-`alte_eiche` oder `heiltrank2`.
+```toml
+[[geste]]
+woerter     = ["winke", "winken"]
+hilfe       = "Winken oder jemandem zuwinken"
+selbst      = "Du winkst fröhlich."              # winke
+andere      = "{name} winkt fröhlich."
+selbst_ziel = "Du winkst {ziel_dativ} zu."       # winke bert / winke wirt
+ziel        = "{name} winkt dir zu."
+andere_ziel = "{name} winkt {ziel_dativ} zu."
+```
 
-### Farben
-
-In allen Texten kannst du Farben setzen: `"Ein {rot}gefährlicher{/} Ort"`.
-`{/}` schaltet die Farbe wieder aus.
-Verfügbar sind: `rot gruen gelb blau magenta cyan weiss grau schwarz hellrot
-hellgruen hellgelb hellblau hellmagenta hellcyan hellweiss fett`.
+`{name}` ist, wer die Geste macht. `{ziel}` ist das Ziel im Akkusativ („den
+Wirt“), `{ziel_dativ}` im Dativ („dem Wirt“). Den Dativ trägt man bei NPCs und
+Monstern mit `dativ = "dem Wirt"` ein. Mit `rolle` kann eine Geste auch nur für
+Baumeister oder Admins gelten, mit `aktiv = false` wird sie abgeschaltet.
 
 ---
 

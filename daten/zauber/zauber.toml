@@ -8,13 +8,11 @@
 
 [[zauber]]
 id   = "kleine_heilung"
+erbt = "vorlage_heilzauber"
 name = "Kleine Heilung"
 schluesselwoerter = ["heilung", "heilen"]
 beschreibung = "Heilt leichte Wunden."
 mana_kosten = 10
-ziel = "spieler"                # ohne Angabe: man selbst
-fertigkeit = "heilkunde"
-mindest_stufe = 1
 wirkungen = [ { art = "heilen", wert = 20 } ]
 text_selbst = "Du legst die Hände auf und murmelst eine Heilformel für {ziel}."
 text_ziel   = "{name} legt dir die Hände auf. Ein warmes Licht umhüllt dich."
@@ -22,11 +20,11 @@ text_raum   = "{name} murmelt eine Heilformel, ein warmes Licht leuchtet auf."
 
 [[zauber]]
 id   = "segen"
+erbt = "vorlage_heilzauber"
 name = "Segen"
 beschreibung = "Heilt alle Anwesenden ein wenig."
 mana_kosten = 25
 ziel = "raum"
-fertigkeit = "heilkunde"
 mindest_stufe = 10
 abklingzeit = 30
 wirkungen = [ { art = "heilen", wert = 10 } ]
@@ -35,13 +33,11 @@ text_ziel   = "{name} spricht einen Segen. Du fühlst dich geborgen."
 
 [[zauber]]
 id   = "feuerpfeil"
+erbt = "vorlage_kampfzauber"
 name = "Feuerpfeil"
 schluesselwoerter = ["feuer", "pfeil"]
 beschreibung = "Ein brennender Pfeil aus reiner Magie."
 mana_kosten = 8
-ziel = "gegner"
-fertigkeit = "magie"
-mindest_stufe = 1
 wirkungen = [ { art = "schaden", wert = 12 } ]
 text_selbst = "Ein {hellrot}Feuerpfeil{/} schießt aus deiner Hand auf {ziel}!"
 text_raum   = "{name} schleudert einen Feuerpfeil auf {ziel}!"

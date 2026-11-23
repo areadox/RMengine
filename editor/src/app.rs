@@ -1,6 +1,9 @@
 //! Die Oberfläche des Welteditors.
 
+use crate::befehle::Befehlswerk;
+use crate::bereiche::{self, BefehlsAuswahl};
 use crate::welt::{self, Problem, Raum, Welt, RICHTUNGEN};
+use crate::zauber::Zauberbuch;
 use eframe::egui::{
     self, Align2, Color32, CornerRadius, FontId, Key, KeyboardShortcut, Modifiers, Pos2, Rect, Sense, Shape, Stroke,
     StrokeKind, Vec2,
@@ -22,6 +25,14 @@ struct Stand {
     wiederbelebung: String,
 }
 
+/// Welcher Teil der Welt gerade bearbeitet wird.
+#[derive(Clone, Copy, PartialEq)]
+enum Bereich {
+    Raeume,
+    Zauber,
+    Befehle,
+}
+
 enum Ziehen {
     Verschieben { id: String },
     Verbinden { id: String },
@@ -29,6 +40,12 @@ enum Ziehen {
 }
 
 pub struct App {
+    bereich: Bereich,
+    zauberbuch: Option<Zauberbuch>,
+    befehlswerk: Option<Befehlswerk>,
+    zauber_auswahl: Option<usize>,
+    befehl_auswahl: Option<BefehlsAuswahl>,
+    bereich_suche: String,
     ordner_eingabe: String,
     welt: Option<Welt>,
     ladefehler: Option<String>,
@@ -76,6 +93,12 @@ impl App {
     pub fn neu(cc: &eframe::CreationContext<'_>, ordner: PathBuf) -> App {
         cc.egui_ctx.set_visuals(egui::Visuals::dark());
         let mut app = App {
+            bereich: Bereich::Raeume,
+            zauberbuch: None,
+            befehlswerk: None,
+            zauber_auswahl: None,
+            befehl_auswahl: None,
+            bereich_suche: String::new(),
             ordner_eingabe: ordner.display().to_string(),
             welt: None,
             ladefehler: None,
@@ -119,6 +142,28 @@ impl App {
 
     fn laden(&mut self) {
         let ordner = PathBuf::from(self.ordner_eingabe.trim());
+        // Zauber und Befehle (Fehler darin hindern nicht am Bearbeiten der Räume)
+        let zauber_id = self.zauber_auswahl.and_then(|i| self.zauberbuch.as_ref()?.zauber.get(i).map(|z| z.id.clone()));
+        self.zauberbuch = match Zauberbuch::laden(&ordner) {
+            Ok(b) => Some(b),
+            Err(e) => {
+                self.melden(format!("Zauber konnten nicht geladen werden: {e}"), true);
+                None
+            }
+        };
+        self.zauber_auswahl = zauber_id.and_then(|id| self.zauberbuch.as_ref()?.index(&id));
+        self.befehlswerk = match Befehlswerk::laden(&ordner) {
+            Ok(b) => Some(b),
+            Err(e) => {
+                self.melden(format!("Befehle konnten nicht geladen werden: {e}"), true);
+                None
+            }
+        };
+        if let (Some(BefehlsAuswahl::Geste(n)), Some(b)) = (self.befehl_auswahl, &self.befehlswerk) {
+            if n >= b.gesten.len() {
+                self.befehl_auswahl = None;
+            }
+        }
         match Welt::laden(&ordner) {
             Ok(w) => {
                 self.geladen = Stand {
@@ -147,7 +192,7 @@ impl App {
                 } else {
                     self.oberwelt_ansicht = false;
                 }
-                self.probleme = self.welt().pruefen();
+                self.probleme = self.alle_probleme();
                 let n = self.welt().raeume.len();
                 self.melden(format!("{n} Räume aus '{}' geladen.", ordner.display()), false);
             }
@@ -224,16 +269,47 @@ impl App {
         }
         self.id_eingabe = self.auswahl.clone().unwrap_or_default();
         self.id_fehler = None;
-        self.probleme = self.welt().pruefen();
+        self.probleme = self.alle_probleme();
     }
 
     fn geaendert(&self) -> bool {
         self.welt.as_ref().is_some_and(|w| w.geaendert(&self.geladen.raeume, &self.geladen.startraum, &self.geladen.wiederbelebung))
+            || self.zauberbuch.as_ref().is_some_and(|b| b.geaendert())
+            || self.befehlswerk.as_ref().is_some_and(|b| b.geaendert())
+    }
+
+    /// Probleme aller Bereiche: Räume, Zauber und Befehle.
+    fn alle_probleme(&self) -> Vec<Problem> {
+        let Some(w) = self.welt.as_ref() else { return Vec::new() };
+        let mut p = w.pruefen();
+        if let Some(b) = &self.zauberbuch {
+            p.extend(b.pruefen(&|r| w.ziel_gueltig(r)).into_iter().map(|t| Problem {
+                fehler: !t.ends_with("(Hinweis)."),
+                raum: None,
+                text: t,
+            }));
+        }
+        if let Some(b) = &self.befehlswerk {
+            p.extend(b.pruefen().into_iter().map(|(fehler, text)| Problem { fehler, raum: None, text }));
+        }
+        p
     }
 
     fn speichern(&mut self) {
         let Some(w) = self.welt.as_mut() else { return };
-        match w.speichern() {
+        // Erst die Räume, dann Zauber und Befehle (die lesen die Dateien frisch ein)
+        let ergebnis = w.speichern().and_then(|mut d| {
+            if let Some(b) = self.zauberbuch.as_mut() {
+                d.extend(b.speichern()?);
+            }
+            if let Some(b) = self.befehlswerk.as_mut() {
+                d.extend(b.speichern()?);
+            }
+            d.sort();
+            d.dedup();
+            Ok(d)
+        });
+        match ergebnis {
             Ok(dateien) => {
                 let text = if dateien.is_empty() {
                     "Nichts zu speichern.".to_string()
@@ -462,6 +538,43 @@ impl eframe::App for App {
         self.tastatur(&ctx);
         self.oben(ui);
         self.unten(ui);
+
+        // Zauber und Befehle: Liste links, Formular in der Mitte
+        if self.bereich != Bereich::Raeume {
+            let raeume: Vec<String> = self.welt().raeume.iter().map(|r| r.id.clone()).collect();
+            let bereich = self.bereich;
+            egui::Panel::left("bereich_links").default_size(260.0).show(ui, |ui| match bereich {
+                Bereich::Zauber => match self.zauberbuch.as_mut() {
+                    Some(b) => bereiche::zauber_liste(ui, b, &mut self.zauber_auswahl, &mut self.bereich_suche),
+                    None => {
+                        ui.label("Die Zauber konnten nicht geladen werden (siehe Meldung unten).");
+                    }
+                },
+                _ => match self.befehlswerk.as_mut() {
+                    Some(b) => bereiche::befehle_liste(ui, b, &mut self.befehl_auswahl, &mut self.bereich_suche),
+                    None => {
+                        ui.label("Die Befehle konnten nicht geladen werden (siehe Meldung unten).");
+                    }
+                },
+            });
+            egui::CentralPanel::default().show(ui, |ui| match bereich {
+                Bereich::Zauber => {
+                    if let Some(b) = self.zauberbuch.as_mut() {
+                        bereiche::zauber_formular(ui, b, &mut self.zauber_auswahl, &raeume);
+                    }
+                }
+                _ => {
+                    if let Some(b) = self.befehlswerk.as_mut() {
+                        bereiche::befehl_formular(ui, b, &mut self.befehl_auswahl);
+                    }
+                }
+            });
+            // Prüfung laufend aktualisieren (Änderungen passieren direkt im Formular)
+            self.probleme = self.alle_probleme();
+            self.fenster(&ctx);
+            return;
+        }
+
         egui::Panel::left("links").default_size(230.0).show(ui, |ui| self.links(ui));
         egui::Panel::right("rechts").default_size(380.0).size_range(320.0..=800.0).show(ui, |ui| {
             if self.oberwelt_ansicht {
@@ -514,7 +627,7 @@ impl App {
         if ctx.input_mut(|i| i.consume_shortcut(&speichern)) {
             self.speichern();
         }
-        if !textfeld {
+        if !textfeld && self.bereich == Bereich::Raeume {
             if ctx.input_mut(|i| i.consume_shortcut(&redo1) || i.consume_shortcut(&redo2)) {
                 self.wiederholen_machen();
             } else if ctx.input_mut(|i| i.consume_shortcut(&undo)) {
@@ -538,6 +651,13 @@ impl App {
     fn oben(&mut self, ui: &mut egui::Ui) {
         egui::Panel::top("oben").show(ui, |ui| {
             ui.horizontal(|ui| {
+                for (b, name) in [(Bereich::Raeume, "🗺 Räume"), (Bereich::Zauber, "✨ Zauber"), (Bereich::Befehle, "⌨ Befehle")] {
+                    if ui.selectable_label(self.bereich == b, egui::RichText::new(name).strong()).clicked() && self.bereich != b {
+                        self.bereich = b;
+                        self.bereich_suche.clear();
+                    }
+                }
+                ui.separator();
                 let geaendert = self.geaendert();
                 let text = if geaendert { "💾 Speichern*" } else { "💾 Speichern" };
                 if ui.add_enabled(geaendert, egui::Button::new(text)).on_hover_text("Strg+S").clicked() {
@@ -980,7 +1100,7 @@ impl App {
                 self.gruppe = fokus;
             }
             self.welt_mut().raeume[i] = r;
-            self.probleme = self.welt().pruefen();
+            self.probleme = self.alle_probleme();
         }
         if let Some(a) = aktion {
             a(self);

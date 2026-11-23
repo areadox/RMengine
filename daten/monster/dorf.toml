@@ -20,14 +20,13 @@
 
 [[monster]]
 id   = "ratte"
+erbt = "vorlage_raubtier"
 name = "eine fette Ratte"
 schluesselwoerter = ["ratte"]
 beschreibung = "Eine Ratte, so groß wie eine Katze, mit gelben Zähnen."
 stufe = 1
 lebenspunkte = 8
-wandert = true
 wander_chance = 15
-aggressiv = true
 sprueche = ["*fiept.", "*nagt an einem Fass."]
 beute = [ { gegenstand = "rattenschwanz", chance = 50 } ]
 erholung  = 2.5

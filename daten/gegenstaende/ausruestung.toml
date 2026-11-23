@@ -11,17 +11,15 @@
 
 [[gegenstand]]
 id   = "kurzschwert"
+erbt = "vorlage_waffe"
 name = "ein Kurzschwert"
 schluesselwoerter = ["schwert", "kurzschwert"]
-typ  = "waffe"
-platz = "waffe"
 gewicht = 3
 wert = 30
 bodentext = "Ein Kurzschwert hängt an der Wand."
 beschreibung = "Eine einfache, aber gut geschliffene Klinge."
 eigenschaften = { schaden = 6, staerke = 1 }
 erholung   = 2.0
-fertigkeit = "schwertkampf"
 
 [gegenstand.details]
 klinge = "Die Klinge ist zweischneidig und eine knappe Elle lang. Kleine Scharten zeugen von Benutzung."
@@ -29,9 +27,10 @@ griff  = { text = "Der Griff ist mit Leder umwickelt, das sich an einer Stelle l
 
 [[gegenstand]]
 id   = "holzschild"
+erbt = "vorlage_ruestung"
 name = "ein Holzschild"
+akkusativ = "einen Holzschild"
 schluesselwoerter = ["schild"]
-typ  = "ruestung"
 platz = "schild"
 gewicht = 4
 wert = 15
@@ -40,10 +39,10 @@ eigenschaften = { ruestung = 3 }
 
 [[gegenstand]]
 id   = "lederhelm"
+erbt = "vorlage_ruestung"
 name = "ein Lederhelm"
 akkusativ = "einen Lederhelm"
 schluesselwoerter = ["helm"]
-typ  = "ruestung"
 platz = "kopf"
 gewicht = 1
 wert = 10
@@ -53,24 +52,22 @@ eigenschaften = { ruestung = 1 }
 
 [[gegenstand]]
 id   = "dolch"
+erbt = "vorlage_waffe"
 name = "ein Dolch"
+akkusativ = "einen Dolch"
 schluesselwoerter = ["dolch", "messer"]
-typ  = "waffe"
-platz = "waffe"
 gewicht = 1
 wert = 12
 beschreibung = "Ein schmaler Dolch. Schnell, aber nicht sehr gefährlich."
 eigenschaften = { schaden = 3, geschick = 1 }
 erholung   = 1.3
-fertigkeit = "schwertkampf"
 
 [[gegenstand]]
 id   = "streitaxt"
+erbt = "vorlage_waffe"
 name = "eine schwere Streitaxt"
 akkusativ = "eine schwere Streitaxt"
 schluesselwoerter = ["axt", "streitaxt"]
-typ  = "waffe"
-platz = "waffe"
 gewicht = 6
 wert = 60
 beschreibung = "Eine zweischneidige Axt, so schwer, dass man sie mit beiden Händen führen muss."

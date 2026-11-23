@@ -11,6 +11,7 @@ angreifbar = false
 
 [[monster]]
 id   = "wolf"
+erbt = "vorlage_raubtier"
 name = "ein grauer Wolf"
 akkusativ = "einen grauen Wolf"
 schluesselwoerter = ["wolf"]
@@ -19,8 +20,6 @@ beschreibung = "Ein magerer Wolf mit struppigem Fell und hungrigen Augen."
 stufe = 3
 lebenspunkte = 30
 werte = { staerke = 12, geschick = 14 }
-aggressiv = true
-wandert = true
 wander_chance = 8
 sprueche = ["*heult.", "*fletscht die Zähne."]
 beute = [ { gegenstand = "wolfspelz", chance = 75 } ]
