@@ -341,10 +341,12 @@ Statt Räume von Hand in die TOML-Dateien zu schreiben, kannst du sie auch mit d
 **Welteditor** (`rmeditor`) auf einer Karte bauen. Er liest und schreibt genau
 dieselben Dateien wie der Server.
 
-```bash
-cargo run --release -p rmeditor              # öffnet ./daten
-cargo run --release -p rmeditor -- pfad/zu/daten
-```
+- **Windows:** Startmenü → *RMengine* → *Welteditor*
+- **Linux:** im Anwendungsmenü *RMengine Welteditor* oder im Terminal `rmeditor`
+- **Aus dem Quellcode:** `cargo run --release -p rmeditor` (öffnet `./daten`)
+
+Der Editor braucht eine grafische Oberfläche. Er wird mit `rmengine --update`
+automatisch mit aktualisiert.
 
 - **Links:** Karte und Ebene (`z`) wählen, Räume suchen und anspringen.
 - **Mitte:** die Karte. Ein Klick wählt einen Raum aus. Ziehen verschiebt ihn.
@@ -356,7 +358,8 @@ cargo run --release -p rmeditor -- pfad/zu/daten
 - **Rechts:** alle Eigenschaften des Raums: Name, Beschreibung, Gelände, Ausgänge,
   Sinne, Gegenstände, Monster, NPCs und `nutzt`. Grau angezeigte Ausgänge sind die
   Rückwege, die der Server automatisch anlegt.
-- **Rechtsklick:** Startraum festlegen, Verbindung trennen, Raum löschen.
+- **Rechtsklick:** Startraum (★) oder Wiederbelebungsort (✚) festlegen,
+  Verbindung trennen, Raum löschen.
 - **Prüfung:** Oben steht, wie viele Fehler und Hinweise es gibt. Ein Klick darauf
   zeigt die Liste, und ein Klick auf einen Eintrag springt zum Raum. *Mit Engine
   prüfen* startet `rmengine --pruefen` für den gespeicherten Stand.
@@ -371,7 +374,7 @@ cargo run --release -p rmeditor -- pfad/zu/daten
 Beim Speichern ändert der Editor nur, was du wirklich geändert hast. Kommentare,
 Leerzeilen, `details` und alles andere, was der Editor nicht kennt, bleiben in den
 Dateien erhalten. Benennst du einen Raum um, passt er alle Verweise an: Ausgänge,
-`startraum`, Oberwelt-Eingänge und Teleport-Zauber.
+`startraum`, `wiederbelebung_raum`, Oberwelt-Eingänge und Teleport-Zauber.
 
 ---
 

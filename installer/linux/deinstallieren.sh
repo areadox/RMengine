@@ -5,8 +5,9 @@ set -euo pipefail
 ZIEL="${RMENGINE_ZIEL:-$HOME/.local/share/rmengine}"
 BIN="${RMENGINE_BIN:-$HOME/.local/bin}"
 
-rm -f "$BIN/rmengine" "$HOME/.local/share/applications/rmengine.desktop"
+rm -f "$BIN/rmengine" "$BIN/rmeditor" "$HOME/.local/share/applications/rmengine.desktop" "$HOME/.local/share/applications/rmeditor.desktop"
 rm -f "$ZIEL/rmengine" "$ZIEL/rmengine.alt" "$ZIEL/rmengine.neu" "$ZIEL/ANLEITUNG.md" "$ZIEL/README.md"
+rm -f "$ZIEL/rmeditor" "$ZIEL/rmeditor.alt" "$ZIEL/rmeditor.neu"
 if [ "${1:-}" = "--alles" ]; then
   rm -rf "$ZIEL"
   echo "RMengine wurde vollständig entfernt (inklusive Weltdaten und Spielständen)."

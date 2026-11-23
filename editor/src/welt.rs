@@ -173,6 +173,9 @@ pub struct Welt {
     pub ordner: PathBuf,
     pub raeume: Vec<Raum>,
     pub startraum: String,
+    /// [kampf] wiederbelebung_raum: hier erwacht man nach dem Tod (leer = Startraum)
+    pub wiederbelebung: String,
+    wiederbelebung_geladen: String,
     pub beidseitig: bool,
     pub gelaende: BTreeMap<String, Gelaende>,
     pub gegenstaende: BTreeSet<String>,
@@ -252,6 +255,11 @@ impl Welt {
             startraum = s(w, "startraum");
             beidseitig = w.get("ausgaenge_beidseitig").and_then(|i| i.as_bool()).unwrap_or(true);
         }
+        let wiederbelebung = welt_doc
+            .get("kampf")
+            .and_then(|i| i.as_table())
+            .map(|k| s(k, "wiederbelebung_raum"))
+            .unwrap_or_default();
         let mut gelaende = BTreeMap::new();
         if let Some(g) = welt_doc.get("gelaende").and_then(|i| i.as_table()) {
             for (id, item) in g.iter() {
@@ -272,6 +280,8 @@ impl Welt {
             ordner: ordner.to_path_buf(),
             raeume: Vec::new(),
             startraum: startraum.clone(),
+            wiederbelebung: wiederbelebung.clone(),
+            wiederbelebung_geladen: wiederbelebung,
             beidseitig,
             gelaende,
             gegenstaende: BTreeSet::new(),
@@ -490,6 +500,9 @@ impl Welt {
         if self.startraum == alt {
             self.startraum = neu.into();
         }
+        if self.wiederbelebung == alt {
+            self.wiederbelebung = neu.into();
+        }
         if let Some(n) = self.eingaenge.remove(alt) {
             self.eingaenge.insert(neu.into(), n);
         }
@@ -582,6 +595,25 @@ impl Welt {
                 raum: None,
                 text: format!("Der Startraum '{}' existiert nicht.", self.startraum),
             });
+        }
+        if !self.wiederbelebung.is_empty() && !self.ziel_gueltig(&self.wiederbelebung) {
+            p.push(Problem {
+                fehler: true,
+                raum: None,
+                text: format!(
+                    "Der Wiederbelebungsort '{}' ([kampf] wiederbelebung_raum) existiert nicht.",
+                    self.wiederbelebung
+                ),
+            });
+        }
+        for (raum, name) in &self.eingaenge {
+            if self.index(raum).is_none() {
+                p.push(Problem {
+                    fehler: true,
+                    raum: None,
+                    text: format!("Der Oberwelt-Eingang '{name}' führt zu '{raum}', den es nicht mehr gibt."),
+                });
+            }
         }
         for r in &self.raeume {
             if r.beschreibung.trim().is_empty() {
@@ -696,12 +728,24 @@ impl Welt {
             }
         }
 
-        // welt.toml: Startraum
+        // welt.toml: Startraum und Wiederbelebungsort
         let mut welt_neu = None;
-        if self.startraum != self.startraum_geladen {
+        if self.startraum != self.startraum_geladen || self.wiederbelebung != self.wiederbelebung_geladen {
             let mut d = self.welt_doc.clone();
             if let Some(w) = d.get_mut("welt").and_then(|i| i.as_table_mut()) {
                 wert_setzen(w, "startraum", Value::from(self.startraum.as_str()));
+            }
+            if self.wiederbelebung != self.wiederbelebung_geladen {
+                if d.get("kampf").is_none() && !self.wiederbelebung.is_empty() {
+                    d.insert("kampf", Item::Table(neue_tabelle()));
+                }
+                if let Some(k) = d.get_mut("kampf").and_then(|i| i.as_table_mut()) {
+                    if self.wiederbelebung.is_empty() {
+                        k.remove("wiederbelebung_raum");
+                    } else {
+                        wert_setzen(k, "wiederbelebung_raum", Value::from(self.wiederbelebung.as_str()));
+                    }
+                }
             }
             welt_neu = Some(d);
         }
@@ -751,8 +795,8 @@ impl Welt {
     }
 
     /// Gibt es Änderungen gegenüber den Dateien?
-    pub fn geaendert(&self, geladen: &[Raum], start: &str) -> bool {
-        self.raeume != geladen || self.startraum != start
+    pub fn geaendert(&self, geladen: &[Raum], start: &str, wiederbelebung: &str) -> bool {
+        self.raeume != geladen || self.startraum != start || self.wiederbelebung != wiederbelebung
     }
 }
 
@@ -883,9 +927,13 @@ fn neue_tabelle() -> Table {
 
 /// Setzt einen Wert und behält dabei Kommentare/Abstände des alten Werts.
 fn wert_setzen(t: &mut Table, k: &str, mut neu: Value) {
-    if let Some(Item::Value(alt)) = t.get(k) {
+    // Vorhandenen Wert an Ort und Stelle ersetzen: So bleiben auch die
+    // Ausrichtung des Schlüssels ("startraum  = ...") und Kommentare erhalten.
+    if let Some(Item::Value(alt)) = t.get_mut(k) {
         let decor = alt.decor().clone();
         *neu.decor_mut() = decor;
+        *alt = neu;
+        return;
     }
     t.insert(k, Item::Value(neu));
 }
@@ -1101,6 +1149,8 @@ mod tests {
 
         let w2 = Welt::laden(&ordner).unwrap();
         assert_eq!(w2.startraum, "marktplatz");
+        // Der Tempel ist Wiederbelebungsort und hat sich nicht geändert
+        assert_eq!(w2.wiederbelebung, "tempel");
         assert!(w2.raum("marktplatz").unwrap().details > 0);
         assert_eq!(w2.raum("nebengasse").unwrap().ausgaenge["west"], "hauptstrasse");
         assert_eq!(w2.raum("hauptstrasse").unwrap().beschreibung, "Zeile eins\nZeile zwei");
@@ -1108,5 +1158,26 @@ mod tests {
         assert!(fehler.is_empty(), "{fehler:?}");
         let _ = fs::remove_dir_all(ordner);
     }
-}
 
+    #[test]
+    fn wiederbelebungsort_wird_mit_umbenannt() {
+        let ordner = kopie("wiederbelebung");
+        let mut w = Welt::laden(&ordner).unwrap();
+        assert_eq!(w.wiederbelebung, "tempel");
+        w.umbenennen("tempel", "kapelle").unwrap();
+        assert!(w.pruefen().iter().all(|p| !p.fehler));
+        w.speichern().unwrap();
+        let text = fs::read_to_string(ordner.join("welt.toml")).unwrap();
+        assert!(text.contains("wiederbelebung_raum       = \"kapelle\""), "{text}");
+        // Kommentar hinter dem Wert bleibt erhalten
+        assert!(text.contains("tod_wartezeit"));
+        let w2 = Welt::laden(&ordner).unwrap();
+        assert_eq!(w2.wiederbelebung, "kapelle");
+
+        // Gelöschter Wiederbelebungsort ist ein Fehler
+        let mut w3 = Welt::laden(&ordner).unwrap();
+        w3.loeschen("kapelle");
+        assert!(w3.pruefen().iter().any(|p| p.fehler && p.text.contains("Wiederbelebungsort")));
+        let _ = fs::remove_dir_all(ordner);
+    }
+}

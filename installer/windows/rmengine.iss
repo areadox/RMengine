@@ -42,6 +42,7 @@ Name: "desktopicon"; Description: "Verknüpfung auf dem Desktop anlegen"; Flags:
 
 [Files]
 Source: "{#Root}\dist\windows\rmengine.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#Root}\dist\windows\rmeditor.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#Root}\ANLEITUNG.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#Root}\README.md"; DestDir: "{app}"; Flags: ignoreversion
 ; Die Beispielwelt nur kopieren, wenn es die Datei noch nicht gibt – eigene Änderungen bleiben erhalten.
@@ -49,12 +50,14 @@ Source: "{#Root}\daten\*"; DestDir: "{app}\daten"; Flags: onlyifdoesntexist unin
 
 [Icons]
 Name: "{group}\RMengine starten"; Filename: "{app}\rmengine.exe"; WorkingDir: "{app}"
+Name: "{group}\Welteditor"; Filename: "{app}\rmeditor.exe"; Parameters: """{app}\daten"""; WorkingDir: "{app}"
 Name: "{group}\Weltdaten bearbeiten (Ordner öffnen)"; Filename: "{app}\daten"
 Name: "{group}\Weltdaten prüfen"; Filename: "{cmd}"; Parameters: "/k chcp 65001 >nul & ""{app}\rmengine.exe"" --pruefen"; WorkingDir: "{app}"
 Name: "{group}\Nach Updates suchen"; Filename: "{cmd}"; Parameters: "/k chcp 65001 >nul & ""{app}\rmengine.exe"" --update"; WorkingDir: "{app}"
 Name: "{group}\Anleitung"; Filename: "{win}\notepad.exe"; Parameters: """{app}\ANLEITUNG.md"""
 Name: "{group}\RMengine deinstallieren"; Filename: "{uninstallexe}"
 Name: "{userdesktop}\RMengine"; Filename: "{app}\rmengine.exe"; WorkingDir: "{app}"; Tasks: desktopicon
+Name: "{userdesktop}\RMengine Welteditor"; Filename: "{app}\rmeditor.exe"; Parameters: """{app}\daten"""; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\rmengine.exe"; Description: "RMengine jetzt starten"; WorkingDir: "{app}"; Flags: postinstall nowait skipifsilent
@@ -62,3 +65,5 @@ Filename: "{app}\rmengine.exe"; Description: "RMengine jetzt starten"; WorkingDi
 [UninstallDelete]
 Type: files; Name: "{app}\rmengine.exe.alt"
 Type: files; Name: "{app}\rmengine.exe.neu"
+Type: files; Name: "{app}\rmeditor.exe.alt"
+Type: files; Name: "{app}\rmeditor.exe.neu"

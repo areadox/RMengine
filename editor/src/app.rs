@@ -19,6 +19,7 @@ type Aktion = Option<Box<dyn FnOnce(&mut App)>>;
 struct Stand {
     raeume: Vec<Raum>,
     startraum: String,
+    wiederbelebung: String,
 }
 
 enum Ziehen {
@@ -78,7 +79,7 @@ impl App {
             ordner_eingabe: ordner.display().to_string(),
             welt: None,
             ladefehler: None,
-            geladen: Stand { raeume: Vec::new(), startraum: String::new() },
+            geladen: Stand { raeume: Vec::new(), startraum: String::new(), wiederbelebung: String::new() },
             auswahl: None,
             id_eingabe: String::new(),
             id_fehler: None,
@@ -120,7 +121,11 @@ impl App {
         let ordner = PathBuf::from(self.ordner_eingabe.trim());
         match Welt::laden(&ordner) {
             Ok(w) => {
-                self.geladen = Stand { raeume: w.raeume.clone(), startraum: w.startraum.clone() };
+                self.geladen = Stand {
+                    raeume: w.raeume.clone(),
+                    startraum: w.startraum.clone(),
+                    wiederbelebung: w.wiederbelebung.clone(),
+                };
                 let start = w.raum(&w.startraum).cloned();
                 self.welt = Some(w);
                 self.ladefehler = None;
@@ -166,13 +171,18 @@ impl App {
     }
 
     fn stand(&self) -> Stand {
-        Stand { raeume: self.welt().raeume.clone(), startraum: self.welt().startraum.clone() }
+        Stand {
+            raeume: self.welt().raeume.clone(),
+            startraum: self.welt().startraum.clone(),
+            wiederbelebung: self.welt().wiederbelebung.clone(),
+        }
     }
 
     fn stand_setzen(&mut self, s: Stand) {
         let w = self.welt_mut();
         w.raeume = s.raeume;
         w.startraum = s.startraum;
+        w.wiederbelebung = s.wiederbelebung;
     }
 
     /// Vor jeder Änderung aufrufen: merkt den Zustand für "Rückgängig".
@@ -218,7 +228,7 @@ impl App {
     }
 
     fn geaendert(&self) -> bool {
-        self.welt.as_ref().is_some_and(|w| w.geaendert(&self.geladen.raeume, &self.geladen.startraum))
+        self.welt.as_ref().is_some_and(|w| w.geaendert(&self.geladen.raeume, &self.geladen.startraum, &self.geladen.wiederbelebung))
     }
 
     fn speichern(&mut self) {
@@ -719,6 +729,10 @@ impl App {
             if self.welt().startraum == r.id {
                 ui.label(egui::RichText::new("★ Startraum").color(Color32::GOLD));
             }
+            if self.welt().wiederbelebung == r.id {
+                ui.label(egui::RichText::new("✚ Wiederbelebung").color(Color32::LIGHT_GREEN))
+                    .on_hover_text("Hier erwachen Spieler nach dem Tod ([kampf] wiederbelebung_raum in welt.toml).");
+            }
         });
         ui.add_space(4.0);
 
@@ -942,6 +956,14 @@ impl App {
                     app.nach_aenderung();
                 }));
             }
+            if self.welt().wiederbelebung != r.id && ui.button("✚ Als Wiederbelebungsort").clicked() {
+                let id = r.id.clone();
+                aktion = Some(Box::new(move |app: &mut App| {
+                    app.merken();
+                    app.welt_mut().wiederbelebung = id;
+                    app.nach_aenderung();
+                }));
+            }
             if ui.button("🗑 Löschen").clicked() {
                 self.loeschen_fragen = Some(r.id.clone());
             }
@@ -1113,6 +1135,9 @@ impl App {
             if welt.startraum == r.id {
                 painter.text(b.left_top() + Vec2::new(3.0, 1.0), Align2::LEFT_TOP, "★", FontId::proportional(12.0 * self.zoom.max(0.7)), Color32::GOLD);
             }
+            if welt.wiederbelebung == r.id {
+                painter.text(b.left_top() + Vec2::new(3.0 + 14.0 * self.zoom.max(0.7), 1.0), Align2::LEFT_TOP, "✚", FontId::proportional(12.0 * self.zoom.max(0.7)), Color32::LIGHT_GREEN);
+            }
             // Ausgänge, die nicht auf dieser Ebene liegen: hoch/runter/rein/raus
             let mut marken = Vec::new();
             for (ri, (ziel, _)) in welt.alle_ausgaenge(&r.id) {
@@ -1271,6 +1296,15 @@ impl App {
                         aktion = Some(Box::new(move |app: &mut App| {
                             app.merken();
                             app.welt_mut().startraum = id;
+                            app.nach_aenderung();
+                        }));
+                        ui.close();
+                        return;
+                    }
+                    if ui.button("✚ Als Wiederbelebungsort festlegen").clicked() {
+                        aktion = Some(Box::new(move |app: &mut App| {
+                            app.merken();
+                            app.welt_mut().wiederbelebung = id;
                             app.nach_aenderung();
                         }));
                         ui.close();
@@ -1807,6 +1841,7 @@ Linien
   gelb mit Pfeil = Einbahnstraße
   orange gestrichelt = Ziel liegt nicht im Nachbarfeld dieser Richtung
                        (die Engine zeichnet die Verbindung dann nicht)
+  ★ = Startraum, ✚ = Wiederbelebungsort (Rechtsklick zum Festlegen)
   ⏶ ⏷ = Ausgänge hoch / runter
   🚪 = rein / raus (z.B. in ein Haus mit eigener Karte)
   🌍 = raus auf die Oberwelt (aus oberwelt.toml)

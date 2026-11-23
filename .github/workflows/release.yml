@@ -25,8 +25,10 @@ env:
 
 jobs:
   linux:
-    name: Linux (x86_64, statisch)
-    runs-on: ubuntu-latest
+    name: Linux (x86_64)
+    # 22.04, damit der Welteditor auch auf älteren Distributionen läuft (glibc 2.35).
+    # Der Server selbst wird statisch (musl) gebaut und läuft überall.
+    runs-on: ubuntu-22.04
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
@@ -49,8 +51,11 @@ jobs:
       - name: musl installieren
         run: sudo apt-get update && sudo apt-get install -y musl-tools
 
-      - name: Bauen
+      - name: Server bauen (statisch)
         run: cargo build --release --locked --target x86_64-unknown-linux-musl
+
+      - name: Welteditor bauen
+        run: cargo build --release --locked -p rmeditor
 
       - name: Beispielwelt prüfen
         run: ./target/x86_64-unknown-linux-musl/release/rmengine daten --pruefen
@@ -58,12 +63,14 @@ jobs:
       - name: Paket bauen
         run: |
           BIN=target/x86_64-unknown-linux-musl/release/rmengine
+          EDITOR=target/release/rmeditor
           mkdir -p dist/rmengine
-          cp "$BIN" dist/rmengine/
+          cp "$BIN" "$EDITOR" dist/rmengine/
           cp -r daten ANLEITUNG.md README.md installer/linux/installieren.sh installer/linux/deinstallieren.sh dist/rmengine/
-          chmod +x dist/rmengine/rmengine dist/rmengine/*.sh
+          chmod +x dist/rmengine/rmengine dist/rmengine/rmeditor dist/rmengine/*.sh
           tar -czf dist/rmengine-linux-x86_64.tar.gz -C dist rmengine
           cp "$BIN" dist/rmengine-linux-x86_64
+          cp "$EDITOR" dist/rmeditor-linux-x86_64
           cp installer/linux/install.sh dist/install.sh
 
       - uses: actions/upload-artifact@v4
@@ -72,6 +79,7 @@ jobs:
           path: |
             dist/rmengine-linux-x86_64.tar.gz
             dist/rmengine-linux-x86_64
+            dist/rmeditor-linux-x86_64
             dist/install.sh
 
   windows:
@@ -86,7 +94,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Bauen
-        run: cargo build --release --locked
+        run: cargo build --release --locked -p rmengine -p rmeditor
 
       - name: Beispielwelt prüfen
         shell: cmd
@@ -101,12 +109,14 @@ jobs:
           $version = (Select-String -Path Cargo.toml -Pattern '^version = "(.*)"').Matches[0].Groups[1].Value
           New-Item -ItemType Directory -Force dist\windows | Out-Null
           Copy-Item target\release\rmengine.exe dist\windows\rmengine.exe
+          Copy-Item target\release\rmeditor.exe dist\windows\rmeditor.exe
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DAppVersion=$version" installer\windows\rmengine.iss
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Copy-Item target\release\rmengine.exe dist\rmengine-windows-x86_64.exe
+          Copy-Item target\release\rmeditor.exe dist\rmeditor-windows-x86_64.exe
           # Portable Version als ZIP (ohne Installation)
           New-Item -ItemType Directory -Force dist\portable\RMengine | Out-Null
-          Copy-Item target\release\rmengine.exe, ANLEITUNG.md, README.md dist\portable\RMengine\
+          Copy-Item target\release\rmengine.exe, target\release\rmeditor.exe, ANLEITUNG.md, README.md dist\portable\RMengine\
           Copy-Item -Recurse daten dist\portable\RMengine\daten
           Compress-Archive -Path dist\portable\RMengine -DestinationPath dist\RMengine-windows-x86_64-portable.zip
 
@@ -116,6 +126,7 @@ jobs:
           path: |
             dist/RMengine-Setup-*.exe
             dist/rmengine-windows-x86_64.exe
+            dist/rmeditor-windows-x86_64.exe
             dist/RMengine-windows-x86_64-portable.zip
 
   release:
@@ -141,17 +152,19 @@ jobs:
           ## Installation
 
           **Windows:** `RMengine-Setup-….exe` herunterladen und ausführen. Installiert wird ohne Administratorrechte nach *Dokumente\RMengine*.
-          Ohne Installation: `RMengine-windows-x86_64-portable.zip` entpacken und `rmengine.exe` starten.
+          Im Startmenü gibt es den Server und den **Welteditor**.
+          Ohne Installation: `RMengine-windows-x86_64-portable.zip` entpacken und `rmengine.exe` (Server) oder `rmeditor.exe` (Welteditor) starten.
 
           **Linux:**
           ```bash
           curl -fsSL https://github.com/areadox/RMengine/releases/latest/download/install.sh | bash
           ```
           oder `rmengine-linux-x86_64.tar.gz` entpacken und `rmengine/installieren.sh` ausführen.
+          Danach: `rmengine` startet den Server, `rmeditor` den Welteditor (braucht eine grafische Oberfläche).
 
           ## Aktualisieren
 
-          `rmengine --update` (unter Windows im Startmenü: *RMengine → Nach Updates suchen*).
+          `rmengine --update` (unter Windows im Startmenü: *RMengine → Nach Updates suchen*). Der Welteditor wird dabei mit aktualisiert.
           Deine Weltdaten und Spielstände werden dabei nicht verändert.
           TEXT
 

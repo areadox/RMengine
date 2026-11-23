@@ -10,12 +10,13 @@ use std::time::Duration;
 pub const REPO: &str = "areadox/RMengine";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// Name der Programmdatei im Release für dieses Betriebssystem.
-fn asset_name() -> Option<&'static str> {
+/// Name einer Programmdatei im Release für dieses Betriebssystem,
+/// z.B. programm = "rmengine" -> "rmengine-windows-x86_64.exe".
+fn asset_name(programm: &str) -> Option<String> {
     if cfg!(all(windows, target_arch = "x86_64")) {
-        Some("rmengine-windows-x86_64.exe")
+        Some(format!("{programm}-windows-x86_64.exe"))
     } else if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
-        Some("rmengine-linux-x86_64")
+        Some(format!("{programm}-linux-x86_64"))
     } else {
         None
     }
@@ -109,11 +110,11 @@ pub fn aktualisieren() -> Result<(), String> {
         println!("Was ist neu?\n{neu}\n");
     }
 
-    let name = asset_name().ok_or("Für dieses Betriebssystem gibt es kein automatisches Update.")?;
+    let name = asset_name("rmengine").ok_or("Für dieses Betriebssystem gibt es kein automatisches Update.")?;
     let url = r
         .dateien
         .iter()
-        .find(|(n, _)| n == name)
+        .find(|(n, _)| *n == name)
         .map(|(_, u)| u.clone())
         .ok_or_else(|| format!("Im Release fehlt die Datei '{name}'."))?;
 
@@ -126,6 +127,22 @@ pub fn aktualisieren() -> Result<(), String> {
         return Err("Die heruntergeladene Datei ist zu klein – Update abgebrochen.".into());
     }
     programm_ersetzen(&programm, &daten)?;
+
+    // Den Welteditor gleich mit aktualisieren, wenn er daneben liegt
+    let editor = ordner.join(if cfg!(windows) { "rmeditor.exe" } else { "rmeditor" });
+    if editor.exists() {
+        let url = asset_name("rmeditor").and_then(|n| r.dateien.iter().find(|(d, _)| *d == n).map(|(_, u)| u.clone()));
+        match url {
+            Some(url) => {
+                println!("Lade den Welteditor herunter ...");
+                match herunterladen(&url).and_then(|d| programm_ersetzen(&editor, &d)) {
+                    Ok(()) => println!("Welteditor aktualisiert."),
+                    Err(e) => println!("Der Welteditor konnte nicht aktualisiert werden: {e}"),
+                }
+            }
+            None => println!("(Im Release gibt es keinen Welteditor für dieses System.)"),
+        }
+    }
 
     // Anleitung mitaktualisieren (die Weltdaten bleiben unberührt)
     if let Some((_, u)) = r.dateien.iter().find(|(n, _)| n == "ANLEITUNG.md") {
@@ -183,5 +200,9 @@ fn mit_endung(p: &Path, endung: &str) -> PathBuf {
 pub fn aufraeumen() {
     if let Ok(p) = std::env::current_exe() {
         let _ = fs::remove_file(mit_endung(&p, "alt"));
+        if let Some(o) = p.parent() {
+            let editor = o.join(if cfg!(windows) { "rmeditor.exe" } else { "rmeditor" });
+            let _ = fs::remove_file(mit_endung(&editor, "alt"));
+        }
     }
 }
