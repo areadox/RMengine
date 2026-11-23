@@ -1,0 +1,19 @@
+# Prüft bei jedem Push, ob alles baut und die Beispielwelt fehlerfrei ist.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  pruefen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --locked
+      - run: ./target/debug/rmengine daten --pruefen

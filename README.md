@@ -1,19 +1,59 @@
-# MUD-Treiber
+# RMengine
 
 Ein datengetriebener MUD-Treiber (Engine) in Rust. Räume, Gegenstände, Monster,
-Fertigkeiten und Zauber werden zentral in einfachen TOML-Dateien verwaltet.
-Programmieren muss man dafür nicht.
+Fertigkeiten und Zauber werden zentral in einfachen TOML-Dateien verwaltet,
+und die Landschaft zeichnet man als Textbild. Programmieren muss man dafür nicht.
 
 **Wie man eine Welt baut, steht in der [ANLEITUNG.md](ANLEITUNG.md).**
+
+## Installation
+
+**Windows:** Installer von der [Release-Seite](https://github.com/areadox/RMengine/releases/latest) herunterladen und ausführen.
+
+**Linux:**
+
+```bash
+curl -fsSL https://github.com/areadox/RMengine/releases/latest/download/install.sh | bash
+```
+
+**Aktualisieren:**
+
+```bash
+rmengine --update
+```
+
+Unter Windows geht das auch über das Startmenü. Die Weltdaten bleiben dabei unverändert.
+
+Danach verbinden:
+
+```bash
+telnet localhost 4000
+```
+
+Mudlet oder ein anderes MUD-Programm funktioniert genauso.
+
+## Aus dem Quellcode
 
 ```bash
 cargo run --release              # Server starten (Port 4000)
 cargo run --release -- --pruefen # nur die Weltdaten prüfen
 ```
 
-```bash
-telnet localhost 4000
-```
+## Eine neue Version veröffentlichen
+
+1. In `Cargo.toml` die `version` erhöhen, z.B. auf `0.2.0`, und committen.
+2. Ein Tag anlegen und hochladen:
+
+   ```bash
+   git tag v0.2.0
+   ```
+
+   ```bash
+   git push origin v0.2.0
+   ```
+
+GitHub Actions baut dann Windows-Installer, Linux-Paket und die Programmdateien für
+das Update und veröffentlicht alles als Release.
 
 ## Funktionen
 
@@ -41,6 +81,7 @@ telnet localhost 4000
 | `netz.rs`    | Telnet-Server und Login                                      |
 | `spieler.rs` | Speichern, Laden, Passwörter                                 |
 | `text.rs`    | Farben, Zeilenumbruch, Tippfehler-Vorschläge                 |
+| `update.rs`  | Update-Funktion über GitHub Releases                         |
 
 ## Vorbereitet für das Kampfsystem
 

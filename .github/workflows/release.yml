@@ -1,0 +1,147 @@
+# Baut RMengine für Windows und Linux und veröffentlicht ein Release.
+# Auslöser: ein Tag wie "v0.2.0" (die Version muss zu Cargo.toml passen).
+#
+#   git tag v0.2.0 && git push origin v0.2.0
+
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  linux:
+    name: Linux (x86_64, statisch)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version prüfen
+        run: |
+          VERSION=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+          if [ "v$VERSION" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME passt nicht zur Version $VERSION in Cargo.toml"
+            exit 1
+          fi
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-musl
+
+      - name: musl installieren
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+      - name: Bauen
+        run: cargo build --release --locked --target x86_64-unknown-linux-musl
+
+      - name: Beispielwelt prüfen
+        run: ./target/x86_64-unknown-linux-musl/release/rmengine daten --pruefen
+
+      - name: Paket bauen
+        run: |
+          BIN=target/x86_64-unknown-linux-musl/release/rmengine
+          mkdir -p dist/rmengine
+          cp "$BIN" dist/rmengine/
+          cp -r daten ANLEITUNG.md README.md installer/linux/installieren.sh installer/linux/deinstallieren.sh dist/rmengine/
+          chmod +x dist/rmengine/rmengine dist/rmengine/*.sh
+          tar -czf dist/rmengine-linux-x86_64.tar.gz -C dist rmengine
+          cp "$BIN" dist/rmengine-linux-x86_64
+          cp installer/linux/install.sh dist/install.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: |
+            dist/rmengine-linux-x86_64.tar.gz
+            dist/rmengine-linux-x86_64
+            dist/install.sh
+
+  windows:
+    name: Windows (x86_64)
+    runs-on: windows-latest
+    env:
+      # Ohne Visual-C++-Laufzeit lauffähig
+      RUSTFLAGS: -C target-feature=+crt-static
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Bauen
+        run: cargo build --release --locked
+
+      - name: Beispielwelt prüfen
+        shell: cmd
+        run: target\release\rmengine.exe daten --pruefen < NUL
+
+      - name: Inno Setup installieren
+        run: choco install innosetup -y --no-progress
+
+      - name: Installer bauen
+        shell: pwsh
+        run: |
+          $version = (Select-String -Path Cargo.toml -Pattern '^version = "(.*)"').Matches[0].Groups[1].Value
+          New-Item -ItemType Directory -Force dist\windows | Out-Null
+          Copy-Item target\release\rmengine.exe dist\windows\rmengine.exe
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DAppVersion=$version" installer\windows\rmengine.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Copy-Item target\release\rmengine.exe dist\rmengine-windows-x86_64.exe
+          # Portable Version als ZIP (ohne Installation)
+          New-Item -ItemType Directory -Force dist\portable\RMengine | Out-Null
+          Copy-Item target\release\rmengine.exe, ANLEITUNG.md, README.md dist\portable\RMengine\
+          Copy-Item -Recurse daten dist\portable\RMengine\daten
+          Compress-Archive -Path dist\portable\RMengine -DestinationPath dist\RMengine-windows-x86_64-portable.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: |
+            dist/RMengine-Setup-*.exe
+            dist/rmengine-windows-x86_64.exe
+            dist/RMengine-windows-x86_64-portable.zip
+
+  release:
+    name: Release veröffentlichen
+    needs: [linux, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Release-Text
+        run: |
+          cat > notizen.md <<'TEXT'
+          ## Installation
+
+          **Windows:** `RMengine-Setup-….exe` herunterladen und ausführen. Installiert wird ohne Administratorrechte nach *Dokumente\RMengine*.
+          Ohne Installation: `RMengine-windows-x86_64-portable.zip` entpacken und `rmengine.exe` starten.
+
+          **Linux:**
+          ```bash
+          curl -fsSL https://github.com/areadox/RMengine/releases/latest/download/install.sh | bash
+          ```
+          oder `rmengine-linux-x86_64.tar.gz` entpacken und `rmengine/installieren.sh` ausführen.
+
+          ## Aktualisieren
+
+          `rmengine --update` (unter Windows im Startmenü: *RMengine → Nach Updates suchen*).
+          Deine Weltdaten und Spielstände werden dabei nicht verändert.
+          TEXT
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          body_path: notizen.md
+          generate_release_notes: true
+          files: |
+            dist/*
+            ANLEITUNG.md

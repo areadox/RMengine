@@ -1,20 +1,48 @@
 # Anleitung für Weltenbauer
 
-Mit diesem MUD-Treiber baust du eine Welt, **ohne zu programmieren**. Die ganze
+Mit RMengine baust du eine Welt, **ohne zu programmieren**. Die ganze
 Welt steht in Textdateien im Ordner `daten/`. Du änderst eine Datei, tippst im
 Spiel `neuladen`, und die Änderung ist da. Ein Neustart ist dafür nicht nötig.
 
 ---
 
-## 1. Starten
+## 1. Installieren und starten
 
-Einmalig Rust installieren: <https://rustup.rs>
+### Windows
+
+1. Lade auf der [Release-Seite](https://github.com/areadox/RMengine/releases/latest)
+   die Datei `RMengine-Setup-….exe` herunter und führe sie aus. Administratorrechte
+   sind nicht nötig. Installiert wird nach **Dokumente\RMengine**.
+2. Im Startmenü unter **RMengine** findest du:
+   - *RMengine starten*: startet den Server
+   - *Weltdaten bearbeiten*: öffnet den Ordner mit deiner Welt
+   - *Weltdaten prüfen*: sucht Fehler in den Dateien
+   - *Nach Updates suchen*: installiert eine neue Version
+   - *Anleitung*: diese Datei
+
+Beim ersten Start fragt die Windows-Firewall nach. Erlaube den Zugriff, damit
+sich Spieler verbinden können.
+
+Ohne Installation geht es auch: `RMengine-windows-x86_64-portable.zip` entpacken
+und `rmengine.exe` starten.
+
+### Linux
 
 ```bash
-cargo run --release
+curl -fsSL https://github.com/areadox/RMengine/releases/latest/download/install.sh | bash
 ```
 
-Danach verbindest du dich mit einem MUD-Programm, zum Beispiel
+Das Programm landet in `~/.local/share/rmengine`, die Welt in
+`~/.local/share/rmengine/daten`. Danach:
+
+```bash
+rmengine            # Server starten
+rmengine --pruefen  # Weltdaten prüfen
+```
+
+### Verbinden
+
+Verbinde dich mit einem MUD-Programm, zum Beispiel
 [Mudlet](https://www.mudlet.org) (Server `localhost`, Port `4000`), oder im
 Terminal mit:
 
@@ -25,11 +53,28 @@ telnet localhost 4000
 **Wichtig:** Lege als Erstes die Figur `Admin` an. Wer so heißt, ist Baumeister
 (einstellbar in `welt.toml` unter `admins`).
 
-Nur die Daten prüfen, ohne den Server zu starten:
+### Aktualisieren
 
-```bash
-cargo run --release -- --pruefen
-```
+Beim Start meldet RMengine, wenn es eine neue Version gibt. Aktualisieren kannst
+du so:
+
+- **Windows:** Startmenü → *RMengine* → *Nach Updates suchen*, oder den neuen
+  Installer einfach über die alte Version installieren.
+- **Linux:**
+
+  ```bash
+  rmengine --update
+  ```
+
+Dabei wird nur das Programm ausgetauscht. **Deine Welt im Ordner `daten` und die
+Spielstände im Ordner `spieler` bleiben unverändert.** Beende den Server vor dem
+Update.
+
+### Für Entwickler
+
+Mit installiertem Rust (<https://rustup.rs>) startest du den Server aus dem
+Quellcode mit `cargo run --release` und prüfst die Daten mit
+`cargo run --release -- --pruefen`.
 
 ---
 
