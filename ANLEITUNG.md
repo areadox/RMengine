@@ -78,7 +78,70 @@ Quellcode mit `cargo run --release` und prüfst die Daten mit
 
 ---
 
-## 2. Der Aufbau des Datenordners
+## 2. Befehle für Spieler
+
+Die wichtigsten Befehle zeigt `hilfe`. Zwei davon gehören jeder Figur:
+
+### Spielstand (`spielstand` oder kurz `sp`)
+
+```
+Spielstand von Bert der Wanderer
+
+  Lebenspunkte [####################]  100/100
+  Mana         [##########----------]   25/50
+
+Werte
+  Stärke          11 (+1)
+  ...
+Ausrüstung
+  Waffe         ein Kurzschwert
+Können
+  Fertigkeiten  3  (beste: Magie 4, Heilkunde 2, Schwertkampf 1)
+  Zauber        3  (Kleine Heilung, Heimkehr, Feuerpfeil)
+Unterwegs
+  Aufenthalt    Der Dorfplatz
+  Erkundet      12 von 25 Räumen (48%)
+  Spielzeit     1 Std 23 Min, dabei seit 23.11.2026
+```
+
+Boni durch angelegte Ausrüstung erscheinen in Klammern hinter dem Wert.
+
+### Spielerbuch (`spielerbuch`, `buch` oder `lies spielerbuch`)
+
+Hier stellt jeder Spieler selbst ein, wie das Spiel für ihn aussieht. Geändert
+wird mit `spielerbuch <einstellung> <wert>`, zum Beispiel
+`spielerbuch karte aus`.
+
+| Einstellung      | Werte                 | Wirkung                                      |
+|------------------|-----------------------|----------------------------------------------|
+| `farben`         | an / aus              | farbige Texte                                |
+| `karte`          | an / aus              | Karte beim Umsehen                           |
+| `kartengroesse`  | klein / normal / gross | Größe der Karte                             |
+| `kurz`           | an / aus              | beim Gehen keine Raumbeschreibung            |
+| `breite`         | 40 bis 200            | Zeilenbreite für Texte                       |
+| `prompt`         | an / aus              | Eingabezeile mit Lebenspunkten und Mana      |
+| `ankuendigungen` | an / aus              | Meldungen, wenn Spieler kommen und gehen     |
+| `npc`            | an / aus              | Sprüche von Bewohnern und Tieren             |
+| `titel`          | Text oder `loeschen`  | z.B. „der Wanderer“, steht hinter dem Namen  |
+| `beschreibung`   | Text oder `loeschen`  | was andere sehen, wenn sie dich ansehen      |
+| `passwort`       | `<alt> <neu>`         | Passwort ändern                              |
+
+Alle Einstellungen werden sofort gespeichert.
+
+### Anzeigenamen
+
+IDs dürfen keine Umlaute haben. Wie Werte und Ausrüstungsplätze im Spiel heißen,
+legst du in `welt.toml` fest:
+
+```toml
+[namen]
+staerke = "Stärke"
+koerper = "Körper"
+```
+
+---
+
+## 3. Der Aufbau des Datenordners
 
 ```
 daten/
@@ -88,7 +151,7 @@ daten/
   monster/*.toml       Monster und Bewohner
   fertigkeiten/*.toml  Fertigkeiten
   zauber/*.toml        Zaubersprüche
-  oberwelt/            die Landschaft (siehe Abschnitt 4)
+  oberwelt/            die Landschaft (siehe Abschnitt 5)
 ```
 
 Die Ordner sind nur eine Ordnungshilfe. Der Treiber liest **alle** `.toml`-Dateien
@@ -128,7 +191,7 @@ hellgruen hellgelb hellblau hellmagenta hellcyan hellweiss fett`.
 
 ---
 
-## 3. Räume und die Karte
+## 4. Räume und die Karte
 
 ```toml
 [[raum]]
@@ -271,7 +334,7 @@ immer an derselben Stelle. Die Karte sieht deshalb bei jedem Umsehen gleich aus.
 
 ---
 
-## 4. Die Oberwelt (Landschaft)
+## 5. Die Oberwelt (Landschaft)
 
 Für Städte, Häuser und Höhlen baust du einzelne Räume wie oben. Für das **weite
 Land dazwischen** zeichnest du stattdessen eine Landkarte. Jedes Zeichen darin ist
@@ -396,7 +459,7 @@ der Eigenschaft `landkarte = 1`, Baumeister nicht.
 
 ---
 
-## 5. Gegenstände
+## 6. Gegenstände
 
 ```toml
 [[gegenstand]]
@@ -424,7 +487,7 @@ benutzen_text = "Du trinkst den Trank."
 
 ---
 
-## 6. Monster
+## 7. Monster
 
 ```toml
 [[monster]]
@@ -454,7 +517,7 @@ aufgefüllt.
 
 ---
 
-## 7. Fertigkeiten
+## 8. Fertigkeiten
 
 ```toml
 [[fertigkeit]]
@@ -470,7 +533,7 @@ beschreibung = "Wunden heilen."
 
 ---
 
-## 8. Zauber
+## 9. Zauber
 
 ```toml
 [[zauber]]
@@ -505,7 +568,7 @@ Mit dem Zaubern übt man die zugehörige Fertigkeit und kann dabei aufsteigen.
 
 ---
 
-## 9. Baumeister-Befehle im Spiel
+## 10. Baumeister-Befehle im Spiel
 
 | Befehl                         | Wirkung                                      |
 |--------------------------------|----------------------------------------------|
@@ -524,7 +587,7 @@ technische Werte zu Gegenständen und Monstern.
 
 ---
 
-## 10. Wenn etwas nicht stimmt
+## 11. Wenn etwas nicht stimmt
 
 Der Treiber prüft beim Laden alles und meldet Fehler mit Datei und Ort, oft mit
 einem Vorschlag:

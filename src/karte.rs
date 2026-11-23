@@ -32,7 +32,7 @@ pub fn zeichnen(w: &Welt, sp: &SpielerDaten, radius: i32, mit_legende: bool) -> 
             .filter(|s| s.sp.name != sp.name)
             .filter_map(|s| crate::oberwelt::aus_id(&s.sp.raum))
             .collect();
-        return ow.karte_zeichnen(x, y, &andere, mit_legende);
+        return ow.karte_zeichnen(x, y, &andere, mit_legende, sp.einstellungen.kartengroesse);
     }
     if d.welt.stadtkarte_stil == "kasten" {
         return zeichnen_kasten(w, sp, radius, mit_legende);

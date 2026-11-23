@@ -12,7 +12,10 @@ pub enum Folge {
     Beenden,
 }
 
-const BREITE: usize = 78;
+/// Zeilenbreite des Spielers (Einstellung im Spielerbuch)
+fn breite(w: &Welt, sid: u64) -> usize {
+    w.spieler.get(&sid).map(|s| s.sp.einstellungen.breite).unwrap_or(78)
+}
 
 pub fn ausfuehren(w: &mut Welt, sid: u64, eingabe: &str) -> Folge {
     if !w.spieler.contains_key(&sid) {
@@ -70,7 +73,12 @@ pub fn ausfuehren(w: &mut Welt, sid: u64, eingabe: &str) -> Folge {
         "emote" | "me" | "/me" => emote(w, sid, rest),
         "rufe" | "ruf" | "shout" => rufen(w, sid, rest),
         "wer" | "who" => wer(w, sid),
-        "werte" | "score" | "status" => werte(w, sid),
+        "spielstand" | "sp" | "werte" | "score" | "status" => spielstand(w, sid),
+        "spielerbuch" | "buch" | "sb" | "einstellungen" | "optionen" => spielerbuch(w, sid, rest),
+        "lies" | "lese" | "read" => match normalisieren(rest).as_str() {
+            "spielerbuch" | "buch" | "" => spielerbuch(w, sid, ""),
+            _ => w.sende(sid, "Was willst du lesen?"),
+        },
         "fertigkeiten" | "fert" | "skills" => fertigkeiten(w, sid),
         "zauber" | "spells" | "zaubersprueche" => zauber_liste(w, sid),
         "zaubere" | "zauber_sprechen" | "cast" | "z" => zaubern(w, sid, rest),
@@ -101,6 +109,10 @@ pub fn ausfuehren(w: &mut Welt, sid: u64, eingabe: &str) -> Folge {
 pub fn prompt(w: &Welt, sid: u64) {
     if let Some(s) = w.spieler.get(&sid) {
         let p = &s.sp;
+        if !p.einstellungen.prompt {
+            s.sende_ohne_umbruch("\n> ");
+            return;
+        }
         s.sende_ohne_umbruch(&format!(
             "\n{{gruen}}LP {}/{}{{/}} {{cyan}}MP {}/{}{{/}} > ",
             p.lebenspunkte, p.max_lebenspunkte, p.mana, p.max_mana
@@ -155,7 +167,8 @@ fn hilfe(w: &Welt, sid: u64, admin: bool) {
   {gelb}emote{/} <text>         Eine Handlung zeigen (kurz: :text)
   {gelb}rufe{/} <text>          Etwas rufen, das alle hören
   {gelb}wer{/}                  Wer ist gerade da?
-  {gelb}werte{/}                Deine Werte und Ausrüstung
+  {gelb}spielstand{/} (sp)      Deine Werte, Ausrüstung und Fortschritte
+  {gelb}spielerbuch{/}          Einstellungen: Karte, Farben, Titel, Passwort ...
   {gelb}fertigkeiten{/}         Deine Fertigkeiten
   {gelb}zauber{/}               Deine Zaubersprüche
   {gelb}zaubere{/} <zauber> [ziel]  Einen Zauber sprechen
@@ -236,13 +249,21 @@ fn gruppieren(ids: &[String]) -> Vec<(String, usize)> {
 // Umsehen und Bewegen
 // ---------------------------------------------------------------------------
 
+/// Raum mit Beschreibung zeigen (beim Umsehen).
 pub fn raum_anzeigen(w: &Welt, sid: u64) {
+    raum_zeigen(w, sid, true);
+}
+
+/// `voll = false` beim Gehen: Mit der Einstellung "kurz" fehlt dann die Beschreibung.
+fn raum_zeigen(w: &Welt, sid: u64, voll: bool) {
     let Some(s) = w.spieler.get(&sid) else { return };
     let Some(raum) = w.d.raum(&s.sp.raum) else { return };
+    let e = &s.sp.einstellungen;
     let mut aus = String::new();
 
-    if w.d.welt.karte_beim_umsehen {
-        aus.push_str(&karte::zeichnen(w, &s.sp, w.d.welt.karten_radius, false));
+    if w.d.welt.karte_beim_umsehen && e.karte {
+        let radius = (w.d.welt.karten_radius + e.kartengroesse).max(1);
+        aus.push_str(&karte::zeichnen(w, &s.sp, radius, false));
         aus.push('\n');
     }
     aus.push_str(&format!("{{fett}}{{gelb}}{}{{/}}", raum.name));
@@ -252,8 +273,10 @@ pub fn raum_anzeigen(w: &Welt, sid: u64) {
         aus.push_str(&format!(" {{grau}}[{}]{{/}}", raum.id));
     }
     aus.push('\n');
-    aus.push_str(&umbrechen(&raum.beschreibung, BREITE));
-    aus.push('\n');
+    if voll || !e.kurz {
+        aus.push_str(&umbrechen(&raum.beschreibung, e.breite));
+        aus.push('\n');
+    }
 
     let mut ausgaenge: Vec<String> = raum.ausgaenge.keys().map(|r| r.anzeige().to_string()).collect();
     let himmelsrichtungen = raum.ausgaenge.keys().filter(|r| r.versatz().2 == 0 && r.versatz() != (0, 0, 0)).count();
@@ -284,7 +307,7 @@ pub fn raum_anzeigen(w: &Welt, sid: u64) {
     }
     for pid in w.spieler_im_raum(&raum.id) {
         if pid != sid {
-            aus.push_str(&format!("{{hellgruen}}{} ist hier.{{/}}\n", w.spieler[&pid].sp.name));
+            aus.push_str(&format!("{{hellgruen}}{} ist hier.{{/}}\n", w.spieler[&pid].sp.voller_name()));
         }
     }
     w.sende(sid, aus.trim_end());
@@ -311,18 +334,19 @@ fn gehen(w: &mut Welt, sid: u64, richt: Richtung) {
         }
     }
     w.sende_raum(&ziel, &format!("{name} {}.", richt.kommt()), &[sid]);
-    raum_anzeigen(w, sid);
+    raum_zeigen(w, sid, false);
 }
 
 fn untersuchen(w: &Welt, sid: u64, such: &str) {
     let s = &w.spieler[&sid];
     let raum_id = &s.sp.raum;
     let such = such.strip_prefix("an ").unwrap_or(such);
+    let br = breite(w, sid);
 
     // 1. Details im Raum (z.B. "brunnen")
     if let Some(r) = w.d.raum(raum_id) {
         if let Some(t) = r.details.get(&normalisieren(such)) {
-            w.sende(sid, &umbrechen(t, BREITE));
+            w.sende(sid, &umbrechen(t, br));
             return;
         }
     }
@@ -333,7 +357,7 @@ fn untersuchen(w: &Welt, sid: u64, such: &str) {
         if let Some(i) = finde_gegenstand(&w.d, liste, such) {
             let g = &w.d.gegenstaende[&liste[i]];
             let mut t = format!("{{fett}}{}{{/}}\n", gross(&g.name));
-            t.push_str(&umbrechen(if g.beschreibung.is_empty() { "Nichts Besonderes." } else { &g.beschreibung }, BREITE));
+            t.push_str(&umbrechen(if g.beschreibung.is_empty() { "Nichts Besonderes." } else { &g.beschreibung }, br));
             if !g.platz.is_empty() {
                 t.push_str(&format!("\n{{grau}}(Kann angelegt werden: {}){{/}}", g.platz));
             }
@@ -352,7 +376,7 @@ fn untersuchen(w: &Welt, sid: u64, such: &str) {
         let m = &w.monster[&mid];
         if let Some(def) = w.d.monster.get(&m.def) {
             let mut t = format!("{{fett}}{}{{/}}\n", gross(&def.name));
-            t.push_str(&umbrechen(if def.beschreibung.is_empty() { "Nichts Besonderes." } else { &def.beschreibung }, BREITE));
+            t.push_str(&umbrechen(if def.beschreibung.is_empty() { "Nichts Besonderes." } else { &def.beschreibung }, br));
             if s.admin {
                 t.push_str(&format!(
                     "\n{{grau}}[id: {}, stufe: {}, LP: {}/{}, MP: {}, heimat: {}, datei: {}]{{/}}",
@@ -367,11 +391,16 @@ fn untersuchen(w: &Welt, sid: u64, such: &str) {
     if let Some(pid) = finde_spieler_im_raum(w, raum_id, such) {
         let o = &w.spieler[&pid].sp;
         let teile: Vec<String> = o.ausruestung.values().map(|g| w.d.gegenstand_akk(g)).collect();
-        let t = if teile.is_empty() {
-            format!("{} trägt nichts Besonderes.", o.name)
+        let mut t = format!("{{fett}}{}{{/}}\n", o.voller_name());
+        if !o.beschreibung.is_empty() {
+            t.push_str(&umbrechen(&o.beschreibung, br));
+            t.push('\n');
+        }
+        if teile.is_empty() {
+            t.push_str(&format!("{} trägt nichts Besonderes.", o.name));
         } else {
-            format!("{} trägt {}.", o.name, aufzaehlen(&teile))
-        };
+            t.push_str(&format!("{} trägt {}.", o.name, aufzaehlen(&teile)));
+        }
         w.sende(sid, &t);
         return;
     }
@@ -591,7 +620,7 @@ fn wer(w: &Welt, sid: u64) {
     let mut t = format!("{{fett}}In {} sind gerade unterwegs:{{/}}\n", w.d.welt.name);
     for s in w.spieler.values() {
         let marke = if s.admin { " {rot}[Baumeister]{/}" } else { "" };
-        t.push_str(&format!("  {}{marke}\n", s.sp.name));
+        t.push_str(&format!("  {}{marke}\n", s.sp.voller_name()));
     }
     t.push_str(&format!("{} Spieler", w.spieler.len()));
     w.sende(sid, &t);
@@ -600,33 +629,6 @@ fn wer(w: &Welt, sid: u64) {
 // ---------------------------------------------------------------------------
 // Werte, Fertigkeiten, Zauber
 // ---------------------------------------------------------------------------
-
-fn werte(w: &Welt, sid: u64) {
-    let sp = &w.spieler[&sid].sp;
-    let mut t = format!("{{fett}}{}{{/}}\n", sp.name);
-    t.push_str(&format!(
-        "  {{gruen}}Lebenspunkte: {}/{}{{/}}   {{cyan}}Mana: {}/{}{{/}}\n",
-        sp.lebenspunkte, sp.max_lebenspunkte, sp.mana, sp.max_mana
-    ));
-    if !sp.werte.is_empty() {
-        let teile: Vec<String> = sp.werte.iter().map(|(k, v)| format!("{}: {v}", gross(k))).collect();
-        t.push_str(&format!("  {}\n", teile.join("   ")));
-    }
-    let mut boni: std::collections::BTreeMap<String, i32> = Default::default();
-    for id in sp.ausruestung.values() {
-        if let Some(g) = w.d.gegenstaende.get(id) {
-            for (k, v) in &g.eigenschaften {
-                *boni.entry(k.clone()).or_default() += v;
-            }
-        }
-    }
-    if !boni.is_empty() {
-        let teile: Vec<String> = boni.iter().map(|(k, v)| format!("{}: {v}", gross(k))).collect();
-        t.push_str(&format!("  {{grau}}Durch Ausrüstung: {}{{/}}\n", teile.join(", ")));
-    }
-    t.push_str(&format!("  {{grau}}Erkundete Räume: {} von {}{{/}}", sp.besucht.len(), w.d.raeume.len()));
-    w.sende(sid, &t);
-}
 
 fn fertigkeiten(w: &Welt, sid: u64) {
     let sp = &w.spieler[&sid].sp;
@@ -999,4 +1001,288 @@ fn admin_befehl(w: &mut Welt, sid: u64, befehl: &str, rest: &str) -> bool {
         _ => return false,
     }
     true
+}
+
+// ---------------------------------------------------------------------------
+// Spielstand (sp): Werte und Fortschritte auf einen Blick
+// ---------------------------------------------------------------------------
+
+/// [##########----------]
+fn balken(wert: i32, max: i32, breite: usize, farbe: &str) -> String {
+    let anteil = if max > 0 { (wert.max(0) as f64 / max as f64).min(1.0) } else { 0.0 };
+    let voll = (anteil * breite as f64).round() as usize;
+    format!("[{{{farbe}}}{}{{/}}{{grau}}{}{{/}}]", "#".repeat(voll), "-".repeat(breite - voll))
+}
+
+fn dauer(sekunden: u64) -> String {
+    let (std, min) = (sekunden / 3600, (sekunden % 3600) / 60);
+    match (std, min) {
+        (0, m) => format!("{m} Min"),
+        (s, m) => format!("{s} Std {m} Min"),
+    }
+}
+
+/// Sekunden seit 1970 -> "23.11.2026"
+fn datum(sekunden: u64) -> String {
+    let tage = (sekunden / 86_400) as i64 + 719_468;
+    let era = tage.div_euclid(146_097);
+    let doe = tage - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let tag = doy - (153 * mp + 2) / 5 + 1;
+    let monat = if mp < 10 { mp + 3 } else { mp - 9 };
+    let jahr = yoe + era * 400 + if monat <= 2 { 1 } else { 0 };
+    format!("{tag:02}.{monat:02}.{jahr}")
+}
+
+fn spielstand(w: &Welt, sid: u64) {
+    let sp = &w.spieler[&sid].sp;
+    let mut t = format!("{{fett}}Spielstand von {}{{/}}\n\n", sp.voller_name());
+
+    t.push_str(&format!(
+        "  Lebenspunkte {} {:>4}/{}\n",
+        balken(sp.lebenspunkte, sp.max_lebenspunkte, 20, "gruen"),
+        sp.lebenspunkte,
+        sp.max_lebenspunkte
+    ));
+    t.push_str(&format!(
+        "  Mana         {} {:>4}/{}\n",
+        balken(sp.mana, sp.max_mana, 20, "cyan"),
+        sp.mana,
+        sp.max_mana
+    ));
+
+    // Boni durch angelegte Ausrüstung
+    let mut boni: std::collections::BTreeMap<String, i32> = Default::default();
+    for id in sp.ausruestung.values() {
+        if let Some(g) = w.d.gegenstaende.get(id) {
+            for (k, v) in &g.eigenschaften {
+                *boni.entry(k.clone()).or_default() += v;
+            }
+        }
+    }
+    if !sp.werte.is_empty() {
+        t.push_str("\n{gelb}Werte{/}\n");
+        for (k, v) in &sp.werte {
+            let bonus = boni.remove(k).unwrap_or(0);
+            let extra = match bonus {
+                0 => String::new(),
+                b if b > 0 => format!(" {{hellgruen}}(+{b}){{/}}"),
+                b => format!(" {{hellrot}}({b}){{/}}"),
+            };
+            t.push_str(&format!("  {:<14}{:>4}{extra}\n", w.d.anzeigename(k), v + bonus));
+        }
+    }
+
+    t.push_str("\n{gelb}Ausrüstung{/}\n");
+    if sp.ausruestung.is_empty() {
+        t.push_str("  nichts angelegt\n");
+    }
+    for (platz, id) in &sp.ausruestung {
+        t.push_str(&format!("  {:<14}{}\n", w.d.anzeigename(platz), w.d.gegenstand_name(id)));
+    }
+    if !boni.is_empty() {
+        let teile: Vec<String> = boni.iter().map(|(k, v)| format!("{} {v}", w.d.anzeigename(k))).collect();
+        t.push_str(&format!("  {{grau}}Zusammen: {}{{/}}\n", teile.join(", ")));
+    }
+
+    t.push_str("\n{gelb}Können{/}\n");
+    let mut fert: Vec<(&String, &u32)> = sp.fertigkeiten.iter().collect();
+    fert.sort_by(|a, b| b.1.cmp(a.1));
+    let beste: Vec<String> = fert
+        .iter()
+        .take(3)
+        .filter_map(|(id, stufe)| w.d.fertigkeiten.get(*id).map(|f| format!("{} {stufe}", f.name)))
+        .collect();
+    t.push_str(&format!(
+        "  Fertigkeiten  {}{}\n",
+        sp.fertigkeiten.len(),
+        if beste.is_empty() { String::new() } else { format!("  {{grau}}(beste: {}){{/}}", beste.join(", ")) }
+    ));
+    let zauber: Vec<String> = sp.zauber.iter().filter_map(|z| w.d.zauber.get(z).map(|z| z.name.clone())).collect();
+    t.push_str(&format!(
+        "  Zauber        {}{}\n",
+        zauber.len(),
+        if zauber.is_empty() { String::new() } else { format!("  {{grau}}({}){{/}}", zauber.join(", ")) }
+    ));
+
+    let gewicht: i32 = sp.inventar.iter().filter_map(|g| w.d.gegenstaende.get(g)).map(|g| g.gewicht).sum();
+    let raeume = w.d.raeume.len().max(1);
+    let besucht = sp.besucht.iter().filter(|r| w.d.raeume.contains_key(*r)).count();
+    let ort = w.d.raum(&sp.raum).map(|r| r.name.clone()).unwrap_or_default();
+    t.push_str("\n{gelb}Unterwegs{/}\n");
+    t.push_str(&format!("  Aufenthalt    {ort}\n"));
+    t.push_str(&format!("  Gepäck        {} Gegenstände, Gewicht {gewicht}\n", sp.inventar.len()));
+    t.push_str(&format!(
+        "  Erkundet      {besucht} von {} Räumen ({}%)\n",
+        w.d.raeume.len(),
+        besucht * 100 / raeume
+    ));
+    t.push_str(&format!("  Spielzeit     {}", dauer(sp.spielzeit)));
+    if sp.erstellt > 0 {
+        t.push_str(&format!(", dabei seit {}", datum(sp.erstellt)));
+    }
+    w.sende(sid, &t);
+}
+
+// ---------------------------------------------------------------------------
+// Spielerbuch: persönliche Einstellungen
+// ---------------------------------------------------------------------------
+
+fn an_aus(b: bool) -> &'static str {
+    if b {
+        "{hellgruen}an{/}"
+    } else {
+        "{grau}aus{/}"
+    }
+}
+
+fn als_schalter(wert: &str) -> Option<bool> {
+    match normalisieren(wert).as_str() {
+        "an" | "ein" | "ja" | "1" | "on" => Some(true),
+        "aus" | "nein" | "0" | "off" => Some(false),
+        _ => None,
+    }
+}
+
+const EINSTELLUNGEN: &[&str] = &[
+    "farben", "karte", "kartengroesse", "kurz", "breite", "prompt", "ankuendigungen", "npc", "titel", "beschreibung", "passwort",
+];
+
+fn spielerbuch_zeigen(w: &Welt, sid: u64) {
+    let sp = &w.spieler[&sid].sp;
+    let e = &sp.einstellungen;
+    let groesse = match e.kartengroesse {
+        i32::MIN..=-1 => "klein",
+        0 => "normal",
+        _ => "gross",
+    };
+    let zeile = |name: &str, wert: &str, beschreibung: &str| {
+        format!("  {{gelb}}{name:<15}{{/}} {} {{grau}}{beschreibung}{{/}}\n", text::auffuellen(wert, 6))
+    };
+    let mut t = format!("{{fett}}Spielerbuch von {}{{/}}\n\n", sp.voller_name());
+    t.push_str("{fett}Anzeige{/}\n");
+    t.push_str(&zeile("farben", an_aus(sp.farben), "farbige Texte"));
+    t.push_str(&zeile("karte", an_aus(e.karte), "Karte beim Umsehen zeigen"));
+    t.push_str(&zeile("kartengroesse", groesse, "klein, normal oder gross"));
+    t.push_str(&zeile("kurz", an_aus(e.kurz), "beim Gehen keine Raumbeschreibung (schau zeigt sie)"));
+    t.push_str(&zeile("breite", &e.breite.to_string(), "Zeilenbreite für Texte, 40 bis 200"));
+    t.push_str(&zeile("prompt", an_aus(e.prompt), "Eingabezeile mit Lebenspunkten und Mana"));
+    t.push_str("\n{fett}Mitteilungen{/}\n");
+    t.push_str(&zeile("ankuendigungen", an_aus(e.ankuendigungen), "melden, wenn Spieler kommen und gehen"));
+    t.push_str(&zeile("npc", an_aus(e.npc_sprueche), "Sprüche von Bewohnern und Tieren"));
+    t.push_str("\n{fett}Deine Figur{/}\n");
+    let titel = if sp.titel.is_empty() { "(keiner)".to_string() } else { sp.titel.clone() };
+    t.push_str(&format!("  {{gelb}}{:<15}{{/}} {titel}\n", "titel"));
+    let besch = if sp.beschreibung.is_empty() { "(keine)".to_string() } else { sp.beschreibung.clone() };
+    t.push_str(&format!("  {{gelb}}{:<15}{{/}} {besch}\n", "beschreibung"));
+    t.push_str(&format!("  {{gelb}}{:<15}{{/}} {{grau}}ändern mit: spielerbuch passwort <alt> <neu>{{/}}\n", "passwort"));
+    t.push_str("\nÄndern: {gelb}spielerbuch <einstellung> <wert>{/}, z.B. {gelb}spielerbuch karte aus{/}");
+    w.sende(sid, &t);
+}
+
+fn spielerbuch(w: &mut Welt, sid: u64, rest: &str) {
+    if rest.is_empty() {
+        spielerbuch_zeigen(w, sid);
+        return;
+    }
+    let (was, wert) = match rest.split_once(char::is_whitespace) {
+        Some((a, b)) => (normalisieren(a), b.trim()),
+        None => (normalisieren(rest), ""),
+    };
+    let Some(s) = w.spieler.get_mut(&sid) else { return };
+    let e = &mut s.sp.einstellungen;
+
+    // Ein-/Aus-Schalter
+    let schalter: Option<&mut bool> = match was.as_str() {
+        "farben" | "farbe" => Some(&mut s.sp.farben),
+        "karte" => Some(&mut e.karte),
+        "kurz" | "kurzbeschreibung" => Some(&mut e.kurz),
+        "prompt" => Some(&mut e.prompt),
+        "ankuendigungen" | "ankuendigung" => Some(&mut e.ankuendigungen),
+        "npc" | "npcs" | "sprueche" | "npc_sprueche" => Some(&mut e.npc_sprueche),
+        _ => None,
+    };
+    let meldung = if let Some(feld) = schalter {
+        match als_schalter(wert) {
+            Some(b) => {
+                *feld = b;
+                format!("{} ist jetzt {}.", gross(&was), an_aus(b))
+            }
+            None => format!("Bitte {{gelb}}an{{/}} oder {{gelb}}aus{{/}} angeben, z.B. spielerbuch {was} aus"),
+        }
+    } else {
+        match was.as_str() {
+            "kartengroesse" | "kartengrosse" | "groesse" => match normalisieren(wert).as_str() {
+                "klein" => {
+                    e.kartengroesse = -1;
+                    "Die Karte ist jetzt klein.".into()
+                }
+                "normal" | "mittel" => {
+                    e.kartengroesse = 0;
+                    "Die Karte ist jetzt normal groß.".into()
+                }
+                "gross" | "groß" => {
+                    e.kartengroesse = 1;
+                    "Die Karte ist jetzt groß.".into()
+                }
+                _ => "Bitte klein, normal oder gross angeben.".into(),
+            },
+            "breite" => match wert.parse::<usize>() {
+                Ok(b) if (40..=200).contains(&b) => {
+                    e.breite = b;
+                    format!("Texte werden jetzt auf {b} Zeichen umbrochen.")
+                }
+                _ => "Bitte eine Zahl von 40 bis 200 angeben.".into(),
+            },
+            "titel" => {
+                if wert.is_empty() || matches!(normalisieren(wert).as_str(), "loeschen" | "-" | "keiner") {
+                    s.sp.titel.clear();
+                    "Dein Titel wurde entfernt.".into()
+                } else if text::sichtbare_laenge(wert) > 40 {
+                    "Der Titel darf höchstens 40 Zeichen lang sein.".into()
+                } else {
+                    s.sp.titel = wert.to_string();
+                    format!("Du heißt jetzt: {}", s.sp.voller_name())
+                }
+            }
+            "beschreibung" => {
+                if wert.is_empty() || matches!(normalisieren(wert).as_str(), "loeschen" | "-" | "keine") {
+                    s.sp.beschreibung.clear();
+                    "Deine Beschreibung wurde entfernt.".into()
+                } else if text::sichtbare_laenge(wert) > 400 {
+                    "Die Beschreibung darf höchstens 400 Zeichen lang sein.".into()
+                } else {
+                    s.sp.beschreibung = wert.to_string();
+                    "So sehen dich andere jetzt.".into()
+                }
+            }
+            "passwort" => {
+                let teile: Vec<&str> = wert.split_whitespace().collect();
+                match teile.as_slice() {
+                    [alt, neu] if s.sp.passwort_stimmt(alt) => {
+                        if neu.chars().count() < 4 {
+                            "Das neue Passwort ist zu kurz (mindestens 4 Zeichen).".into()
+                        } else {
+                            s.sp.passwort_setzen(neu);
+                            "Dein Passwort wurde geändert.".into()
+                        }
+                    }
+                    [_, _] => "Das alte Passwort stimmt nicht.".into(),
+                    _ => "Benutzung: spielerbuch passwort <altes> <neues>".into(),
+                }
+            }
+            _ => {
+                let namen: Vec<String> = EINSTELLUNGEN.iter().map(|s| s.to_string()).collect();
+                let tipp = text::vorschlag(&was, namen.iter()).map(|v| format!(" Meintest du '{v}'?")).unwrap_or_default();
+                format!("Diese Einstellung gibt es nicht.{tipp} Tippe {{gelb}}spielerbuch{{/}} für eine Übersicht.")
+            }
+        }
+    };
+    // Sofort speichern, damit nichts verloren geht
+    if let Some(s) = w.spieler.get(&sid) {
+        w.speichern(&s.sp);
+    }
+    w.sende(sid, &meldung);
 }

@@ -11,6 +11,11 @@ on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      neuerungen:
+        description: "Was ist neu? (erscheint im Release und beim Update)"
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -126,8 +131,13 @@ jobs:
           merge-multiple: true
 
       - name: Release-Text
+        env:
+          NEUERUNGEN: ${{ github.event.inputs.neuerungen }}
         run: |
-          cat > notizen.md <<'TEXT'
+          if [ -n "$NEUERUNGEN" ]; then
+            printf '## Was ist neu?\n\n%s\n\n' "$NEUERUNGEN" > notizen.md
+          fi
+          cat >> notizen.md <<'TEXT'
           ## Installation
 
           **Windows:** `RMengine-Setup-….exe` herunterladen und ausführen. Installiert wird ohne Administratorrechte nach *Dokumente\RMengine*.

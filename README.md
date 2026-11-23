@@ -42,7 +42,7 @@ cargo run --release -- --pruefen # nur die Weltdaten prüfen
 ## Eine neue Version veröffentlichen
 
 1. In `Cargo.toml` die `version` erhöhen, z.B. auf `0.2.0`, und committen.
-2. Auf GitHub unter **Actions → Release → Run workflow** starten.
+2. Auf GitHub unter **Actions → Release → Run workflow** starten. Ins Feld *„Was ist neu?“* die Neuerungen schreiben: Sie erscheinen im Release und beim Update.
 
    Alternativ ein Tag hochladen:
 
@@ -65,7 +65,8 @@ das Update und veröffentlicht alles als Release.
 - zentrale Verwaltung von Items, Monstern, Fertigkeiten und Zaubern, alles in TOML
 - gründliche Prüfung der Daten mit deutschen Fehlermeldungen und Tippfehler-Vorschlägen
 - `neuladen` im laufenden Spiel
-- Spieler werden gespeichert: Inventar, Ausrüstung, Fertigkeiten, Zauber, besuchte Räume
+- Spieler werden gespeichert: Inventar, Ausrüstung, Fertigkeiten, Zauber, besuchte Räume, Spielzeit
+- **Spielstand** (`sp`) mit Balken, Ausrüstungsboni und Fortschritt; **Spielerbuch** für persönliche Einstellungen (Karte, Kurzmodus, Zeilenbreite, Titel, Passwort …)
 - Monster wandern in ihrem Gebiet umher und sprechen
 - Zauber mit Heilung, Mana und Teleport, Abklingzeiten und Fertigkeitssteigerung
 - Ausrüstungsplätze, benutzbare Tränke und Nahrung

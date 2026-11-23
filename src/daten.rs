@@ -272,6 +272,8 @@ struct WeltDatei {
     gelaende: BTreeMap<String, GelaendeDef>,
     #[serde(default)]
     deko: BTreeMap<String, String>,
+    #[serde(default)]
+    namen: BTreeMap<String, String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -541,11 +543,18 @@ pub struct Daten {
     pub koordinaten: HashMap<(String, i32, i32, i32), String>,
     /// Farben der Verzierungen: Zeichen -> Farbe
     pub deko_farben: BTreeMap<String, String>,
+    /// Anzeigenamen für IDs, z.B. staerke -> "Stärke"
+    pub namen: BTreeMap<String, String>,
     pub oberwelt: Option<Oberwelt>,
     pub warnungen: Vec<String>,
 }
 
 impl Daten {
+    /// Schöner Name für eine ID (aus [namen] in welt.toml), sonst die ID mit großem Anfangsbuchstaben.
+    pub fn anzeigename(&self, id: &str) -> String {
+        self.namen.get(id).cloned().unwrap_or_else(|| text::gross(id))
+    }
+
     /// Holt einen Raum – einen gebauten oder ein Feld der Oberwelt ("ow:x:y").
     pub fn raum(&self, id: &str) -> Option<Cow<'_, RaumDef>> {
         if let Some(r) = self.raeume.get(id) {
@@ -651,6 +660,7 @@ pub fn laden(ordner: &Path) -> Result<Daten, Vec<String>> {
         zauber: BTreeMap::new(),
         koordinaten: HashMap::new(),
         deko_farben: wd.deko,
+        namen: wd.namen,
         oberwelt: None,
         warnungen: Vec::new(),
     };

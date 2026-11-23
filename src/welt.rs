@@ -154,6 +154,15 @@ impl Welt {
         }
     }
 
+    /// Nur an Spieler, die Ankündigungen (kommen/gehen) sehen wollen.
+    pub fn sende_ankuendigung(&self, t: &str, ausser: &[u64]) {
+        for (id, s) in &self.spieler {
+            if !ausser.contains(id) && s.sp.einstellungen.ankuendigungen {
+                s.sende(t);
+            }
+        }
+    }
+
     pub fn sende_alle(&self, t: &str, ausser: &[u64]) {
         for (id, s) in &self.spieler {
             if !ausser.contains(id) {
@@ -205,6 +214,10 @@ impl Welt {
             fertigkeiten: st.fertigkeiten.clone(),
             zauber: st.zauber.clone(),
             werte: st.werte.clone(),
+            erstellt: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0),
             ..Default::default()
         };
         sp.passwort_setzen(passwort);
@@ -227,7 +240,7 @@ impl Welt {
         let id = self.neue_id();
         self.spieler.insert(id, Sitzung { sp, sender, admin, abklingzeiten: HashMap::new() });
         self.sende_raum(&raum, &format!("{name} erscheint."), &[id]);
-        self.sende_alle(&format!("{{grau}}[{name} hat die Welt betreten.]{{/}}"), &[id]);
+        self.sende_ankuendigung(&format!("{{grau}}[{name} hat die Welt betreten.]{{/}}"), &[id]);
         println!("Anmeldung: {name}");
         Ok(id)
     }
@@ -236,7 +249,7 @@ impl Welt {
         if let Some(s) = self.spieler.remove(&sid) {
             self.speichern(&s.sp);
             self.sende_raum(&s.sp.raum, &format!("{} verschwindet.", s.sp.name), &[]);
-            self.sende_alle(&format!("{{grau}}[{} hat die Welt verlassen.]{{/}}", s.sp.name), &[]);
+            self.sende_ankuendigung(&format!("{{grau}}[{} hat die Welt verlassen.]{{/}}", s.sp.name), &[]);
             println!("Abmeldung: {}", s.sp.name);
         }
     }
@@ -263,7 +276,9 @@ impl Welt {
 
         // Erholung
         let (lp, mp) = (self.d.welt.regeneration_lp, self.d.welt.regeneration_mp);
+        let takt = self.d.welt.takt_sekunden;
         for s in self.spieler.values_mut() {
+            s.sp.spielzeit += takt;
             s.sp.lebenspunkte = (s.sp.lebenspunkte + lp).min(s.sp.max_lebenspunkte);
             s.sp.mana = (s.sp.mana + mp).min(s.sp.max_mana);
         }
@@ -329,7 +344,13 @@ impl Welt {
                     self.sende_raum(&alt, &format!("{name} {}.", richt.geht()), &[]);
                     self.sende_raum(&ziel, &format!("{name} {}.", richt.kommt()), &[]);
                 }
-                Aktion::Sagen(raum, t) => self.sende_raum(&raum, &t, &[]),
+                Aktion::Sagen(raum, t) => {
+                    for s in self.spieler.values() {
+                        if s.sp.raum == raum && s.sp.einstellungen.npc_sprueche {
+                            s.sende(&t);
+                        }
+                    }
+                }
             }
         }
     }

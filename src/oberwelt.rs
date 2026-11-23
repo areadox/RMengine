@@ -531,8 +531,10 @@ impl Oberwelt {
     /// Der Ausschnitt rund um den Spieler, so weit er sehen kann.
     /// Stil "kompakt": ein Zeichen pro Feld im Rahmen, X = du.
     /// Stil "weit": ein Zeichen und ein Leerzeichen pro Feld, ohne Rahmen.
-    pub fn karte_zeichnen(&self, x: i32, y: i32, andere: &[(i32, i32)], mit_legende: bool) -> String {
-        let (rx, ry) = (self.cfg.anzeige_breite.max(1), self.cfg.anzeige_hoehe.max(1));
+    /// `zoom`: -1 kleiner, 0 normal, +1 größer (Einstellung im Spielerbuch)
+    pub fn karte_zeichnen(&self, x: i32, y: i32, andere: &[(i32, i32)], mit_legende: bool, zoom: i32) -> String {
+        let rx = (self.cfg.anzeige_breite + zoom * 4).max(2);
+        let ry = (self.cfg.anzeige_hoehe + zoom * 2).max(1);
         let kompakt = self.cfg.stil != "weit";
         let weite = self.sichtweite(x, y);
         let mut gesehen: BTreeSet<char> = BTreeSet::new();

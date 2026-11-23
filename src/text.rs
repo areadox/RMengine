@@ -64,6 +64,12 @@ pub fn sichtbare_laenge(t: &str) -> usize {
     farben_umwandeln(t, false).chars().count()
 }
 
+/// Füllt mit Leerzeichen auf die sichtbare Breite auf (Farbcodes zählen nicht).
+pub fn auffuellen(t: &str, breite: usize) -> String {
+    let fehlt = breite.saturating_sub(sichtbare_laenge(t));
+    format!("{t}{}", " ".repeat(fehlt))
+}
+
 /// Bricht einen Fließtext auf die gegebene Breite um.
 /// Einzelne Zeilenumbrüche im Text werden zu Leerzeichen,
 /// eine Leerzeile beginnt einen neuen Absatz.

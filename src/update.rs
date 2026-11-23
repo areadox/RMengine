@@ -65,6 +65,15 @@ pub fn neueste_version(zeit: Duration) -> Result<Release, String> {
     })
 }
 
+/// Nur den Abschnitt "## Was ist neu?" aus dem Release-Text.
+fn neuerungen(notizen: &str) -> Option<String> {
+    let start = notizen.find("## Was ist neu?")? + "## Was ist neu?".len();
+    let rest = &notizen[start..];
+    let ende = rest.find("\n## ").unwrap_or(rest.len());
+    let text = rest[..ende].trim();
+    (!text.is_empty()).then(|| text.to_string())
+}
+
 /// "1.2.10" > "1.2.9"
 pub fn ist_neuer(neu: &str, alt: &str) -> bool {
     let zahlen = |v: &str| -> Vec<u64> {
@@ -96,8 +105,8 @@ pub fn aktualisieren() -> Result<(), String> {
         return Ok(());
     }
     println!("Neue Version gefunden: {}\n", r.version);
-    if !r.notizen.trim().is_empty() {
-        println!("Was ist neu?\n{}\n", r.notizen.trim());
+    if let Some(neu) = neuerungen(&r.notizen) {
+        println!("Was ist neu?\n{neu}\n");
     }
 
     let name = asset_name().ok_or("Für dieses Betriebssystem gibt es kein automatisches Update.")?;

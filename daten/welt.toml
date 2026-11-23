@@ -50,6 +50,29 @@ intelligenz  = 10
 weisheit     = 10
 
 # ---------------------------------------------------------------------
+# Anzeigenamen: IDs dürfen keine Umlaute haben, hier stehen die schönen
+# Namen für Werte, Ausrüstungsplätze und Eigenschaften.
+# ---------------------------------------------------------------------
+[namen]
+staerke     = "Stärke"
+geschick    = "Geschick"
+ausdauer    = "Ausdauer"
+intelligenz = "Intelligenz"
+weisheit    = "Weisheit"
+waffe       = "Waffe"
+schild      = "Schild"
+kopf        = "Kopf"
+koerper     = "Körper"
+haende      = "Hände"
+beine       = "Beine"
+fuesse      = "Füße"
+hals        = "Hals"
+umhang      = "Umhang"
+licht       = "Licht"
+schaden     = "Schaden"
+ruestung    = "Rüstung"
+
+# ---------------------------------------------------------------------
 # Geländearten: So sehen Räume auf der Karte aus
 # klammern: Kästchen auf der Stadtkarte, z.B. "()" draußen, "[]" Gebäude
 # symbol:   nur für den Stil "linien" (im Kästchen steht das symbol des Raums)

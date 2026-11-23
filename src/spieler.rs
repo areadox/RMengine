@@ -25,6 +25,42 @@ pub struct SpielerDaten {
     pub zauber: Vec<String>,
     pub werte: BTreeMap<String, i32>,
     pub besucht: BTreeSet<String>,
+    /// Was andere sehen, wenn sie einen ansehen
+    pub beschreibung: String,
+    /// Wird hinter dem Namen angezeigt, z.B. "der Wanderer"
+    pub titel: String,
+    /// Sekunden, die man insgesamt in der Welt verbracht hat
+    pub spielzeit: u64,
+    /// Erstellt am (Sekunden seit 1970)
+    pub erstellt: u64,
+    pub einstellungen: Einstellungen,
+}
+
+/// Alles, was man im Spielerbuch einstellen kann.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Einstellungen {
+    pub karte: bool,
+    pub kurz: bool,
+    pub kartengroesse: i32,
+    pub breite: usize,
+    pub prompt: bool,
+    pub ankuendigungen: bool,
+    pub npc_sprueche: bool,
+}
+
+impl Default for Einstellungen {
+    fn default() -> Self {
+        Einstellungen {
+            karte: true,
+            kurz: false,
+            kartengroesse: 0,
+            breite: 78,
+            prompt: true,
+            ankuendigungen: true,
+            npc_sprueche: true,
+        }
+    }
 }
 
 impl Default for SpielerDaten {
@@ -45,11 +81,25 @@ impl Default for SpielerDaten {
             zauber: Vec::new(),
             werte: BTreeMap::new(),
             besucht: BTreeSet::new(),
+            beschreibung: String::new(),
+            titel: String::new(),
+            spielzeit: 0,
+            erstellt: 0,
+            einstellungen: Einstellungen::default(),
         }
     }
 }
 
 impl SpielerDaten {
+    /// "Bert der Wanderer"
+    pub fn voller_name(&self) -> String {
+        if self.titel.is_empty() {
+            self.name.clone()
+        } else {
+            format!("{} {}", self.name, self.titel)
+        }
+    }
+
     pub fn passwort_setzen(&mut self, pw: &str) {
         self.salz = neues_salz();
         self.passwort_hash = passwort_hash(pw, &self.salz);
