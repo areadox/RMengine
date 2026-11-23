@@ -1,0 +1,31 @@
+# =====================================================================
+#  NPC: die Krämerin (Aufbau der Datei: siehe npcs/wirt.toml)
+# =====================================================================
+
+[npc]
+id        = "kraemerin"
+name      = "die Krämerin"
+akkusativ = "die Krämerin"
+schluesselwoerter = ["kraemerin", "frau", "greta"]
+raumtext  = "Die Krämerin zählt hinter dem Tresen ihre Münzen."
+beschreibung = "Greta, die Krämerin, ist eine hagere Frau mit flinken Augen und einem Bleistift hinter dem Ohr."
+stufe        = 3
+lebenspunkte = 40
+sprueche = ["Seile, Kerzen, Proviant – alles da!", "*rückt ihre Brille zurecht."]
+
+[npc.gespraech]
+begruessung = "Hereinspaziert, {spieler}! Schau dich nur um, aber fass nichts an, was du nicht kaufen willst."
+beruf       = "Ich führe den Krämerladen. Was man braucht, hab ich – und was man nicht braucht, auch."
+aufgabe     = "Eine Aufgabe? Bring mir einen schönen Pilz aus dem Wald. Die blauen sind die besten."
+name        = "Greta. Und ja, ich weiß, wie viel alles kostet. Bis auf den letzten Kupferling."
+neuigkeiten = "Der Wirt jammert schon wieder über seine Ratten. Als ob es in meinem Laden keine gäbe!"
+abschied    = "Beehr mich bald wieder!"
+unbekannt   = "Hm? Davon hab ich keine Ahnung, Schätzchen."
+
+[[npc.thema]]
+woerter = ["kaufen", "verkaufen", "preis", "preise", "waren", "handel"]
+antwort = "Handeln kann ich mit dir erst, wenn es Geld in dieser Welt gibt. Bald, bald!"
+
+[[npc.thema]]
+woerter = ["pilz", "pilze"]
+antwort = "Die blauen Pilze vom Waldweg geben einem Kraft für Zauberei, sagt man. Ich ess sie lieber nicht."

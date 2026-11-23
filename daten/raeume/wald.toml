@@ -73,9 +73,12 @@ Eine uralte, riesige Eiche. Ihr Stamm ist so dick, dass fünf Menschen ihn
 nicht umfassen könnten. In der Rinde sind seltsame Zeichen eingeritzt."""
 gegenstaende = ["lederhelm"]
 
-[raum.details]
-zeichen = "Die Zeichen leuchten schwach, wenn du sie berührst. Es sind Runen der Heilkunst."
-rinde   = "Die Rinde ist rau und warm."
+nutzt    = ["eiche"]   # alles über Eichen kommt aus der Bibliothek
+
+[raum.details.zeichen]
+text    = "Fremdartige Zeichen sind tief in die Rinde geritzt. Sie leuchten schwach, wenn du sie berührst."
+woerter = ["runen", "schriftzeichen"]
+gefuehl = "Die Zeichen sind warm, fast wie lebendig. Ein Kribbeln läuft durch deine Finger."
 
 [[raum]]
 id       = "tiefer_wald"

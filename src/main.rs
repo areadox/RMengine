@@ -7,7 +7,9 @@
 //!   rmengine --version                Version anzeigen
 
 mod befehle;
+mod beschreibung;
 mod daten;
+mod gespraech;
 mod karte;
 mod netz;
 mod oberwelt;

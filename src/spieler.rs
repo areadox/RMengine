@@ -7,10 +7,52 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+/// Was eine Figur darf. Höhere Rollen dürfen alles, was niedrigere dürfen.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Rolle {
+    /// Spielt das Spiel
+    #[default]
+    Spieler,
+    /// Baut die Welt: neuladen, springe, erschaffe ... und sieht technische Infos
+    Baumeister,
+    /// Verwaltet: Rollen vergeben, Spieler hinauswerfen, Verkündungen
+    Admin,
+}
+
+impl Rolle {
+    pub fn aus_text(t: &str) -> Option<Rolle> {
+        match crate::text::normalisieren(t).as_str() {
+            "spieler" | "player" => Some(Rolle::Spieler),
+            "baumeister" | "builder" | "magier" => Some(Rolle::Baumeister),
+            "admin" | "administrator" | "gott" => Some(Rolle::Admin),
+            _ => None,
+        }
+    }
+
+    pub fn name(self) -> &'static str {
+        match self {
+            Rolle::Spieler => "Spieler",
+            Rolle::Baumeister => "Baumeister",
+            Rolle::Admin => "Admin",
+        }
+    }
+
+    /// Markierung für "wer" und Co.
+    pub fn marke(self) -> &'static str {
+        match self {
+            Rolle::Spieler => "",
+            Rolle::Baumeister => " {hellgelb}[Baumeister]{/}",
+            Rolle::Admin => " {hellrot}[Admin]{/}",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct SpielerDaten {
     pub name: String,
+    pub rolle: Rolle,
     pub passwort_hash: String,
     pub salz: String,
     pub raum: String,
@@ -67,6 +109,7 @@ impl Default for SpielerDaten {
     fn default() -> Self {
         SpielerDaten {
             name: String::new(),
+            rolle: Rolle::Spieler,
             passwort_hash: String::new(),
             salz: String::new(),
             raum: String::new(),

@@ -100,6 +100,11 @@ pub struct FeldDef {
     /// sieht über gleich hohe oder niedrigere Blocker hinweg.
     pub hoehe: i32,
     pub beschreibungen: Vec<String>,
+    /// Allgemeine Beschreibungen aus der Bibliothek, z.B. ["eiche", "moos"]
+    pub nutzt: Vec<String>,
+    pub geruch: String,
+    pub geraeusch: String,
+    pub gefuehl: String,
 }
 
 impl Default for FeldDef {
@@ -114,6 +119,10 @@ impl Default for FeldDef {
             sichtbehinderung: 0,
             blockiert_sicht: false,
             hoehe: 0,
+            nutzt: Vec::new(),
+            geruch: String::new(),
+            geraeusch: String::new(),
+            gefuehl: String::new(),
             beschreibungen: Vec::new(),
         }
     }
@@ -159,7 +168,15 @@ pub struct OrtDef {
     #[serde(default)]
     pub monster: Vec<String>,
     #[serde(default)]
-    pub details: BTreeMap<String, String>,
+    pub details: BTreeMap<String, crate::beschreibung::Detail>,
+    #[serde(default)]
+    pub nutzt: Vec<String>,
+    #[serde(default)]
+    pub geruch: String,
+    #[serde(default)]
+    pub geraeusch: String,
+    #[serde(default)]
+    pub gefuehl: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -469,9 +486,29 @@ impl Oberwelt {
             deko_dichte: None,
             deko_richtung: BTreeMap::new(),
             ausgaenge_roh: BTreeMap::new(),
-            details: ort
-                .map(|o| o.details.iter().map(|(k, v)| (text::normalisieren(k), v.clone())).collect())
-                .unwrap_or_default(),
+            details: ort.map(|o| o.details.clone()).unwrap_or_default(),
+            nutzt: {
+                // Auch was auf den Nachbarfeldern wächst und liegt, kann man ansehen.
+                let mut n = f.nutzt.clone();
+                if let Some(o) = ort {
+                    n.extend(o.nutzt.iter().cloned());
+                }
+                for r in ACHT {
+                    let (nx, ny) = nachbar(x, y, r);
+                    if let Some(nf) = self.feld(nx, ny) {
+                        for id in &nf.nutzt {
+                            if !n.contains(id) {
+                                n.push(id.clone());
+                            }
+                        }
+                    }
+                }
+                n
+            },
+            geruch: ort.map(|o| o.geruch.clone()).filter(|t| !t.is_empty()).unwrap_or_else(|| f.geruch.clone()),
+            geraeusch: ort.map(|o| o.geraeusch.clone()).filter(|t| !t.is_empty()).unwrap_or_else(|| f.geraeusch.clone()),
+            gefuehl: ort.map(|o| o.gefuehl.clone()).filter(|t| !t.is_empty()).unwrap_or_else(|| f.gefuehl.clone()),
+            npcs: Vec::new(),
             gegenstaende: ort.map(|o| o.gegenstaende.clone()).unwrap_or_default(),
             monster: ort.map(|o| o.monster.clone()).unwrap_or_default(),
             ausgaenge: self.ausgaenge(x, y),

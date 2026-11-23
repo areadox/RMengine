@@ -4,6 +4,7 @@
 //! in den TOML-Dateien aussehen. Beim Laden wird alles gründlich geprüft, damit
 //! Tippfehler sofort mit einer verständlichen Meldung auffallen.
 
+use crate::beschreibung::{self, BeschreibungDef, Detail};
 use crate::oberwelt::{self, Oberwelt};
 use crate::text;
 use std::borrow::Cow;
@@ -169,6 +170,7 @@ pub struct WeltConfig {
     pub startraum: String,
     pub willkommen: String,
     pub admins: Vec<String>,
+    pub baumeister: Vec<String>,
     pub karte_beim_umsehen: bool,
     pub karten_radius: i32,
     pub nur_besuchte_raeume_auf_karte: bool,
@@ -193,6 +195,7 @@ impl Default for WeltConfig {
             startraum: String::new(),
             willkommen: String::new(),
             admins: Vec::new(),
+            baumeister: Vec::new(),
             karte_beim_umsehen: true,
             karten_radius: 3,
             nur_besuchte_raeume_auf_karte: false,
@@ -247,6 +250,11 @@ pub struct GelaendeDef {
     pub deko: String,
     /// Wie dicht die Verzierung ist (Prozent)
     pub deko_dichte: u32,
+    /// Gilt für alle Räume dieser Art: Bibliothek, Gerüche, Geräusche, Gefühl
+    pub nutzt: Vec<String>,
+    pub geruch: String,
+    pub geraeusch: String,
+    pub gefuehl: String,
 }
 
 impl Default for GelaendeDef {
@@ -258,6 +266,10 @@ impl Default for GelaendeDef {
             klammern: "[]".into(),
             deko: String::new(),
             deko_dichte: 30,
+            nutzt: Vec::new(),
+            geruch: String::new(),
+            geraeusch: String::new(),
+            gefuehl: String::new(),
         }
     }
 }
@@ -314,11 +326,24 @@ pub struct RaumDef {
     #[serde(default, rename = "ausgaenge")]
     pub ausgaenge_roh: BTreeMap<String, String>,
     #[serde(default)]
-    pub details: BTreeMap<String, String>,
+    pub details: BTreeMap<String, Detail>,
+    /// Was man riecht, hört und fühlt (Befehle riech, hoer, taste)
+    #[serde(default)]
+    pub geruch: String,
+    #[serde(default)]
+    pub geraeusch: String,
+    #[serde(default)]
+    pub gefuehl: String,
+    /// Allgemeine Beschreibungen aus der Bibliothek (daten/beschreibungen)
+    #[serde(default)]
+    pub nutzt: Vec<String>,
     #[serde(default)]
     pub gegenstaende: Vec<String>,
     #[serde(default)]
     pub monster: Vec<String>,
+    /// NPCs, die hier wohnen (aus daten/npcs)
+    #[serde(default)]
+    pub npcs: Vec<String>,
 
     #[serde(skip)]
     pub ausgaenge: BTreeMap<Richtung, String>,
@@ -354,6 +379,18 @@ pub struct GegenstandDef {
     pub eigenschaften: BTreeMap<String, i32>,
     #[serde(default)]
     pub benutzen_text: String,
+    #[serde(default)]
+    pub details: BTreeMap<String, Detail>,
+    /// Was man riecht, hört und fühlt (Befehle riech, hoer, taste)
+    #[serde(default)]
+    pub geruch: String,
+    #[serde(default)]
+    pub geraeusch: String,
+    #[serde(default)]
+    pub gefuehl: String,
+    /// Allgemeine Beschreibungen aus der Bibliothek (daten/beschreibungen)
+    #[serde(default)]
+    pub nutzt: Vec<String>,
 
     #[serde(skip)]
     pub quelle: String,
@@ -406,6 +443,27 @@ pub struct MonsterDef {
     pub sprueche: Vec<String>,
     #[serde(default = "fuenf_u")]
     pub sprech_chance: u32,
+    /// Antworten auf Standardfragen (hallo, beruf, aufgabe ...)
+    #[serde(default)]
+    pub gespraech: crate::gespraech::GespraechDef,
+    /// Eigene Gesprächsthemen
+    #[serde(default)]
+    pub thema: Vec<crate::gespraech::ThemaDef>,
+    /// Steht in einer eigenen NPC-Datei ([npc])
+    #[serde(skip)]
+    pub ist_npc: bool,
+    #[serde(default)]
+    pub details: BTreeMap<String, Detail>,
+    /// Was man riecht, hört und fühlt (Befehle riech, hoer, taste)
+    #[serde(default)]
+    pub geruch: String,
+    #[serde(default)]
+    pub geraeusch: String,
+    #[serde(default)]
+    pub gefuehl: String,
+    /// Allgemeine Beschreibungen aus der Bibliothek (daten/beschreibungen)
+    #[serde(default)]
+    pub nutzt: Vec<String>,
 
     #[serde(skip)]
     pub quelle: String,
@@ -515,6 +573,9 @@ struct InhaltsDatei {
     monster: Vec<MonsterDef>,
     fertigkeit: Vec<FertigkeitDef>,
     zauber: Vec<ZauberDef>,
+    beschreibung: Vec<BeschreibungDef>,
+    /// Ein NPC pro Datei: [npc]
+    npc: Option<MonsterDef>,
 }
 
 // ---------------------------------------------------------------------------
@@ -546,10 +607,64 @@ pub struct Daten {
     /// Anzeigenamen für IDs, z.B. staerke -> "Stärke"
     pub namen: BTreeMap<String, String>,
     pub oberwelt: Option<Oberwelt>,
+    /// Allgemeine Beschreibungen (Bäume, Himmel, Steine ...), auf die man mit `nutzt` verweist
+    pub bibliothek: BTreeMap<String, BeschreibungDef>,
     pub warnungen: Vec<String>,
 }
 
 impl Daten {
+    /// Alle Bibliotheks-Einträge, die über `nutzt` erreichbar sind (auch über mehrere Stufen),
+    /// als Details zum Durchsuchen.
+    pub fn bibliothek_fuer(&self, ids: &[String]) -> BTreeMap<String, Detail> {
+        let mut aus = BTreeMap::new();
+        let mut offen: Vec<String> = ids.to_vec();
+        while let Some(id) = offen.pop() {
+            if aus.contains_key(&id) {
+                continue;
+            }
+            if let Some(b) = self.bibliothek.get(&id) {
+                offen.extend(b.nutzt.iter().cloned());
+                let mut innen = Vec::new();
+                beschreibung::alle_verweise(&b.details, &mut innen);
+                offen.extend(innen);
+                aus.insert(id, b.als_detail());
+            }
+        }
+        aus
+    }
+
+    /// Wonach man in einem Raum suchen kann: eigene Details + Bibliothek
+    /// (vom Raum, seinem Gelände und seinen Details).
+    pub fn raum_kontext(&self, r: &RaumDef) -> BTreeMap<String, Detail> {
+        let mut ids = r.nutzt.clone();
+        if let Some(g) = self.gelaende.get(&r.gelaende) {
+            ids.extend(g.nutzt.iter().cloned());
+        }
+        beschreibung::alle_verweise(&r.details, &mut ids);
+        self.bibliothek_fuer(&ids)
+    }
+
+    /// Geruch/Geräusch/Gefühl eines Raums – sonst das seines Geländes.
+    pub fn raum_sinn(&self, r: &RaumDef, s: beschreibung::Sinn) -> String {
+        use beschreibung::Sinn::*;
+        let eigen = match s {
+            Riechen => &r.geruch,
+            Hoeren => &r.geraeusch,
+            Tasten => &r.gefuehl,
+        };
+        if !eigen.is_empty() {
+            return eigen.clone();
+        }
+        self.gelaende
+            .get(&r.gelaende)
+            .map(|g| match s {
+                Riechen => g.geruch.clone(),
+                Hoeren => g.geraeusch.clone(),
+                Tasten => g.gefuehl.clone(),
+            })
+            .unwrap_or_default()
+    }
+
     /// Schöner Name für eine ID (aus [namen] in welt.toml), sonst die ID mit großem Anfangsbuchstaben.
     pub fn anzeigename(&self, id: &str) -> String {
         self.namen.get(id).cloned().unwrap_or_else(|| text::gross(id))
@@ -662,6 +777,7 @@ pub fn laden(ordner: &Path) -> Result<Daten, Vec<String>> {
         deko_farben: wd.deko,
         namen: wd.namen,
         oberwelt: None,
+        bibliothek: BTreeMap::new(),
         warnungen: Vec::new(),
     };
     let mut fehler = Vec::new();
@@ -707,8 +823,14 @@ pub fn laden(ordner: &Path) -> Result<Daten, Vec<String>> {
         einsortieren!(inh.raum, d.raeume, "Raum", datei, &mut fehler);
         einsortieren!(inh.gegenstand, d.gegenstaende, "Gegenstand", datei, &mut fehler);
         einsortieren!(inh.monster, d.monster, "Monster", datei, &mut fehler);
+        let npcs: Vec<MonsterDef> = inh.npc.into_iter().map(|mut n| {
+            n.ist_npc = true;
+            n
+        }).collect();
+        einsortieren!(npcs, d.monster, "NPC", datei, &mut fehler);
         einsortieren!(inh.fertigkeit, d.fertigkeiten, "Fertigkeit", datei, &mut fehler);
         einsortieren!(inh.zauber, d.zauber, "Zauber", datei, &mut fehler);
+        einsortieren!(inh.beschreibung, d.bibliothek, "Beschreibung", datei, &mut fehler);
     }
 
     d.oberwelt = oberwelt::laden(ordner, &mut fehler);
@@ -894,17 +1016,21 @@ fn pruefen(d: &mut Daten, fehler: &mut Vec<String>, warn: &mut Vec<String>) {
         for m in &r.monster {
             verweis(&d.monster, m, &wo, "Monster", fehler);
         }
+        for n in &r.npcs {
+            verweis(&d.monster, n, &wo, "NPC", fehler);
+        }
         if r.beschreibung.trim().is_empty() {
             warn.push(format!("{wo}: hat keine Beschreibung."));
         }
     }
+    // NPCs leben wie Monster in den Räumen
+    for r in d.raeume.values_mut() {
+        let npcs = std::mem::take(&mut r.npcs);
+        r.monster.extend(npcs);
+    }
     for (id, aus) in ausgaenge_neu {
         if let Some(r) = d.raeume.get_mut(&id) {
             r.ausgaenge = aus;
-            r.details = std::mem::take(&mut r.details)
-                .into_iter()
-                .map(|(k, v)| (text::normalisieren(&k), v))
-                .collect();
         }
     }
 
@@ -994,6 +1120,43 @@ fn pruefen(d: &mut Daten, fehler: &mut Vec<String>, warn: &mut Vec<String>) {
         }
     }
 
+    // --- Bibliothek: Stimmen alle Verweise (nutzt)? ---
+    {
+        let mut pruefe = |ids: Vec<String>, wo: String| {
+            for id in ids {
+                verweis(&d.bibliothek, &id, &wo, "Beschreibung", fehler);
+            }
+        };
+        let mit_details = |nutzt: &[String], details: &BTreeMap<String, Detail>| {
+            let mut ids = nutzt.to_vec();
+            beschreibung::alle_verweise(details, &mut ids);
+            ids
+        };
+        for r in d.raeume.values() {
+            pruefe(mit_details(&r.nutzt, &r.details), format!("[{}] Raum '{}', nutzt", r.quelle, r.id));
+        }
+        for (id, g) in &d.gelaende {
+            pruefe(g.nutzt.clone(), format!("welt.toml [gelaende.{id}], nutzt"));
+        }
+        for g in d.gegenstaende.values() {
+            pruefe(mit_details(&g.nutzt, &g.details), format!("[{}] Gegenstand '{}', nutzt", g.quelle, g.id));
+        }
+        for m in d.monster.values() {
+            pruefe(mit_details(&m.nutzt, &m.details), format!("[{}] Monster '{}', nutzt", m.quelle, m.id));
+        }
+        for b in d.bibliothek.values() {
+            pruefe(mit_details(&b.nutzt, &b.details), format!("[{}] Beschreibung '{}', nutzt", b.quelle, b.id));
+        }
+        if let Some(ow) = &d.oberwelt {
+            for (z, f) in &ow.felder {
+                pruefe(f.nutzt.clone(), format!("oberwelt.toml [feld.\"{z}\"], nutzt"));
+            }
+            for o in &ow.orte {
+                pruefe(mit_details(&o.nutzt, &o.details), format!("oberwelt.toml, Ort '{}', nutzt", o.name));
+            }
+        }
+    }
+
     // --- Gegenstände ---
     for g in d.gegenstaende.values() {
         let wo = format!("[{}] Gegenstand '{}'", g.quelle, g.id);
@@ -1025,6 +1188,9 @@ fn pruefen(d: &mut Daten, fehler: &mut Vec<String>, warn: &mut Vec<String>) {
         }
         if m.wander_chance > 100 || m.sprech_chance > 100 {
             fehler.push(format!("{wo}: Chancen werden in Prozent angegeben (0 bis 100)."));
+        }
+        if m.ist_npc && m.gespraech.begruessung.ist_leer() && m.thema.is_empty() {
+            warn.push(format!("{wo}: Der NPC hat keine [npc.gespraech]-Antworten und kann nicht reden."));
         }
         if m.lebenspunkte <= 0 {
             fehler.push(format!("{wo}: 'lebenspunkte' muss größer als 0 sein."));

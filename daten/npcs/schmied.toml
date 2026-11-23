@@ -1,0 +1,40 @@
+# =====================================================================
+#  NPC: der Schmied (Aufbau der Datei: siehe npcs/wirt.toml)
+# =====================================================================
+
+[npc]
+id        = "schmied"
+name      = "der Schmied"
+akkusativ = "den Schmied"
+schluesselwoerter = ["schmied", "harald"]
+raumtext  = "Der Schmied hämmert auf ein glühendes Eisen."
+beschreibung = """
+Harald, der Schmied, ist ein Bär von einem Mann. Sein Gesicht ist
+rußverschmiert, seine Unterarme sind so dick wie anderer Leute Waden, und
+in seinem Bart haben Funken kleine Löcher gebrannt."""
+geruch    = "Er riecht nach Ruß, Schweiß und heißem Eisen."
+stufe        = 8
+lebenspunkte = 150
+fertigkeiten = { schwertkampf = 30 }
+sprueche = ["*wischt sich den Schweiß von der Stirn.", "Gutes Eisen braucht Geduld."]
+
+[npc.gespraech]
+begruessung = ["*nickt dir knapp zu.", "Hm. Tag."]
+beruf       = "Schmied. Hufeisen, Nägel, Pflugscharen. Und wenn's sein muss, auch mal ein Schwert."
+aufgabe     = "Ich brauche Kohle und Erz, aber das kann ich dir noch nicht anvertrauen. Komm wieder, wenn du dich bewiesen hast."
+name        = "Harald."
+neuigkeiten = "Die Leute wollen wieder mehr Waffen. Das ist nie ein gutes Zeichen."
+abschied    = "*hebt kurz den Hammer zum Gruß."
+unbekannt   = "*schnaubt nur und hämmert weiter."
+
+[[npc.thema]]
+woerter = ["schwert", "kurzschwert", "waffe", "waffen"]
+antwort = "Das Kurzschwert an der Wand? Nimm's mit. Ein Schwert, das nur an der Wand hängt, wird stumpf vor Langeweile."
+
+[[npc.thema]]
+woerter = ["schild", "holzschild", "ruestung"]
+antwort = "Der Schild ist aus Eiche mit Eisenbeschlag. Hält mehr aus, als man denkt."
+
+[[npc.thema]]
+woerter = ["amboss", "esse", "feuer"]
+antwort = "Finger weg vom Amboss. Der gehörte schon meinem Großvater."

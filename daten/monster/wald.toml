@@ -23,6 +23,12 @@ wandert = true
 wander_chance = 8
 sprueche = ["*heult.", "*fletscht die Zähne."]
 beute = [ { gegenstand = "wolfspelz", chance = 75 } ]
+geruch = "Der Wolf riecht nach nassem Fell und Blut."
+geraeusch = "Ein tiefes Knurren dringt aus seiner Kehle."
+
+[monster.details]
+augen  = "Gelbe Augen, die dich nicht eine Sekunde loslassen."
+zaehne = { text = "Lange, gelbliche Reißzähne.", woerter = ["gebiss", "fang"] }
 
 [[monster]]
 id   = "hoehlenspinne"

@@ -11,9 +11,12 @@ willkommen = """
 Willkommen im kleinen Dorf {gruen}Eichenhain{/} am Rande des Dunkelwaldes.
 Hier beginnt dein Abenteuer."""
 
-# Diese Namen sind Baumeister und dürfen Baumeister-Befehle benutzen.
-# WICHTIG: Lege die Figur "Admin" sofort selbst an (oder ändere den Namen)!
-admins = ["Admin"]
+# Rollen: Spieler < Baumeister (baut die Welt) < Admin (verwaltet alles).
+# Wer hier steht, hat MINDESTENS diese Rolle. Weitere Rollen vergibt ein
+# Admin im Spiel mit:  rolle <name> spieler|baumeister|admin
+# WICHTIG: Trag hier deinen eigenen Figurennamen ein und lege die Figur sofort an!
+admins     = ["Admin"]
+baumeister = []
 
 karte_beim_umsehen  = true        # Bei jedem "schau" die kleine Karte zeigen
 karten_radius       = 1           # Räume in jede Richtung (1 = 3x3 Räume; "karte" zeigt mehr)
@@ -75,6 +78,8 @@ ruestung    = "Rüstung"
 # ---------------------------------------------------------------------
 # Geländearten: So sehen Räume auf der Karte aus
 # klammern: Kästchen auf der Stadtkarte, z.B. "()" draußen, "[]" Gebäude
+# nutzt:    allgemeine Beschreibungen aus daten/beschreibungen (für alle Räume dieser Art)
+# geruch / geraeusch / gefuehl: was man mit riech / hoer / taste wahrnimmt
 # symbol:   nur für den Stil "linien" (im Kästchen steht das symbol des Raums)
 # Farben: rot gruen gelb blau magenta cyan weiss grau schwarz
 #         hellrot hellgruen hellgelb hellblau hellmagenta hellcyan hellweiss
@@ -84,24 +89,33 @@ name   = "Platz"
 symbol = "+"
 farbe  = "hellgelb"
 klammern = "()"
+nutzt    = ["pflaster", "himmel", "luft"]
+geruch   = "Es riecht nach Rauch aus den Schornsteinen."
+geraeusch = "Stimmen, Schritte und das Gackern von Hühnern."
 
 [gelaende.strasse]
 name   = "Straße"
 symbol = "."
 farbe  = "weiss"
 klammern = "()"
+nutzt    = ["pflaster", "himmel", "staub", "dach", "schornstein"]
+geraeusch = "Irgendwo bellt ein Hund."
 
 [gelaende.haus]
 name   = "Gebäude"
 symbol = "#"
 farbe  = "hellweiss"
 klammern = "[]"
+nutzt    = ["wand", "dielen", "decke", "tuer", "fenster", "balken"]
 
 [gelaende.tempel]
 name   = "Tempel"
 symbol = "T"
 farbe  = "hellcyan"
 klammern = "[]"
+nutzt    = ["mauer", "fenster", "kerze"]
+geruch   = "Ein Hauch von Weihrauch hängt in der Luft."
+geraeusch = "Es ist so still, dass du deinen eigenen Atem hörst."
 
 [gelaende.wald]
 name   = "Wald"
@@ -110,6 +124,9 @@ farbe  = "gruen"
 klammern = "{}"
 deko     = "o&"          # Bäume rund um Waldräume
 deko_dichte = 60
+nutzt    = ["baum", "eiche", "buche", "moos", "farn", "laub", "erde", "pilze", "voegel"]
+geruch   = "Es riecht nach feuchtem Laub, Moos und Pilzen."
+geraeusch = "Vögel zwitschern, und irgendwo knackt ein Ast."
 
 [gelaende.lichtung]
 name   = "Wiese"
@@ -118,6 +135,9 @@ farbe  = "hellgruen"
 klammern = "()"
 deko     = "o"
 deko_dichte = 25
+nutzt    = ["gras", "blumen", "himmel", "insekten", "baum"]
+geruch   = "Süßer Blütenduft liegt in der Luft."
+geraeusch = "Bienen summen zwischen den Blumen."
 
 [gelaende.garten]
 name     = "Garten"
@@ -126,18 +146,26 @@ farbe    = "hellgruen"
 klammern = "()"
 deko     = "o&"            # verstreute Bäume und Büsche
 deko_dichte = 45           # Prozent der freien Stellen rund um den Raum
+nutzt    = ["gras", "blumen", "kraeuter", "hecke", "insekten", "apfelbaum"]
+geruch   = "Es duftet nach Kräutern und Blüten."
+geraeusch = "Bienen summen geschäftig."
 
 [gelaende.wasser]
 name   = "Wasser"
 symbol = "~"
 farbe  = "hellblau"
 klammern = "()"
+nutzt    = ["wasser", "ufer", "schilf", "himmel"]
+geruch   = "Es riecht nach Wasser und Schilf."
+geraeusch = "Wasser plätschert leise."
 
 [gelaende.berg]
 name   = "Fels"
 symbol = "^"
 farbe  = "grau"
 klammern = "<>"
+nutzt    = ["fels", "steine", "wind", "himmel"]
+geraeusch = "Der Wind pfeift um die Felsen."
 
 [gelaende.hoehle]
 name   = "Höhle"
@@ -151,6 +179,10 @@ klammern = "<>"
 #   deko = "o&"                  verstreut um das Kästchen
 #   deko_richtung = { sued = "~" }  eine ganze Seite, z.B. ein Bach
 # ---------------------------------------------------------------------
+nutzt    = ["fels", "steine", "spinnweben"]
+geruch   = "Es riecht feucht und muffig."
+geraeusch = "Wasser tropft irgendwo von der Decke."
+gefuehl  = "Die Wände sind feucht und kalt."
 [deko]
 "o" = "gruen"
 "&" = "hellgruen"

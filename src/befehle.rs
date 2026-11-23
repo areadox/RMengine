@@ -1,7 +1,10 @@
 //! Alle Befehle, die Spieler eintippen können.
 
+use crate::beschreibung::{self, Detail, Sinn};
 use crate::daten::{Daten, Richtung};
+use crate::gespraech;
 use crate::karte;
+use crate::spieler::{self, Rolle};
 use crate::text::{self, aufzaehlen, gross, normalisieren, umbrechen};
 use crate::welt::Welt;
 use rand::Rng;
@@ -36,20 +39,26 @@ pub fn ausfuehren(w: &mut Welt, sid: u64, eingabe: &str) -> Folge {
         prompt(w, sid);
         return Folge::Weiter;
     }
-    let admin = w.spieler[&sid].admin;
+    let rolle = w.spieler[&sid].rolle;
+    let baut = rolle >= Rolle::Baumeister;
 
     match befehl.as_str() {
         "ende" | "quit" | "exit" | "tschuess" => {
             w.sende(sid, "Bis bald! Deine Figur wurde gespeichert.");
             return Folge::Beenden;
         }
-        "hilfe" | "help" | "?" => hilfe(w, sid, admin),
+        "hilfe" | "help" | "?" => hilfe(w, sid, rolle),
         "schau" | "schaue" | "l" | "look" | "umsehen" | "betrachte" | "untersuche" | "unt" | "x" => {
             if rest.is_empty() {
                 raum_anzeigen(w, sid);
             } else {
                 untersuchen(w, sid, rest);
             }
+        }
+        "riech" | "rieche" | "riechen" | "schnupper" | "schnuppere" | "smell" => wahrnehmen(w, sid, rest, Sinn::Riechen),
+        "hoer" | "hoere" | "hoeren" | "horch" | "horche" | "lausche" | "listen" => wahrnehmen(w, sid, rest, Sinn::Hoeren),
+        "taste" | "tasten" | "fuehl" | "fuehle" | "beruehre" | "fass" | "fasse" | "touch" | "feel" => {
+            wahrnehmen(w, sid, rest, Sinn::Tasten)
         }
         "gehe" | "geh" | "go" => match Richtung::aus_text(rest) {
             Some(r) => gehen(w, sid, r),
@@ -60,7 +69,7 @@ pub fn ausfuehren(w: &mut Welt, sid: u64, eingabe: &str) -> Folge {
             let k = karte::zeichnen(w, &w.spieler[&sid].sp, radius, true);
             w.sende(sid, &k);
         }
-        "weltkarte" | "landkarte" | "worldmap" => weltkarte(w, sid, admin),
+        "weltkarte" | "landkarte" | "worldmap" => weltkarte(w, sid, baut),
         "nimm" | "nehme" | "take" | "get" => nehmen(w, sid, rest),
         "lege" | "leg" | "ablegen" | "drop" | "fallenlassen" => fallenlassen(w, sid, rest),
         "inventar" | "i" | "inv" => inventar(w, sid),
@@ -70,6 +79,8 @@ pub fn ausfuehren(w: &mut Welt, sid: u64, eingabe: &str) -> Folge {
             benutzen(w, sid, rest)
         }
         "sage" | "sag" | "say" => sagen(w, sid, rest),
+        "frage" | "frag" | "ask" => fragen(w, sid, rest),
+        "rede" | "red" | "sprich" | "sprech" | "talk" => reden(w, sid, rest),
         "emote" | "me" | "/me" => emote(w, sid, rest),
         "rufe" | "ruf" | "shout" => rufen(w, sid, rest),
         "wer" | "who" => wer(w, sid),
@@ -97,7 +108,7 @@ pub fn ausfuehren(w: &mut Welt, sid: u64, eingabe: &str) -> Folge {
         _ => {
             if let Some(r) = Richtung::aus_text(&befehl) {
                 gehen(w, sid, r);
-            } else if !(admin && admin_befehl(w, sid, &befehl, rest)) {
+            } else if !(baut && admin_befehl(w, sid, &befehl, rest)) {
                 w.sende(sid, "Wie bitte? Tippe {gelb}hilfe{/} für eine Liste der Befehle.");
             }
         }
@@ -149,10 +160,11 @@ fn weltkarte(w: &Welt, sid: u64, admin: bool) {
     w.sende(sid, &ow.weltkarte(x, y));
 }
 
-fn hilfe(w: &Welt, sid: u64, admin: bool) {
+fn hilfe(w: &Welt, sid: u64, rolle: Rolle) {
     let mut t = String::from(
         "{fett}Befehle{/}
   {gelb}schau{/} [etwas]        Umsehen oder etwas genauer ansehen (kurz: l)
+  {gelb}riech{/} / {gelb}hoer{/} / {gelb}taste{/} [etwas]  Riechen, lauschen, anfassen
   {gelb}n o s w no nw so sw{/}  In eine Richtung gehen; {gelb}h{/}och / {gelb}r{/}unter
   {gelb}karte{/} [größe]        Die Karte der Umgebung zeigen
   {gelb}weltkarte{/}            Die ganze Oberwelt (mit einer Landkarte)
@@ -163,7 +175,9 @@ fn hilfe(w: &Welt, sid: u64, admin: bool) {
   {gelb}anlegen{/} <ding>       Waffe oder Rüstung anlegen
   {gelb}ausziehen{/} <ding>     Ausrüstung wieder abnehmen
   {gelb}benutze{/} <ding>       Trank trinken, Essen essen ...
-  {gelb}sage{/} <text>          Etwas sagen (kurz: 'text)
+  {gelb}sage{/} <text>          Etwas sagen (kurz: 'text) – NPCs hören zu
+  {gelb}rede mit{/} <npc>       Ein Gespräch beginnen
+  {gelb}frage{/} <npc> nach <x> Einen NPC etwas fragen
   {gelb}emote{/} <text>         Eine Handlung zeigen (kurz: :text)
   {gelb}rufe{/} <text>          Etwas rufen, das alle hören
   {gelb}wer{/}                  Wer ist gerade da?
@@ -175,20 +189,31 @@ fn hilfe(w: &Welt, sid: u64, admin: bool) {
   {gelb}farbe{/} an|aus         Farben ein- oder ausschalten
   {gelb}speichern{/}, {gelb}ende{/}",
     );
-    if admin {
+    if rolle >= Rolle::Baumeister {
         t.push_str(
             "
 
-{fett}{rot}Baumeister-Befehle{/}
+{fett}{hellgelb}Baumeister-Befehle{/}
   {gelb}neuladen{/}                 Alle Weltdaten neu laden (ohne Neustart)
   {gelb}pruefen{/}                  Weltdaten prüfen, ohne sie zu laden
   {gelb}wo{/}                       ID, Koordinaten und Datei des Raums
   {gelb}springe{/} <raum-id>        Zu einem Raum springen
   {gelb}erschaffe{/} <gegenstand-id> Einen Gegenstand erschaffen
   {gelb}beschwoere{/} <monster-id>  Ein Monster herbeirufen
-  {gelb}lehre{/} <spieler> <fertigkeit-/zauber-id> [stufe]
   {gelb}liste{/} raeume|gegenstaende|monster|fertigkeiten|zauber|gelaende
   {gelb}zuruecksetzen{/}            Gegenstände und Monster sofort auffüllen",
+        );
+    }
+    if rolle >= Rolle::Admin {
+        t.push_str(
+            "
+
+{fett}{hellrot}Admin-Befehle{/}
+  {gelb}rolle{/} <spieler> spieler|baumeister|admin   Rolle vergeben (auch offline)
+  {gelb}rauswerfen{/} <spieler> [grund]   Spieler vom Server werfen
+  {gelb}verkuende{/} <text>               Nachricht an alle
+  {gelb}lehre{/} <spieler> <fertigkeit-/zauber-id> [stufe]
+  {gelb}speichernalle{/}                  Alle Spieler sofort speichern",
         );
     }
     w.sende(sid, &t);
@@ -269,7 +294,7 @@ fn raum_zeigen(w: &Welt, sid: u64, voll: bool) {
     aus.push_str(&format!("{{fett}}{{gelb}}{}{{/}}", raum.name));
     if crate::oberwelt::ist_oberwelt(&raum.id) {
         aus.push_str(&format!(" {{grau}}({}, {}){{/}}", raum.x, raum.y));
-    } else if s.admin {
+    } else if s.baut() {
         aus.push_str(&format!(" {{grau}}[{}]{{/}}", raum.id));
     }
     aus.push('\n');
@@ -337,74 +362,225 @@ fn gehen(w: &mut Welt, sid: u64, richt: Richtung) {
     raum_zeigen(w, sid, false);
 }
 
-fn untersuchen(w: &Welt, sid: u64, such: &str) {
-    let s = &w.spieler[&sid];
-    let raum_id = &s.sp.raum;
-    let such = such.strip_prefix("an ").unwrap_or(such);
-    let br = breite(w, sid);
+/// Was hat der Spieler gemeint?
+enum Ziel {
+    Detail(String, Detail),
+    Gegenstand(String),
+    Monster(u64),
+    Spieler(u64),
+}
 
-    // 1. Details im Raum (z.B. "brunnen")
-    if let Some(r) = w.d.raum(raum_id) {
-        if let Some(t) = r.details.get(&normalisieren(such)) {
-            w.sende(sid, &umbrechen(t, br));
-            return;
+/// "rinde der alten eiche" -> ["rinde der alten eiche", "rinde", "alten", "eiche"]
+fn suchwoerter(such: &str) -> Vec<String> {
+    const FUELL: &[&str] = &[
+        "der", "die", "das", "den", "dem", "des", "ein", "eine", "einen", "am", "an", "im", "in", "vom", "von",
+        "auf", "unter", "mit", "zum", "zur",
+    ];
+    let mut v = vec![such.trim().to_string()];
+    for wort in such.split_whitespace() {
+        if !FUELL.contains(&normalisieren(wort).as_str()) && !v.iter().any(|x| x == wort) {
+            v.push(wort.to_string());
         }
     }
-    // 2. Gegenstände bei sich, angelegt oder am Boden
+    v
+}
+
+/// Details eines Gegenstands oder Monsters plus deren Bibliothek.
+fn ding_kontext(d: &Daten, details: &std::collections::BTreeMap<String, Detail>, nutzt: &[String]) -> std::collections::BTreeMap<String, Detail> {
+    let mut ids = nutzt.to_vec();
+    beschreibung::alle_verweise(details, &mut ids);
+    let mut alles = details.clone();
+    alles.extend(d.bibliothek_fuer(&ids));
+    alles
+}
+
+fn finde(w: &Welt, sid: u64, such: &str) -> Option<Ziel> {
+    let s = &w.spieler[&sid];
+    let raum = w.d.raum(&s.sp.raum)?;
     let angelegt: Vec<String> = s.sp.ausruestung.values().cloned().collect();
-    let boden = w.boden.get(raum_id).cloned().unwrap_or_default();
-    for liste in [&s.sp.inventar, &angelegt, &boden] {
-        if let Some(i) = finde_gegenstand(&w.d, liste, such) {
-            let g = &w.d.gegenstaende[&liste[i]];
+    let boden = w.boden.get(&raum.id).cloned().unwrap_or_default();
+    let alle_dinge: Vec<&String> = s.sp.inventar.iter().chain(angelegt.iter()).chain(boden.iter()).collect();
+    let monster = w.monster_im_raum(&raum.id);
+    let kontext = w.d.raum_kontext(&raum);
+
+    for wort in suchwoerter(such) {
+        // 1. Eigene Details des Raums
+        if let Some((n, d)) = beschreibung::suchen(&raum.details, &wort) {
+            return Some(Ziel::Detail(n.to_string(), d.clone()));
+        }
+        // 2. Gegenstände: bei sich, angelegt, am Boden
+        for liste in [&s.sp.inventar, &angelegt, &boden] {
+            if let Some(i) = finde_gegenstand(&w.d, liste, &wort) {
+                return Some(Ziel::Gegenstand(liste[i].clone()));
+            }
+        }
+        // 3. Monster und Spieler
+        if let Some(m) = finde_monster(w, &raum.id, &wort) {
+            return Some(Ziel::Monster(m));
+        }
+        if let Some(p) = finde_spieler_im_raum(w, &raum.id, &wort) {
+            return Some(Ziel::Spieler(p));
+        }
+        // 4. Details an Gegenständen und Monstern ("griff", "fell")
+        for id in &alle_dinge {
+            if let Some(g) = w.d.gegenstaende.get(*id) {
+                let k = ding_kontext(&w.d, &g.details, &g.nutzt);
+                if let Some((n, d)) = beschreibung::suchen(&k, &wort) {
+                    return Some(Ziel::Detail(n.to_string(), d.clone()));
+                }
+            }
+        }
+        for mid in &monster {
+            if let Some(def) = w.monster.get(mid).and_then(|m| w.d.monster.get(&m.def)) {
+                let k = ding_kontext(&w.d, &def.details, &def.nutzt);
+                if let Some((n, d)) = beschreibung::suchen(&k, &wort) {
+                    return Some(Ziel::Detail(n.to_string(), d.clone()));
+                }
+            }
+        }
+        // 5. Allgemeine Beschreibungen aus der Bibliothek (Bäume, Himmel ...)
+        if let Some((n, d)) = beschreibung::suchen(&kontext, &wort) {
+            return Some(Ziel::Detail(n.to_string(), d.clone()));
+        }
+    }
+    None
+}
+
+fn untersuchen(w: &Welt, sid: u64, such: &str) {
+    let s = &w.spieler[&sid];
+    let br = breite(w, sid);
+    let such = such.strip_prefix("an ").unwrap_or(such);
+
+    match finde(w, sid, such) {
+        Some(Ziel::Detail(name, d)) => {
+            let text = if d.text().is_empty() { "Daran ist nichts Besonderes." } else { d.text() };
+            let mut t = umbrechen(text, br);
+            if s.baut() {
+                let unter = beschreibung::unterdetails(&d);
+                let sinne: Vec<&str> = [(Sinn::Riechen, "geruch"), (Sinn::Hoeren, "geraeusch"), (Sinn::Tasten, "gefuehl")]
+                    .iter()
+                    .filter(|(sinn, _)| !d.sinn(*sinn).is_empty())
+                    .map(|(_, n)| *n)
+                    .collect();
+                t.push_str(&format!("\n{{grau}}[Detail '{name}'"));
+                if !unter.is_empty() {
+                    t.push_str(&format!(", Unterdetails: {}", unter.join(", ")));
+                }
+                if !sinne.is_empty() {
+                    t.push_str(&format!(", Sinne: {}", sinne.join(", ")));
+                }
+                t.push_str("]{/}");
+            }
+            w.sende(sid, &t);
+        }
+        Some(Ziel::Gegenstand(id)) => {
+            let Some(g) = w.d.gegenstaende.get(&id) else { return };
             let mut t = format!("{{fett}}{}{{/}}\n", gross(&g.name));
             t.push_str(&umbrechen(if g.beschreibung.is_empty() { "Nichts Besonderes." } else { &g.beschreibung }, br));
             if !g.platz.is_empty() {
-                t.push_str(&format!("\n{{grau}}(Kann angelegt werden: {}){{/}}", g.platz));
+                t.push_str(&format!("\n{{grau}}(Kann angelegt werden: {}){{/}}", w.d.anzeigename(&g.platz)));
             }
-            if s.admin {
+            if s.baut() {
                 t.push_str(&format!(
                     "\n{{grau}}[id: {}, typ: {}, gewicht: {}, wert: {}, eigenschaften: {:?}, datei: {}]{{/}}",
                     g.id, g.typ, g.gewicht, g.wert, g.eigenschaften, g.quelle
                 ));
             }
             w.sende(sid, &t);
-            return;
         }
-    }
-    // 3. Monster
-    if let Some(mid) = finde_monster(w, raum_id, such) {
-        let m = &w.monster[&mid];
-        if let Some(def) = w.d.monster.get(&m.def) {
+        Some(Ziel::Monster(mid)) => {
+            let Some(m) = w.monster.get(&mid) else { return };
+            let Some(def) = w.d.monster.get(&m.def) else { return };
             let mut t = format!("{{fett}}{}{{/}}\n", gross(&def.name));
             t.push_str(&umbrechen(if def.beschreibung.is_empty() { "Nichts Besonderes." } else { &def.beschreibung }, br));
-            if s.admin {
+            if s.baut() {
                 t.push_str(&format!(
                     "\n{{grau}}[id: {}, stufe: {}, LP: {}/{}, MP: {}, heimat: {}, datei: {}]{{/}}",
                     def.id, def.stufe, m.lebenspunkte, def.lebenspunkte, m.mana, m.heimat, def.quelle
                 ));
             }
             w.sende(sid, &t);
-            return;
         }
+        Some(Ziel::Spieler(pid)) => {
+            let o = &w.spieler[&pid].sp;
+            let teile: Vec<String> = o.ausruestung.values().map(|g| w.d.gegenstand_akk(g)).collect();
+            let mut t = format!("{{fett}}{}{{/}}\n", o.voller_name());
+            if !o.beschreibung.is_empty() {
+                t.push_str(&umbrechen(&o.beschreibung, br));
+                t.push('\n');
+            }
+            if teile.is_empty() {
+                t.push_str(&format!("{} trägt nichts Besonderes.", o.name));
+            } else {
+                t.push_str(&format!("{} trägt {}.", o.name, aufzaehlen(&teile)));
+            }
+            w.sende(sid, &t);
+        }
+        None => w.sende(sid, "So etwas siehst du hier nicht."),
     }
-    // 4. Andere Spieler
-    if let Some(pid) = finde_spieler_im_raum(w, raum_id, such) {
-        let o = &w.spieler[&pid].sp;
-        let teile: Vec<String> = o.ausruestung.values().map(|g| w.d.gegenstand_akk(g)).collect();
-        let mut t = format!("{{fett}}{}{{/}}\n", o.voller_name());
-        if !o.beschreibung.is_empty() {
-            t.push_str(&umbrechen(&o.beschreibung, br));
-            t.push('\n');
+}
+
+/// riech / hoer / taste – mit oder ohne Ziel.
+fn wahrnehmen(w: &Welt, sid: u64, such: &str, sinn: Sinn) {
+    let s = &w.spieler[&sid];
+    let br = breite(w, sid);
+    let name = s.sp.name.clone();
+    let raum_id = s.sp.raum.clone();
+    let such = such.strip_prefix("an ").unwrap_or(such).trim();
+    let waehle = |geruch: &str, geraeusch: &str, gefuehl: &str| -> String {
+        match sinn {
+            Sinn::Riechen => geruch,
+            Sinn::Hoeren => geraeusch,
+            Sinn::Tasten => gefuehl,
         }
-        if teile.is_empty() {
-            t.push_str(&format!("{} trägt nichts Besonderes.", o.name));
-        } else {
-            t.push_str(&format!("{} trägt {}.", o.name, aufzaehlen(&teile)));
+        .to_string()
+    };
+
+    let text = if such.is_empty() {
+        w.d.raum(&raum_id).map(|r| w.d.raum_sinn(&r, sinn)).unwrap_or_default()
+    } else {
+        match finde(w, sid, such) {
+            Some(Ziel::Detail(name, d)) => {
+                // Ein einfaches Detail ohne Sinne? Dann hilft die Bibliothek aus.
+                let eigen = d.sinn(sinn).to_string();
+                if eigen.is_empty() {
+                    w.d.raum(&raum_id)
+                        .and_then(|r| {
+                            let k = w.d.raum_kontext(&r);
+                            beschreibung::suchen(&k, &name).map(|(_, b)| b.sinn(sinn).to_string())
+                        })
+                        .unwrap_or_default()
+                } else {
+                    eigen
+                }
+            }
+            Some(Ziel::Gegenstand(id)) => {
+                w.d.gegenstaende.get(&id).map(|g| waehle(&g.geruch, &g.geraeusch, &g.gefuehl)).unwrap_or_default()
+            }
+            Some(Ziel::Monster(mid)) => w
+                .monster
+                .get(&mid)
+                .and_then(|m| w.d.monster.get(&m.def))
+                .map(|d| waehle(&d.geruch, &d.geraeusch, &d.gefuehl))
+                .unwrap_or_default(),
+            Some(Ziel::Spieler(pid)) => {
+                let anderer = w.spieler[&pid].sp.name.clone();
+                if sinn == Sinn::Tasten && pid != sid {
+                    w.sende(pid, &format!("{name} stupst dich an."));
+                    format!("Du stupst {anderer} an.")
+                } else {
+                    String::new()
+                }
+            }
+            None => {
+                w.sende(sid, "So etwas findest du hier nicht.");
+                return;
+            }
         }
-        w.sende(sid, &t);
-        return;
-    }
-    w.sende(sid, "So etwas siehst du hier nicht.");
+    };
+    let text = if text.is_empty() { sinn.nichts().to_string() } else { text };
+    w.sende(sid, &umbrechen(&text, br));
+    w.sende_raum(&raum_id, &format!("{name} {}.", sinn.handlung()), &[sid]);
 }
 
 // ---------------------------------------------------------------------------
@@ -595,6 +771,141 @@ fn sagen(w: &Welt, sid: u64, t: &str) {
     let s = &w.spieler[&sid].sp;
     w.sende(sid, &format!("{{cyan}}Du sagst: „{t}“{{/}}"));
     w.sende_raum(&s.raum, &format!("{{cyan}}{} sagt: „{t}“{{/}}", s.name), &[sid]);
+
+    // Hören NPCs zu? Wer mit Namen angesprochen wird, antwortet immer.
+    // Ist nur ein NPC da, antwortet er, wenn er etwas zum Thema weiß.
+    let npcs: Vec<u64> = w.monster_im_raum(&s.raum).into_iter().filter(|m| kann_reden(w, *m)).collect();
+    let satz = gespraech::satz_vorbereiten(t);
+    let angesprochen = npcs.iter().copied().find(|mid| {
+        w.monster.get(mid).and_then(|m| w.d.monster.get(&m.def)).is_some_and(|d| {
+            satz.split_whitespace().any(|wort| passt(wort, &d.name, &d.id, &d.schluesselwoerter))
+        })
+    });
+    match (angesprochen, npcs.as_slice()) {
+        (Some(mid), _) => {
+            npc_antwortet(w, &s.raum, mid, &s.name, t, true);
+        }
+        (None, [mid]) => {
+            npc_antwortet(w, &s.raum, *mid, &s.name, t, false);
+        }
+        _ => {}
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Gespräche mit NPCs
+// ---------------------------------------------------------------------------
+
+fn kann_reden(w: &Welt, mid: u64) -> bool {
+    w.monster.get(&mid).and_then(|m| w.d.monster.get(&m.def)).is_some_and(|d| {
+        let g = &d.gespraech;
+        !d.thema.is_empty()
+            || [&g.begruessung, &g.abschied, &g.beruf, &g.aufgabe, &g.name, &g.neuigkeiten, &g.ort, &g.unbekannt]
+                .iter()
+                .any(|t| !t.ist_leer())
+    })
+}
+
+/// Der NPC antwortet für alle hörbar. `notfalls`: auch antworten, wenn er die Frage nicht versteht.
+fn npc_antwortet(w: &Welt, raum: &str, mid: u64, spieler: &str, frage: &str, notfalls: bool) -> bool {
+    let Some(def) = w.monster.get(&mid).and_then(|m| w.d.monster.get(&m.def)) else { return false };
+    let text = match gespraech::antwort(&def.gespraech, &def.thema, frage) {
+        Some(t) => t,
+        None if notfalls => def.gespraech.unbekannt.waehle().unwrap_or_else(|| "*zuckt mit den Schultern.".into()),
+        None => return false,
+    };
+    let text = text.replace("{spieler}", spieler).replace("{name}", &def.name);
+    let text = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    let npc = gross(&def.name);
+    let zeile = match text.trim().strip_prefix('*') {
+        Some(handlung) => format!("{npc} {}", handlung.trim()),
+        None => format!("{{hellcyan}}{npc} sagt: „{}“{{/}}", text.trim()),
+    };
+    w.sende_raum(raum, &zeile, &[]);
+    true
+}
+
+/// frage <wer> [nach] <thema>
+fn fragen(w: &Welt, sid: u64, rest: &str) {
+    let s = &w.spieler[&sid].sp;
+    let (wer, thema) = rest.split_once(char::is_whitespace).unwrap_or((rest, ""));
+    if wer.is_empty() {
+        w.sende(sid, "Wen willst du fragen? (z.B. frage wirt nach arbeit)");
+        return;
+    }
+    let Some(mid) = finde_monster(w, &s.raum, wer) else {
+        w.sende(sid, "So jemanden siehst du hier nicht.");
+        return;
+    };
+    let npc_akk = w.monster_akk(mid);
+    if !kann_reden(w, mid) {
+        w.sende(sid, &format!("{} kann dir nicht antworten.", gross(&w.monster_name(mid))));
+        return;
+    }
+    let thema = thema.trim();
+    let thema = ["nach ", "ob ", "wegen ", "ueber ", "über ", "zu "]
+        .iter()
+        .find_map(|p| thema.strip_prefix(p))
+        .unwrap_or(thema)
+        .trim();
+    if thema.is_empty() {
+        w.sende(sid, &format!("Du sprichst {npc_akk} an."));
+        w.sende_raum(&s.raum, &format!("{} spricht {npc_akk} an.", s.name), &[sid]);
+    } else {
+        w.sende(sid, &format!("Du fragst {npc_akk} nach {thema}."));
+        w.sende_raum(&s.raum, &format!("{} fragt {npc_akk} nach {thema}.", s.name), &[sid]);
+    }
+    npc_antwortet(w, &s.raum, mid, &s.name, thema, true);
+}
+
+/// rede [mit] <wer>: Begrüßung und eine Liste der Themen.
+fn reden(w: &Welt, sid: u64, rest: &str) {
+    let s = &w.spieler[&sid].sp;
+    let wer = rest.strip_prefix("mit ").unwrap_or(rest).trim();
+    let npcs: Vec<u64> = w.monster_im_raum(&s.raum).into_iter().filter(|m| kann_reden(w, *m)).collect();
+    let mid = if wer.is_empty() {
+        match npcs.as_slice() {
+            [m] => *m,
+            [] => {
+                w.sende(sid, "Hier ist niemand, mit dem du reden könntest.");
+                return;
+            }
+            _ => {
+                w.sende(sid, "Mit wem willst du reden? (rede mit <name>)");
+                return;
+            }
+        }
+    } else {
+        match finde_monster(w, &s.raum, wer) {
+            Some(m) => m,
+            None => {
+                w.sende(sid, "So jemanden siehst du hier nicht.");
+                return;
+            }
+        }
+    };
+    if !kann_reden(w, mid) {
+        w.sende(sid, &format!("{} kann nicht sprechen.", gross(&w.monster_name(mid))));
+        return;
+    }
+    let npc_akk = w.monster_akk(mid);
+    w.sende(sid, &format!("Du sprichst {npc_akk} an."));
+    w.sende_raum(&s.raum, &format!("{} spricht {npc_akk} an.", s.name), &[sid]);
+    npc_antwortet(w, &s.raum, mid, &s.name, "hallo", true);
+    if let Some(d) = w.monster.get(&mid).and_then(|m| w.d.monster.get(&m.def)) {
+        let themen = gespraech::themenliste(&d.gespraech, &d.thema);
+        if !themen.is_empty() {
+            let kurz = d.schluesselwoerter.first().cloned().unwrap_or_else(|| d.id.clone());
+            w.sende(
+                sid,
+                &format!(
+                    "{{grau}}Du könntest fragen nach: {}.  (z.B. frage {kurz} nach {}){{/}}",
+                    themen.join(", "),
+                    themen[0].to_lowercase()
+                ),
+            );
+        }
+    }
 }
 
 fn emote(w: &Welt, sid: u64, t: &str) {
@@ -619,7 +930,7 @@ fn rufen(w: &Welt, sid: u64, t: &str) {
 fn wer(w: &Welt, sid: u64) {
     let mut t = format!("{{fett}}In {} sind gerade unterwegs:{{/}}\n", w.d.welt.name);
     for s in w.spieler.values() {
-        let marke = if s.admin { " {rot}[Baumeister]{/}" } else { "" };
+        let marke = s.rolle.marke();
         t.push_str(&format!("  {}{marke}\n", s.sp.voller_name()));
     }
     t.push_str(&format!("{} Spieler", w.spieler.len()));
@@ -848,8 +1159,47 @@ fn wirkung_anwenden(w: &mut Welt, sid: u64, art: &str, wert: i32, raum: &str) {
 // Baumeister-Befehle
 // ---------------------------------------------------------------------------
 
+/// Befehle, die nur Admins benutzen dürfen (Baumeister nicht).
+const NUR_ADMIN: &[&str] = &[
+    "rolle", "rauswerfen", "kick", "verkuende", "verkuenden", "lehre", "teach", "speichernalle",
+];
+
 fn admin_befehl(w: &mut Welt, sid: u64, befehl: &str, rest: &str) -> bool {
+    if NUR_ADMIN.contains(&befehl) && w.spieler[&sid].rolle < Rolle::Admin {
+        w.sende(sid, "Das dürfen nur Admins.");
+        return true;
+    }
     match befehl {
+        "rolle" => rolle_vergeben(w, sid, rest),
+        "rauswerfen" | "kick" => {
+            let (name, grund) = rest.split_once(char::is_whitespace).unwrap_or((rest, ""));
+            let Some(pid) = w.spieler.iter().find(|(_, s)| s.sp.name.eq_ignore_ascii_case(name)).map(|(id, _)| *id) else {
+                w.sende(sid, "Dieser Spieler ist nicht online.");
+                return true;
+            };
+            if pid == sid {
+                w.sende(sid, "Dich selbst kannst du nicht hinauswerfen. Tippe 'ende'.");
+                return true;
+            }
+            let name = w.spieler[&pid].sp.name.clone();
+            let grund = if grund.trim().is_empty() { String::new() } else { format!(" Grund: {}", grund.trim()) };
+            w.sende(pid, &format!("{{hellrot}}Du wurdest von einem Admin aus der Welt geworfen.{grund}{{/}}"));
+            w.abmelden(pid);
+            w.sende(sid, &format!("{name} wurde hinausgeworfen."));
+            println!("{} hat {name} hinausgeworfen.{grund}", w.spieler[&sid].sp.name);
+        }
+        "verkuende" | "verkuenden" => {
+            if rest.is_empty() {
+                w.sende(sid, "Was willst du verkünden?");
+            } else {
+                let von = w.spieler[&sid].sp.name.clone();
+                w.sende_alle(&format!("\n{{hellgelb}}*** Verkündung von {von}: {rest} ***{{/}}\n"), &[]);
+            }
+        }
+        "speichernalle" => {
+            w.alle_speichern();
+            w.sende(sid, &format!("{} Spieler gespeichert.", w.spieler.len()));
+        }
         "neuladen" | "reload" => match w.neuladen() {
             Ok(warnungen) => {
                 let mut t = format!(
@@ -1038,7 +1388,7 @@ fn datum(sekunden: u64) -> String {
 
 fn spielstand(w: &Welt, sid: u64) {
     let sp = &w.spieler[&sid].sp;
-    let mut t = format!("{{fett}}Spielstand von {}{{/}}\n\n", sp.voller_name());
+    let mut t = format!("{{fett}}Spielstand von {}{{/}}{}\n\n", sp.voller_name(), w.spieler[&sid].rolle.marke());
 
     t.push_str(&format!(
         "  Lebenspunkte {} {:>4}/{}\n",
@@ -1285,4 +1635,55 @@ fn spielerbuch(w: &mut Welt, sid: u64, rest: &str) {
         w.speichern(&s.sp);
     }
     w.sende(sid, &meldung);
+}
+
+/// rolle <name> <spieler|baumeister|admin> – funktioniert auch, wenn der Spieler offline ist.
+fn rolle_vergeben(w: &mut Welt, sid: u64, rest: &str) {
+    let teile: Vec<&str> = rest.split_whitespace().collect();
+    let [name, rolle_text] = teile.as_slice() else {
+        w.sende(sid, "Benutzung: rolle <spieler> spieler|baumeister|admin");
+        return;
+    };
+    let Some(neu) = Rolle::aus_text(rolle_text) else {
+        w.sende(sid, "Rollen: spieler, baumeister, admin");
+        return;
+    };
+    if w.spieler[&sid].sp.name.eq_ignore_ascii_case(name) {
+        w.sende(sid, "Deine eigene Rolle kannst du nicht ändern.");
+        return;
+    }
+    let in_datei = w.d.welt.admins.iter().chain(w.d.welt.baumeister.iter()).any(|n| n.eq_ignore_ascii_case(name));
+
+    let online = w.spieler.iter().find(|(_, s)| s.sp.name.eq_ignore_ascii_case(name)).map(|(id, _)| *id);
+    let (anzeige, wirksam) = if let Some(pid) = online {
+        let Some(s) = w.spieler.get_mut(&pid) else { return };
+        s.sp.rolle = neu;
+        let sp = s.sp.clone();
+        let wirksam = w.rolle_von(&sp);
+        if let Some(s) = w.spieler.get_mut(&pid) {
+            s.rolle = wirksam;
+        }
+        w.speichern(&sp);
+        w.sende(pid, &format!("{{hellgruen}}Deine Rolle ist jetzt: {}. Tippe 'hilfe' für deine Befehle.{{/}}", wirksam.name()));
+        (sp.name, wirksam)
+    } else {
+        let verz = w.spieler_verzeichnis();
+        let mut sp = match spieler::laden(&verz, name) {
+            Ok(sp) => sp,
+            Err(_) => {
+                w.sende(sid, &format!("Eine Figur namens '{name}' gibt es nicht."));
+                return;
+            }
+        };
+        sp.rolle = neu;
+        w.speichern(&sp);
+        let wirksam = w.rolle_von(&sp);
+        (sp.name, wirksam)
+    };
+    let mut t = format!("{anzeige} ist jetzt {}.", wirksam.name());
+    if in_datei && wirksam != neu {
+        t.push_str(" {grau}(Der Name steht in welt.toml unter admins/baumeister – dort muss er entfernt werden.){/}");
+    }
+    w.sende(sid, &t);
+    println!("{} hat {anzeige} die Rolle {} gegeben.", w.spieler[&sid].sp.name, neu.name());
 }

@@ -15,6 +15,10 @@ bodentext = "Ein Kurzschwert hängt an der Wand."
 beschreibung = "Eine einfache, aber gut geschliffene Klinge."
 eigenschaften = { schaden = 6, staerke = 1 }
 
+[gegenstand.details]
+klinge = "Die Klinge ist zweischneidig und eine knappe Elle lang. Kleine Scharten zeugen von Benutzung."
+griff  = { text = "Der Griff ist mit Leder umwickelt, das sich an einer Stelle löst.", gefuehl = "Das Leder liegt gut in der Hand." }
+
 [[gegenstand]]
 id   = "holzschild"
 name = "ein Holzschild"

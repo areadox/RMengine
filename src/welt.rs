@@ -1,7 +1,7 @@
 //! Der laufende Zustand der Welt: wer ist wo, was liegt herum, was tun die Monster.
 
 use crate::daten::{self, Daten};
-use crate::spieler::{self, SpielerDaten};
+use crate::spieler::{self, Rolle, SpielerDaten};
 use crate::text::{self, gross};
 use rand::seq::SliceRandom;
 use rand::Rng;
@@ -16,11 +16,17 @@ pub type Sender = UnboundedSender<Vec<u8>>;
 pub struct Sitzung {
     pub sp: SpielerDaten,
     pub sender: Sender,
-    pub admin: bool,
+    /// Die tatsächliche Rolle: gespeicherte Rolle oder welt.toml, je nachdem was höher ist
+    pub rolle: Rolle,
     pub abklingzeiten: HashMap<String, Instant>,
 }
 
 impl Sitzung {
+    /// Darf die Welt bauen (Baumeister oder Admin)?
+    pub fn baut(&self) -> bool {
+        self.rolle >= Rolle::Baumeister
+    }
+
     pub fn sende(&self, t: &str) {
         let _ = self.sender.send(text::fuer_telnet(t, self.sp.farben, true));
     }
@@ -37,6 +43,20 @@ pub struct Monster {
     pub heimat: String,
     pub lebenspunkte: i32,
     pub mana: i32,
+}
+
+/// Gespeicherte Rolle – aber wer in welt.toml unter admins/baumeister steht,
+/// hat mindestens diese Rolle (so gibt es immer einen ersten Admin).
+fn rolle_berechnen(d: &Daten, sp: &SpielerDaten) -> Rolle {
+    let steht_in = |liste: &[String]| liste.iter().any(|n| n.eq_ignore_ascii_case(&sp.name));
+    let aus_datei = if steht_in(&d.welt.admins) {
+        Rolle::Admin
+    } else if steht_in(&d.welt.baumeister) {
+        Rolle::Baumeister
+    } else {
+        Rolle::Spieler
+    };
+    sp.rolle.max(aus_datei)
 }
 
 pub struct Welt {
@@ -131,7 +151,7 @@ impl Welt {
             s.sp.ausruestung.retain(|_, g| d.gegenstaende.contains_key(g));
             s.sp.fertigkeiten.retain(|f, _| d.fertigkeiten.contains_key(f));
             s.sp.zauber.retain(|z| d.zauber.contains_key(z));
-            s.admin = d.welt.admins.iter().any(|a| a.eq_ignore_ascii_case(&s.sp.name));
+            s.rolle = rolle_berechnen(d, &s.sp);
         }
         Ok(warnungen)
     }
@@ -193,8 +213,8 @@ impl Welt {
         }
     }
 
-    pub fn ist_admin(&self, name: &str) -> bool {
-        self.d.welt.admins.iter().any(|a| a.eq_ignore_ascii_case(name))
+    pub fn rolle_von(&self, sp: &SpielerDaten) -> Rolle {
+        rolle_berechnen(&self.d, sp)
     }
 
     pub fn ist_online(&self, name: &str) -> bool {
@@ -234,11 +254,11 @@ impl Welt {
         if !crate::oberwelt::ist_oberwelt(&sp.raum) {
             sp.besucht.insert(sp.raum.clone());
         }
-        let admin = self.ist_admin(&sp.name);
+        let rolle = self.rolle_von(&sp);
         let name = sp.name.clone();
         let raum = sp.raum.clone();
         let id = self.neue_id();
-        self.spieler.insert(id, Sitzung { sp, sender, admin, abklingzeiten: HashMap::new() });
+        self.spieler.insert(id, Sitzung { sp, sender, rolle, abklingzeiten: HashMap::new() });
         self.sende_raum(&raum, &format!("{name} erscheint."), &[id]);
         self.sende_ankuendigung(&format!("{{grau}}[{name} hat die Welt betreten.]{{/}}"), &[id]);
         println!("Anmeldung: {name}");

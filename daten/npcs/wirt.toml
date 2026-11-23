@@ -1,0 +1,88 @@
+# =====================================================================
+#  NPC: der Wirt der Taverne "Zum Goldenen Eber"
+# =====================================================================
+#  Jeder NPC hat seine eigene Datei mit genau einem [npc].
+#  In einen Raum setzt man ihn mit:  npcs = ["wirt"]
+#
+#  Alle Felder wie bei Monstern (name, beschreibung, sprueche, details ...),
+#  dazu kommen die Gespräche:
+#
+#  [npc.gespraech]  Antworten auf Standardfragen. Statt eines Textes darf
+#                   auch eine Liste stehen – dann wird zufällig gewählt.
+#    begruessung  "hallo", "guten Tag", "moin" ...
+#    beruf        "was ist dein Beruf", "was machst du", "wer bist du" ...
+#    aufgabe      "hast du eine Aufgabe für mich", "kann ich helfen" ...
+#    name         "wie heißt du"
+#    neuigkeiten  "was gibt es Neues", "Gerüchte" ...
+#    ort          "wo bin ich", "was ist das hier" ...
+#    abschied     "tschüss", "auf Wiedersehen" ...
+#    unbekannt    wenn der NPC mit der Frage nichts anfangen kann
+#
+#  [[npc.thema]]    eigene Themen: Stichwörter und Antwort
+#
+#  In Antworten: {spieler} = Name des Fragenden, {name} = Name des NPCs.
+#  Beginnt eine Antwort mit *, ist es eine Handlung ("*nickt.").
+#
+#  So reden Spieler mit ihm:
+#    sage hallo                 rede mit wirt
+#    frage wirt nach ratten     sage wirt, hast du eine aufgabe für mich?
+# =====================================================================
+
+[npc]
+id        = "wirt"
+name      = "der Wirt"
+akkusativ = "den Wirt"
+schluesselwoerter = ["wirt", "mann", "bodo"]
+raumtext  = "Der dicke Wirt poliert hinter der Theke ein Glas."
+beschreibung = """
+Bodo, der Wirt, ist ein freundlicher, rundlicher Mann mit roten Wangen und
+einer fleckigen Schürze. Seine Ärmel sind hochgekrempelt, und über seiner
+Schulter hängt ein Geschirrtuch, das schon bessere Tage gesehen hat."""
+geruch    = "Er riecht nach Bier und Bratenfett."
+stufe        = 5
+lebenspunkte = 80
+sprueche = [
+  "Was darf's sein, Fremder?",
+  "Im Keller sind schon wieder Ratten. Jemand sollte da mal nachsehen ...",
+  "*poliert gelangweilt ein Glas.",
+]
+sprech_chance = 8
+
+[npc.gespraech]
+begruessung = [
+  "Willkommen im Goldenen Eber, {spieler}! Setz dich, das Feuer ist warm.",
+  "Ah, ein neues Gesicht! Sei gegrüßt, {spieler}.",
+]
+beruf       = "Ich bin der Wirt hier, seit zwanzig Jahren schon. Bier, Braten, ein Bett für die Nacht – bei mir bekommt man alles."
+aufgabe     = """
+Eine Aufgabe? Hm ... *kratzt sich am Kinn* Im Keller treiben sich Ratten herum,
+fett wie Katzen. Wenn du die vertreibst, hätte ich wieder Ruhe."""
+name        = "Bodo heiße ich. Aber alle sagen nur 'der Wirt'."
+neuigkeiten = [
+  "Man munkelt, im Dunkelwald heulen die Wölfe lauter als sonst.",
+  "Die Krämerin hat neue Seile bekommen, falls du so was brauchst.",
+  "Oben auf dem Berg im Westen soll es einen alten Steinkreis geben. Unheimlich, sag ich dir.",
+]
+ort         = "Du bist im Goldenen Eber, der einzigen Taverne in Eichenhain. Oben sind die Gästezimmer, unten der Keller."
+abschied    = ["Komm bald wieder, {spieler}!", "Mach's gut und pass auf dich auf!"]
+unbekannt   = ["Davon weiß ich nichts, tut mir leid.", "*zuckt mit den Schultern.", "Da fragst du den Falschen."]
+
+[[npc.thema]]
+woerter = ["ratten", "ratte", "keller"]
+antwort = "Die Viecher fressen mir den Käse weg und nagen die Fässer an! Die Falltür nach unten ist gleich hier."
+
+[[npc.thema]]
+woerter = ["bier", "trinken", "essen", "braten", "durst", "hunger"]
+antwort = "Das beste Bier diesseits des Dunkelwalds! Leider ist das Fass gerade leer. Frag später noch mal."
+
+[[npc.thema]]
+woerter = ["zimmer", "bett", "schlafen", "uebernachten"]
+antwort = "Oben ist ein Zimmer frei. Schau es dir ruhig an."
+
+[[npc.thema]]
+woerter = ["dunkelwald", "wald", "woelfe", "wolf"]
+antwort = "Geh nicht ohne Waffe in den Dunkelwald. Und nicht nach Einbruch der Dunkelheit!"
+
+[[npc.thema]]
+woerter = ["schmied", "waffe", "schwert"]
+antwort = "Waffen? Da musst du zum Schmied, gleich westlich vom Dorfplatz."

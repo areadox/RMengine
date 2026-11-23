@@ -32,6 +32,8 @@ gebiet         = "oberwelt"
 #  hoehe           wer selbst auf einem blockierenden Feld steht, sieht über
 #                  gleich hohe oder niedrigere Blocker hinweg
 #  beschreibungen  Texte für die Felder; jedes Feld bekommt einen davon
+#  nutzt           allgemeine Beschreibungen aus daten/beschreibungen, z.B. ["eiche", "moos"]
+#  geruch / geraeusch / gefuehl   für riech / hoer / taste
 # ---------------------------------------------------------------------
 
 [feld."~"]
@@ -41,6 +43,7 @@ farbe    = "hellblau"
 begehbar = false
 
 [feld.":"]
+nutzt  = ["sand", "meer", "himmel", "wind"]
 name  = "Strand"
 fern  = "einen Sandstrand"
 farbe = "hellgelb"
@@ -50,6 +53,7 @@ beschreibungen = [
 ]
 
 [feld."."]
+nutzt  = ["gras", "blumen", "himmel", "wind", "insekten"]
 name   = "Grasland"
 fern   = "weites Grasland"
 farbe  = "hellgruen"
@@ -61,6 +65,7 @@ beschreibungen = [
 ]
 
 [feld."="]
+nutzt  = ["weg", "himmel"]
 name   = "Landstraße"
 fern   = "eine Straße"
 farbe  = "gelb"
@@ -71,6 +76,7 @@ beschreibungen = [
 ]
 
 [feld."*"]
+nutzt  = ["baum", "eiche", "buche", "moos", "farn", "laub", "erde", "voegel"]
 name   = "Dunkelwald"
 fern   = "dichten Wald"
 farbe  = "gruen"
@@ -83,6 +89,7 @@ beschreibungen = [
 ]
 
 [feld.n]
+nutzt  = ["gras", "steine", "himmel", "wind"]
 name   = "Hügelland"
 fern   = "sanfte Hügel"
 farbe  = "gelb"
@@ -93,6 +100,7 @@ beschreibungen = [
 ]
 
 [feld."%"]
+nutzt  = ["schlamm", "schilf", "nebel", "wasser", "insekten"]
 name   = "Sumpf"
 fern   = "einen nebligen Sumpf"
 farbe  = "magenta"
@@ -106,6 +114,7 @@ beschreibungen = [
 # Berge zeichnet man in karte.txt als kleine Bilder: /^\ oder /\
 # Darum bedeuten / ^ und \ alle dasselbe. (Den Rückstrich schreibt man "\\".)
 [feld."/"]
+nutzt  = ["fels", "steine", "wind", "himmel"]
 name   = "Gebirge"
 fern   = "steile Berge"
 farbe  = "weiss"
@@ -118,6 +127,7 @@ beschreibungen = [
 ]
 
 [feld."^"]
+nutzt  = ["fels", "steine", "wind", "himmel"]
 name   = "Gebirge"
 fern   = "steile Berge"
 farbe  = "weiss"
@@ -130,6 +140,7 @@ beschreibungen = [
 ]
 
 [feld."\\"]
+nutzt  = ["fels", "steine", "wind", "himmel"]
 name   = "Gebirge"
 fern   = "steile Berge"
 farbe  = "weiss"

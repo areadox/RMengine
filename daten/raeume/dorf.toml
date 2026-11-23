@@ -21,9 +21,35 @@ Norden, im Süden erhebt sich ein kleiner Tempel."""
 ausgaenge = { nord = "hauptstrasse", ost = "taverne", west = "schmiede", sued = "tempel", nordost = "marktstand" }
 gegenstaende = ["apfel"]
 
+nutzt     = ["brunnen", "linde"]   # allgemeine Beschreibungen aus daten/beschreibungen
+geruch    = "Es riecht nach frischem Brot aus der Taverne und nach Rauch."
+geraeusch = "Der Brunnen plätschert, irgendwo gackern Hühner."
+
+# Ein SEHR ausführliches Detail: eigener Text, Sinne und Unterdetails.
+# Es ersetzt hier den allgemeinen Brunnen aus der Bibliothek.
+[raum.details.brunnen]
+text      = """
+Der Brunnen von Eichenhain ist älter als jedes Haus im Dorf. Seine
+Einfassung aus grauem Stein ist hüfthoch und von unzähligen Händen glatt
+gerieben. Über dem Schacht spannt sich ein hölzernes Dach mit einer Winde,
+von der ein Seil mit einem Eimer in die Tiefe führt. In den {fett}Rand{/}
+hat jemand etwas eingeritzt."""
+woerter   = ["dorfbrunnen", "schacht"]
+geraeusch = "Tief unten plätschert Wasser. Wenn du hineinrufst, antwortet ein dumpfes Echo."
+gefuehl   = "Die Steine sind kühl und an der Innenseite feucht und glitschig."
+nutzt     = ["wasser"]
+
+[raum.details.brunnen.details.rand]
+text    = "In den Stein ist geritzt: 'Erbaut im Jahre 312'. Darunter, kleiner und krakelig: 'Lina + Jorn'."
+woerter = ["inschrift", "einritzung", "jahreszahl"]
+gefuehl = "Mit dem Finger kannst du die Buchstaben nachfahren."
+
+[raum.details.brunnen.details.eimer]
+text   = "Ein alter Holzeimer an einer rostigen Kette. Am Boden steht noch etwas Wasser."
+geruch = "Der Eimer riecht modrig nach Brunnenwasser."
+
 [raum.details]
-brunnen = "Der Brunnen ist aus grauem Stein. Jemand hat 'Erbaut im Jahre 312' in den Rand geritzt."
-schild  = "Auf dem Schild steht: 'Zum Goldenen Eber'."
+schild = "Auf dem Schild steht: 'Zum Goldenen Eber'."
 
 [[raum]]
 id       = "hauptstrasse"
@@ -75,7 +101,10 @@ beschreibung = """
 Eine gemütliche, verrauchte Gaststube. Ein Feuer knistert im Kamin. Eine
 knarrende Treppe führt nach oben, eine Falltür nach unten in den Keller."""
 ausgaenge = { hoch = "gaestezimmer", runter = "keller" }
-monster   = ["wirt"]
+npcs   = ["wirt"]
+nutzt     = ["theke", "fass", "feuer", "tisch", "stuhl", "bank", "treppe"]
+geruch    = "Es riecht nach Bier, Bratenfett und Holzrauch."
+geraeusch = "Das Feuer knistert, Krüge klappern."
 
 [[raum]]
 id       = "gaestezimmer"
@@ -87,6 +116,7 @@ z = 1
 gebiet   = "dorf"
 gelaende = "haus"
 beschreibung = "Ein kleines Zimmer mit einem Bett und einer Truhe."
+nutzt    = ["bett", "truhe"]
 gegenstaende = ["heiltrank"]
 
 [[raum]]
@@ -102,6 +132,8 @@ Feucht und dunkel. Zwischen den Weinfässern raschelt es verdächtig. Ein
 enger Gang führt weiter nach Osten."""
 ausgaenge = { ost = "kellergang" }
 monster   = ["ratte"]
+nutzt     = ["fass", "spinnweben"]
+geruch    = "Es riecht nach saurem Wein und Mäusedreck."
 
 [[raum]]
 id       = "kellergang"
@@ -125,8 +157,11 @@ gelaende = "haus"
 beschreibung = """
 Hitze schlägt dir entgegen. An der Esse arbeitet ein muskulöser Schmied.
 An den Wänden hängen Werkzeuge und ein paar einfache Waffen."""
-monster      = ["schmied"]
+npcs      = ["schmied"]
 gegenstaende = ["kurzschwert", "holzschild", "amboss"]
+nutzt        = ["feuer"]
+geruch       = "Es riecht nach heißem Eisen, Kohle und Schweiß."
+geraeusch    = "Der Hammer klingt hell auf dem Amboss, das Feuer faucht im Blasebalg."
 
 [[raum]]
 id       = "tempel"
@@ -175,7 +210,7 @@ beschreibung = """
 Ein enger Laden, vollgestopft bis unter die Decke: Seile, Kerzen, Töpfe,
 Säcke mit Mehl. Hinter dem Tresen wartet die Krämerin."""
 ausgaenge = { ost = "hauptstrasse" }
-monster   = ["kraemerin"]
+npcs   = ["kraemerin"]
 
 [[raum]]
 id       = "gartentor"

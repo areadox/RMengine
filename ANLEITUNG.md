@@ -50,8 +50,9 @@ Terminal mit:
 telnet localhost 4000
 ```
 
-**Wichtig:** Lege als Erstes die Figur `Admin` an. Wer so heißt, ist Baumeister
-(einstellbar in `welt.toml` unter `admins`).
+**Wichtig:** Trag in `welt.toml` unter `admins` deinen eigenen Figurennamen ein
+und lege diese Figur gleich an. Sie ist dann Admin und kann im Spiel weitere
+Rollen vergeben (siehe „Rollen: Spieler, Baumeister, Admin“).
 
 ### Aktualisieren
 
@@ -148,10 +149,12 @@ daten/
   welt.toml            Grundeinstellungen, Startwerte, Geländearten
   raeume/*.toml        Räume
   gegenstaende/*.toml  Gegenstände
-  monster/*.toml       Monster und Bewohner
+  monster/*.toml       Monster und Tiere
+  npcs/*.toml          NPCs mit Gesprächen, ein NPC pro Datei
+  beschreibungen/      allgemeine Beschreibungen (Bäume, Himmel, Möbel ...)
   fertigkeiten/*.toml  Fertigkeiten
   zauber/*.toml        Zaubersprüche
-  oberwelt/            die Landschaft (siehe Abschnitt 5)
+  oberwelt/            die Landschaft (siehe Abschnitt 6)
 ```
 
 Die Ordner sind nur eine Ordnungshilfe. Der Treiber liest **alle** `.toml`-Dateien
@@ -334,7 +337,94 @@ immer an derselben Stelle. Die Karte sieht deshalb bei jedem Umsehen gleich aus.
 
 ---
 
-## 5. Die Oberwelt (Landschaft)
+## 5. Ausführlich beschreiben
+
+### Details mit Unterdetails und allen Sinnen
+
+Ein Detail kann ein einfacher Text sein:
+
+```toml
+[raum.details]
+schild = "Auf dem Schild steht: 'Zum Goldenen Eber'."
+```
+
+Oder sehr ausführlich, mit Suchwörtern, Sinnen und Unterdetails in beliebiger
+Tiefe:
+
+```toml
+[raum.details.brunnen]
+text      = """
+Der Brunnen von Eichenhain ist älter als jedes Haus im Dorf. In den
+Rand hat jemand etwas eingeritzt."""
+woerter   = ["dorfbrunnen", "schacht"]     # weitere Suchwörter
+geruch    = "..."                          # riech brunnen
+geraeusch = "Tief unten plätschert Wasser." # hoer brunnen
+gefuehl   = "Die Steine sind kühl."         # taste brunnen
+
+[raum.details.brunnen.details.rand]
+text    = "In den Stein ist geritzt: 'Erbaut im Jahre 312'."
+woerter = ["inschrift"]
+gefuehl = "Mit dem Finger kannst du die Buchstaben nachfahren."
+```
+
+Spieler können dann `schau brunnen`, `schau inschrift`, `taste rand` oder
+`schau rand des brunnens` eingeben.
+
+**Räume, Geländearten, Gegenstände, Monster und NPCs** haben alle
+`geruch`, `geraeusch` und `gefuehl`. Ohne Ziel (`riech`, `hoer`, `taste`)
+beschreiben sie den ganzen Raum. Hat ein Raum keinen eigenen Text, gilt der
+seiner Geländeart. Auch Gegenstände und Monster können `details` haben, zum
+Beispiel den Griff eines Schwerts oder die Zähne eines Wolfs.
+
+### Die Bibliothek: allgemeine Beschreibungen
+
+In `daten/beschreibungen/allgemein.toml` stehen Dinge, die überall gleich
+aussehen: Himmel, Wolken, Wind, Erde, Steine, Gras, Blumen, Moos, Bäume (Eiche,
+Buche, Birke, Tanne, Weide, Linde …) samt Rinde, Ästen, Laub und Wurzeln,
+Wasser, Bach, See, Meer, Vögel, Insekten, Wege, Pflaster, Mauern, Wände, Türen,
+Fenster, Feuer, Kerzen, Möbel und vieles mehr.
+
+Um sie zu benutzen, schreibst du nur `nutzt`:
+
+```toml
+[[raum]]
+id    = "lichtung"
+nutzt = ["gras", "blumen", "eiche", "himmel"]
+
+[gelaende.wald]                       # gilt für ALLE Waldräume
+nutzt = ["baum", "eiche", "moos", "farn", "laub"]
+
+[feld."*"]                            # gilt für alle Waldfelder der Oberwelt
+nutzt = ["baum", "eiche", "moos"]
+```
+
+Ein Bibliothekseintrag kann selbst andere nutzen (die Eiche nutzt „baum“, der
+wiederum Rinde, Äste, Laub und Wurzeln). Ein Spieler an der Lichtung kann also
+auch `taste rinde` oder `schau wurzeln` eingeben. Auf der Oberwelt sieht man
+zusätzlich, was auf den Nachbarfeldern liegt.
+
+Eigene Einträge legst du genauso an, gern in weiteren Dateien in
+`daten/beschreibungen/`:
+
+```toml
+[[beschreibung]]
+id      = "eiche"
+woerter = ["eichen", "eichbaum"]
+text    = "Eine mächtige Eiche ..."
+geraeusch = "Die Eiche knarrt leise im Wind."
+nutzt   = ["baum"]
+
+[beschreibung.details]
+eicheln = "Glatte, braune Eicheln ..."
+```
+
+**Vorrang:** Eigene Details eines Raums gehen immer vor. Ein Raum mit einem
+eigenen Detail `brunnen` zeigt seinen Text und nicht den allgemeinen Brunnen
+der Bibliothek.
+
+---
+
+## 6. Die Oberwelt (Landschaft)
 
 Für Städte, Häuser und Höhlen baust du einzelne Räume wie oben. Für das **weite
 Land dazwischen** zeichnest du stattdessen eine Landkarte. Jedes Zeichen darin ist
@@ -459,7 +549,7 @@ der Eigenschaft `landkarte = 1`, Baumeister nicht.
 
 ---
 
-## 6. Gegenstände
+## 7. Gegenstände
 
 ```toml
 [[gegenstand]]
@@ -487,7 +577,7 @@ benutzen_text = "Du trinkst den Trank."
 
 ---
 
-## 7. Monster
+## 8. Monster
 
 ```toml
 [[monster]]
@@ -517,7 +607,64 @@ aufgefüllt.
 
 ---
 
-## 8. Fertigkeiten
+## 9. NPCs und Gespräche
+
+Jeder NPC hat seine **eigene Datei** in `daten/npcs/`, zum Beispiel
+`daten/npcs/wirt.toml`, mit genau einem `[npc]`. Er hat alle Felder eines
+Monsters, dazu Gespräche:
+
+```toml
+[npc]
+id        = "wirt"
+name      = "der Wirt"
+akkusativ = "den Wirt"
+schluesselwoerter = ["wirt", "bodo"]
+beschreibung = "Bodo, der Wirt, ist ein freundlicher, rundlicher Mann ..."
+
+[npc.gespraech]
+begruessung = "Willkommen im Goldenen Eber, {spieler}!"
+beruf       = "Ich bin der Wirt hier, seit zwanzig Jahren schon."
+aufgabe     = "Im Keller treiben sich Ratten herum ..."
+name        = "Bodo heiße ich."
+neuigkeiten = ["Man munkelt ...", "Die Krämerin hat neue Seile."]   # Liste = zufällig
+ort         = "Du bist im Goldenen Eber."
+abschied    = "Komm bald wieder, {spieler}!"
+unbekannt   = ["Davon weiß ich nichts.", "*zuckt mit den Schultern."]
+
+[[npc.thema]]
+woerter = ["ratten", "keller"]
+antwort = "Die Viecher fressen mir den Käse weg!"
+```
+
+In einen Raum setzt du ihn mit `npcs = ["wirt"]`.
+
+**Die Standardfragen erkennt das Spiel selbst**, egal wie der Spieler sie formuliert:
+
+| Feld          | wird ausgelöst durch zum Beispiel                              |
+|---------------|-----------------------------------------------------------------|
+| `begruessung` | hallo, hi, moin, servus, guten Tag                              |
+| `beruf`       | was ist dein Beruf, was machst du, wer bist du                  |
+| `aufgabe`     | hast du eine Aufgabe für mich, Auftrag, kann ich helfen, Arbeit für mich |
+| `name`        | wie heißt du, dein Name                                         |
+| `neuigkeiten` | was gibt es Neues, Gerüchte, Klatsch                            |
+| `ort`         | wo bin ich, was ist das hier                                    |
+| `abschied`    | tschüss, auf Wiedersehen, bis bald                              |
+
+Eigene Themen (`[[npc.thema]]`) haben Vorrang. In Antworten ersetzt das Spiel
+`{spieler}` durch den Namen des Fragenden und `{name}` durch den des NPCs. Eine
+Antwort, die mit `*` beginnt, ist eine Handlung („*nickt.“).
+
+**So reden Spieler mit NPCs:**
+
+- `sage hallo`: Ist nur ein NPC im Raum, antwortet er, wenn er etwas dazu weiß.
+- `sage wirt, wie spät ist es?`: Wer mit Namen angesprochen wird, antwortet
+  immer, notfalls mit `unbekannt`.
+- `frage wirt nach ratten`
+- `rede mit wirt`: Begrüßung und eine Liste der Themen, nach denen man fragen kann.
+
+---
+
+## 10. Fertigkeiten
 
 ```toml
 [[fertigkeit]]
@@ -533,7 +680,7 @@ beschreibung = "Wunden heilen."
 
 ---
 
-## 9. Zauber
+## 11. Zauber
 
 ```toml
 [[zauber]]
@@ -568,7 +715,34 @@ Mit dem Zaubern übt man die zugehörige Fertigkeit und kann dabei aufsteigen.
 
 ---
 
-## 10. Baumeister-Befehle im Spiel
+## 12. Rollen: Spieler, Baumeister, Admin
+
+Jede Figur hat eine von drei Rollen:
+
+| Rolle          | darf                                                            |
+|----------------|-----------------------------------------------------------------|
+| **Spieler**    | spielen                                                          |
+| **Baumeister** | zusätzlich die Welt bauen und testen, sieht IDs und technische Werte |
+| **Admin**      | zusätzlich Rollen vergeben, Spieler hinauswerfen, Verkündungen  |
+
+Die Rolle wird in der Spielerdatei gespeichert. Ein Admin vergibt sie im Spiel:
+
+```
+rolle bert baumeister
+```
+
+Das funktioniert auch, wenn Bert gerade nicht online ist. In `welt.toml`
+legst du fest, wer **mindestens** Admin oder Baumeister ist. So gibt es immer
+einen ersten Admin:
+
+```toml
+admins     = ["Areadox"]
+baumeister = ["Lina"]
+```
+
+In `wer` und im Spielstand sind Baumeister und Admins markiert.
+
+### Baumeister-Befehle
 
 | Befehl                         | Wirkung                                      |
 |--------------------------------|----------------------------------------------|
@@ -577,17 +751,26 @@ Mit dem Zaubern übt man die zugehörige Fertigkeit und kann dabei aufsteigen.
 | `wo`                           | ID, Koordinaten und Datei des aktuellen Raums |
 | `springe <raum-id>`            | zu einem Raum springen                       |
 | `erschaffe <gegenstand-id>`    | Gegenstand ins Inventar legen                |
-| `beschwoere <monster-id>`      | Monster in den Raum holen                    |
-| `lehre <spieler> <id> [stufe]` | Fertigkeit oder Zauber beibringen            |
+| `beschwoere <monster-id>`      | Monster oder NPC in den Raum holen           |
 | `liste raeume` (usw.)          | alles einer Art auflisten                    |
 | `zuruecksetzen`                | Monster und Gegenstände sofort auffüllen     |
 
-Baumeister sehen außerdem die IDs hinter Raumnamen, und `schau` zeigt ihnen
-technische Werte zu Gegenständen und Monstern.
+Baumeister sehen außerdem die IDs hinter Raumnamen. `schau` zeigt ihnen
+technische Werte sowie Unterdetails und Sinne eines Details.
+
+### Admin-Befehle
+
+| Befehl                            | Wirkung                                 |
+|-----------------------------------|-----------------------------------------|
+| `rolle <spieler> spieler\|baumeister\|admin` | Rolle vergeben (auch offline) |
+| `rauswerfen <spieler> [grund]`    | Spieler vom Server werfen               |
+| `verkuende <text>`                | Nachricht an alle                       |
+| `lehre <spieler> <id> [stufe]`    | Fertigkeit oder Zauber beibringen       |
+| `speichernalle`                   | alle Spieler sofort speichern           |
 
 ---
 
-## 11. Wenn etwas nicht stimmt
+## 13. Wenn etwas nicht stimmt
 
 Der Treiber prüft beim Laden alles und meldet Fehler mit Datei und Ort, oft mit
 einem Vorschlag:

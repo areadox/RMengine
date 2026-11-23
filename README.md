@@ -70,7 +70,10 @@ das Update und veröffentlicht alles als Release.
 - Monster wandern in ihrem Gebiet umher und sprechen
 - Zauber mit Heilung, Mana und Teleport, Abklingzeiten und Fertigkeitssteigerung
 - Ausrüstungsplätze, benutzbare Tränke und Nahrung
-- Baumeister-Befehle zum Testen
+- **Ausführliche Beschreibungen:** Details mit beliebig tiefen Unterdetails, Gerüche, Geräusche und Gefühl (`riech`, `hoer`, `taste`)
+- **Bibliothek allgemeiner Beschreibungen** (Bäume, Himmel, Wasser, Möbel …), die Räume, Geländearten und Oberwelt-Felder mit `nutzt = [...]` verwenden
+- **NPCs in eigenen Dateien** mit Gesprächen: Standardfragen (Gruß, Beruf, Aufgabe, Neuigkeiten …) und eigene Themen
+- **Rollen:** Spieler, Baumeister und Admin, mit eigenen Befehlen
 
 ## Code-Überblick (`src/`)
 
@@ -85,6 +88,8 @@ das Update und veröffentlicht alles als Release.
 | `spieler.rs` | Speichern, Laden, Passwörter                                 |
 | `text.rs`    | Farben, Zeilenumbruch, Tippfehler-Vorschläge                 |
 | `update.rs`  | Update-Funktion über GitHub Releases                         |
+| `beschreibung.rs` | Details, Sinne und Bibliothek                          |
+| `gespraech.rs` | NPC-Gespräche                                              |
 
 ## Vorbereitet für das Kampfsystem
 

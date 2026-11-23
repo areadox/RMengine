@@ -1,0 +1,699 @@
+# =====================================================================
+#  Allgemeine Beschreibungen – die "Bibliothek" der Welt
+# =====================================================================
+#  Hier stehen Dinge, die überall gleich aussehen: Bäume, Himmel, Steine,
+#  Wasser, Mauern, Möbel ... Man schreibt sie EINMAL und benutzt sie in
+#  beliebig vielen Räumen, Geländearten oder Oberwelt-Feldern:
+#
+#      nutzt = ["eiche", "moos", "himmel"]
+#
+#  Dann kann ein Spieler dort "schau eiche", "riech moos" oder
+#  "taste rinde" eingeben.
+#
+#  Aufbau eines Eintrags:
+#
+#    [[beschreibung]]
+#    id        = "eiche"                  # Name zum Verweisen (nutzt = [...])
+#    woerter   = ["eichen", "eichbaum"]   # weitere Suchwörter (die id gilt immer)
+#    text      = "..."                    # was man beim Ansehen liest
+#    geruch    = "..."                    # Befehl: riech eiche
+#    geraeusch = "..."                    # Befehl: hoer eiche
+#    gefuehl   = "..."                    # Befehl: taste eiche
+#    nutzt     = ["rinde", "laub"]        # andere Einträge, die hier mitgelten
+#
+#    [beschreibung.details]               # Unterdetails, beliebig tief
+#    eicheln = "Kleine braune Eicheln ..."
+#
+#  Eigene Räume können diese Texte jederzeit übertreffen: Ein Detail mit
+#  demselben Namen im Raum hat immer Vorrang vor der Bibliothek.
+# =====================================================================
+
+
+# ---------------------------------------------------------------------
+#  HIMMEL, LUFT UND WETTER
+# ---------------------------------------------------------------------
+
+[[beschreibung]]
+id      = "himmel"
+woerter = ["firmament", "horizont"]
+text    = """
+Der Himmel wölbt sich weit über dir. Am Horizont verschwimmen Land und Luft
+zu einem blassen Band, und hoch oben ziehen Wolken langsam ihre Bahn."""
+nutzt   = ["wolken"]
+
+[[beschreibung]]
+id      = "wolken"
+woerter = ["wolke"]
+text    = """
+Weiße, aufgetürmte Wolken treiben gemächlich dahin. Wenn du lange genug
+hinsiehst, erkennst du in ihnen Gesichter, Tiere und Burgen, die sich
+langsam auflösen und neu entstehen."""
+
+[[beschreibung]]
+id        = "luft"
+text      = "Die Luft ist klar und frisch."
+geruch    = "Die Luft riecht sauber und ein wenig nach Erde."
+gefuehl   = "Ein leichter Luftzug streicht dir über das Gesicht."
+
+[[beschreibung]]
+id        = "wind"
+woerter   = ["brise", "luftzug", "boeen"]
+text      = "Du kannst den Wind nicht sehen, nur wie er Gras und Zweige bewegt."
+geraeusch = "Der Wind rauscht und pfeift leise in deinen Ohren."
+gefuehl   = "Der Wind zerrt an deiner Kleidung und kühlt deine Haut."
+
+[[beschreibung]]
+id        = "nebel"
+woerter   = ["dunst", "schwaden", "nebelschwaden"]
+text      = """
+Graue Nebelschwaden kriechen über den Boden. Sie verschlucken Umrisse und
+Geräusche, und was nur wenige Schritte entfernt ist, wird zu einem
+undeutlichen Schatten."""
+geruch    = "Der Nebel riecht feucht und ein wenig modrig."
+gefuehl   = "Kühle Feuchtigkeit legt sich auf deine Haut und dein Haar."
+
+
+# ---------------------------------------------------------------------
+#  BODEN, ERDE UND GESTEIN
+# ---------------------------------------------------------------------
+
+[[beschreibung]]
+id        = "erde"
+woerter   = ["boden", "waldboden", "untergrund", "dreck"]
+text      = """
+Dunkle, krümelige Erde, durchzogen von feinen Wurzeln. Hier und da
+schimmert ein Regenwurm hervor, bevor er sich wieder verkriecht."""
+geruch    = "Die Erde riecht schwer, feucht und lebendig."
+gefuehl   = "Die Erde ist weich und kühl und bleibt an deinen Fingern kleben."
+
+[[beschreibung]]
+id        = "schlamm"
+woerter   = ["matsch", "morast", "modder"]
+text      = "Zäher, brauner Schlamm, in dem Fußspuren sofort volllaufen."
+geruch    = "Der Schlamm stinkt faulig nach abgestandenem Wasser."
+gefuehl   = "Der Schlamm schmatzt und saugt an allem, was ihn berührt."
+
+[[beschreibung]]
+id        = "sand"
+woerter   = ["sandkoerner"]
+text      = """
+Feiner, heller Sand aus unzähligen winzigen Körnern. Dazwischen liegen
+zerbrochene Muschelschalen und kleine, glattgeschliffene Kiesel."""
+gefuehl   = "Der Sand rieselt warm und trocken durch deine Finger."
+
+[[beschreibung]]
+id      = "steine"
+woerter = ["stein", "kiesel", "kieselsteine", "geroell"]
+text    = """
+Steine in allen Größen und Farben: grau, rötlich, manche von hellen Adern
+durchzogen. Die kleinen sind von Wasser und Zeit rundgeschliffen, die
+großen kantig und schwer."""
+gefuehl = "Die Steine sind hart und kühl, an der Unterseite feucht."
+
+[[beschreibung]]
+id      = "fels"
+woerter = ["felsen", "gestein", "felswand", "felsbrocken"]
+text    = """
+Grauer, verwitterter Fels, von Rissen und Spalten durchzogen. In den Ritzen
+haben sich Flechten festgesetzt, gelbe und grünliche Flecken auf dem Stein."""
+gefuehl = "Der Fels ist rau, kalt und unnachgiebig."
+
+[beschreibung.details]
+flechten = "Flechten wachsen in krustigen, runden Flecken auf dem Stein. Sie sehen aus wie verschüttete Farbe."
+risse    = "Feine Risse ziehen sich durch den Fels. In einigen wächst ein wenig Moos."
+
+[[beschreibung]]
+id      = "staub"
+woerter = ["staubschicht"]
+text    = "Eine feine graue Staubschicht liegt auf allem, was lange niemand berührt hat."
+geruch  = "Es riecht trocken und staubig. Du musst ein Niesen unterdrücken."
+gefuehl = "Der Staub hinterlässt einen grauen Film auf deinen Fingerspitzen."
+
+
+# ---------------------------------------------------------------------
+#  PFLANZEN
+# ---------------------------------------------------------------------
+
+[[beschreibung]]
+id        = "gras"
+woerter   = ["wiese", "grashalme", "halme", "rasen"]
+text      = """
+Grünes Gras, hier kurz und dicht, dort hoch und mit fedrigen Rispen. Darin
+verstecken sich Klee, Löwenzahn und kleine Käfer."""
+geruch    = "Das Gras riecht frisch und grün, ein wenig süßlich."
+geraeusch = "Das Gras raschelt leise, wenn der Wind darüberstreicht."
+gefuehl   = "Die Halme kitzeln an deinen Händen."
+
+[beschreibung.details]
+klee       = "Dreiblättriger Klee mit weißen, kugeligen Blüten. Ein vierblättriges Kleeblatt findest du nicht."
+loewenzahn = "Leuchtend gelbe Blüten und daneben die weißen Pusteblumen. Ein Windhauch, und die Schirmchen fliegen davon."
+
+[[beschreibung]]
+id      = "blumen"
+woerter = ["blume", "blueten", "bluete", "wildblumen"]
+text    = """
+Wildblumen in vielen Farben: blaue Glockenblumen, rote Mohnblüten, weiße
+Margeriten und gelber Hahnenfuß. Bienen und Schmetterlinge tummeln sich
+zwischen ihnen."""
+geruch  = "Ein süßer, honigartiger Duft steigt von den Blüten auf."
+gefuehl = "Die Blütenblätter sind zart und seidig."
+
+[[beschreibung]]
+id      = "kraeuter"
+woerter = ["kraut", "heilkraeuter", "gewuerze"]
+text    = """
+Kräuter wachsen hier: buschiger Thymian, silbrig-grüner Salbei, Minze mit
+gezackten Blättern und zarter Schnittlauch mit lila Blütenköpfen."""
+geruch  = "Ein würziger, frischer Duft von Minze, Thymian und Salbei liegt in der Luft."
+gefuehl = "Wenn du über die Blätter streichst, bleibt ihr Duft an deinen Fingern."
+
+[[beschreibung]]
+id      = "moos"
+woerter = ["moose", "moospolster"]
+text    = """
+Dichte, grüne Moospolster bedecken Steine, Wurzeln und die Nordseiten der
+Baumstämme. Winzige Sporenkapseln stehen wie Stecknadeln daraus hervor."""
+geruch  = "Das Moos riecht feucht und erdig."
+gefuehl = "Das Moos ist weich wie ein Kissen und vollgesogen mit Feuchtigkeit."
+
+[[beschreibung]]
+id      = "farn"
+woerter = ["farne", "farnwedel", "wedel"]
+text    = """
+Farne entfalten ihre gefiederten Wedel wie grüne Fächer. Junge Triebe sind
+noch eingerollt wie kleine Schneckenhäuser."""
+gefuehl = "Die Wedel sind zart, an der Unterseite rau von winzigen braunen Sporenhäufchen."
+
+[[beschreibung]]
+id        = "busch"
+woerter   = ["buesche", "strauch", "straeucher", "gebuesch", "gestruepp", "unterholz"]
+text      = """
+Dichtes Buschwerk mit verzweigten Ästen und kleinen, ledrigen Blättern.
+Darin raschelt es manchmal, wenn sich ein kleines Tier versteckt."""
+geraeusch = "Im Gebüsch raschelt es leise."
+gefuehl   = "Die Zweige sind biegsam und kratzen an deinen Armen."
+
+[[beschreibung]]
+id      = "hecke"
+woerter = ["hecken"]
+text    = """
+Eine dichte, sorgfältig gestutzte Hecke, so hoch, dass man kaum darüber
+hinwegsehen kann. Zwischen den Blättern haben Vögel ihre Nester gebaut."""
+gefuehl = "Die Hecke ist so dicht, dass deine Hand kaum hineinkommt."
+
+[[beschreibung]]
+id      = "dornen"
+woerter = ["dorn", "stacheln", "dornbusch", "brombeeren", "dornenranken"]
+text    = """
+Dornige Ranken winden sich hier. Zwischen den spitzen Stacheln hängen
+dunkle Brombeeren."""
+gefuehl = "Autsch! Die Dornen stechen dir in die Finger."
+
+[[beschreibung]]
+id      = "efeu"
+woerter = ["ranken", "kletterpflanze"]
+text    = """
+Efeu klettert in dichten Ranken empor. Seine dunkelgrünen, glänzenden
+Blätter haben fünf Spitzen und kleben mit feinen Haftwurzeln am Untergrund."""
+
+[[beschreibung]]
+id        = "schilf"
+woerter   = ["ried", "rohr", "binsen"]
+text      = """
+Hohes Schilf wiegt sich am Wasser, die braunen Rispen nicken im Wind.
+Dazwischen ragen die dunklen Kolben von Rohrkolben empor."""
+geraeusch = "Das Schilf rauscht und raschelt bei jedem Windhauch."
+gefuehl   = "Die Halme sind lang, glatt und an den Kanten scharf."
+
+[[beschreibung]]
+id      = "pilze"
+woerter = ["schwammerl", "fliegenpilz", "pilzkreis"]
+text    = """
+Pilze wachsen im feuchten Boden: braune Kappen, weiße Stiele und dazwischen
+ein leuchtend roter Fliegenpilz mit weißen Tupfen. Iss lieber nichts davon,
+wenn du dich nicht auskennst."""
+geruch  = "Ein erdiger, leicht nussiger Geruch."
+
+
+# ---------------------------------------------------------------------
+#  BÄUME (und ihre Teile)
+# ---------------------------------------------------------------------
+
+[[beschreibung]]
+id      = "baum"
+woerter = ["baeume", "stamm", "staemme", "baumstamm"]
+text    = """
+Ein hoher Baum mit kräftigem Stamm und weit ausladender Krone. Seine Äste
+recken sich dem Licht entgegen, und die Wurzeln greifen tief in den Boden."""
+geraeusch = "Das Laub rauscht im Wind, und ab und zu knarrt ein Ast."
+nutzt   = ["rinde", "aeste", "laub", "wurzeln", "krone"]
+
+[[beschreibung]]
+id      = "rinde"
+woerter = ["borke", "baumrinde"]
+text    = """
+Die Rinde ist rissig und von tiefen Furchen durchzogen. Ameisen laufen in
+langen Straßen daran auf und ab."""
+geruch  = "Die Rinde riecht holzig und ein wenig nach Harz."
+gefuehl = "Die Rinde ist rau und grob unter deinen Händen."
+
+[[beschreibung]]
+id      = "aeste"
+woerter = ["ast", "zweige", "zweig"]
+text    = """
+Die Äste verzweigen sich immer weiter bis zu dünnen, biegsamen Zweigen.
+Einige sind abgebrochen und liegen am Boden."""
+gefuehl = "Ein abgebrochener Zweig knackt trocken zwischen deinen Fingern."
+
+[[beschreibung]]
+id        = "laub"
+woerter   = ["blaetter", "blatt", "blattwerk", "laubdach"]
+text      = """
+Grüne Blätter in tausend Schattierungen bilden ein dichtes Dach. Das Licht
+fällt in tanzenden Flecken hindurch. Am Boden liegt das Laub vergangener
+Jahre, braun und raschelnd."""
+geraeusch = "Das Laub raschelt unter jedem Schritt."
+geruch    = "Das alte Laub riecht würzig nach Herbst und Erde."
+
+[[beschreibung]]
+id      = "wurzeln"
+woerter = ["wurzel", "baumwurzeln"]
+text    = """
+Knorrige Wurzeln winden sich aus der Erde wie die Finger einer riesigen Hand.
+Man muss aufpassen, dass man nicht darüber stolpert."""
+gefuehl = "Die Wurzeln sind hart und glatt, wo viele Füße darübergegangen sind."
+
+[[beschreibung]]
+id      = "krone"
+woerter = ["baumkrone", "wipfel", "baumwipfel"]
+text    = "Hoch oben verschwimmt die Baumkrone zu einem grünen Gewirr aus Ästen und Blättern."
+
+[[beschreibung]]
+id      = "eiche"
+woerter = ["eichen", "eichbaum"]
+text    = """
+Eine mächtige Eiche, breit und knorrig, wie sie hundert Jahre und mehr
+braucht, um so zu werden. Ihre Blätter sind tief gebuchtet, und an den
+Zweigen hängen Eicheln in kleinen Hütchen."""
+geraeusch = "Die Eiche knarrt leise, wenn der Wind in ihre Krone fährt."
+nutzt   = ["baum"]
+
+[beschreibung.details]
+eicheln = "Glatte, braune Eicheln, jede in einem schuppigen Hütchen. Eichhörnchen und Wildschweine lieben sie."
+
+[[beschreibung]]
+id      = "buche"
+woerter = ["buchen", "rotbuche"]
+text    = """
+Eine schlanke Buche mit glatter, silbergrauer Rinde. Ihre ovalen Blätter
+sind am Rand leicht gewellt und lassen nur wenig Licht hindurch."""
+nutzt   = ["baum"]
+
+[beschreibung.details]
+bucheckern = "Dreikantige, braune Nüsschen in stacheligen Hüllen liegen am Boden."
+rinde      = "Die Rinde der Buche ist ungewöhnlich glatt und grau wie die Haut eines Elefanten. Jemand hat Buchstaben hineingeritzt."
+
+[[beschreibung]]
+id      = "birke"
+woerter = ["birken"]
+text    = """
+Eine Birke mit weißer, papierartiger Rinde, gezeichnet von schwarzen
+Querstreifen. Ihre kleinen, herzförmigen Blätter zittern beim kleinsten
+Windhauch."""
+nutzt   = ["baum"]
+
+[beschreibung.details]
+rinde = "Die weiße Rinde löst sich in dünnen, papierartigen Streifen. Sie brennt hervorragend, auch wenn sie feucht ist."
+
+[[beschreibung]]
+id      = "tanne"
+woerter = ["tannen", "fichte", "fichten", "nadelbaum", "nadelbaeume"]
+text    = """
+Ein hoher, kerzengerader Nadelbaum. Die dunkelgrünen Zweige hängen in
+Etagen übereinander, und an der Spitze sitzen Zapfen."""
+geruch  = "Ein frischer, harziger Duft nach Nadeln und Harz."
+nutzt   = ["baum"]
+
+[beschreibung.details]
+nadeln = "Kurze, spitze Nadeln, oben dunkelgrün, unten mit zwei hellen Streifen."
+zapfen = "Längliche, schuppige Zapfen. Einige liegen geöffnet am Boden."
+harz   = { text = "Bernsteinfarbenes Harz quillt aus einer Wunde in der Rinde.", gefuehl = "Das Harz ist klebrig und lässt sich kaum von den Fingern lösen.", geruch = "Es riecht intensiv und würzig." }
+
+[[beschreibung]]
+id      = "weide"
+woerter = ["weiden", "trauerweide"]
+text    = """
+Eine Weide, deren lange, biegsame Zweige wie ein grüner Vorhang bis zum
+Boden hängen. Darunter ist es kühl und dämmrig wie in einem Zelt."""
+geraeusch = "Die herabhängenden Zweige wispern leise im Wind."
+nutzt   = ["baum"]
+
+[[beschreibung]]
+id      = "apfelbaum"
+woerter = ["obstbaum", "obstbaeume", "apfelbaeume"]
+text    = """
+Ein knorriger, nicht sehr hoher Apfelbaum mit krummen Ästen. Je nach
+Jahreszeit trägt er weiße Blüten oder kleine, rotbackige Äpfel."""
+geruch  = "Ein süßlicher Duft nach Obst."
+nutzt   = ["baum"]
+
+[[beschreibung]]
+id      = "linde"
+woerter = ["linden", "dorflinde"]
+text    = """
+Eine alte Linde mit herzförmigen Blättern und einer weit ausladenden,
+runden Krone. Unter Linden hat man sich schon immer getroffen, gefeiert und
+Gericht gehalten."""
+geruch  = "Die Lindenblüten duften schwer und süß nach Honig."
+nutzt   = ["baum"]
+
+
+# ---------------------------------------------------------------------
+#  WASSER
+# ---------------------------------------------------------------------
+
+[[beschreibung]]
+id        = "wasser"
+woerter   = ["wasseroberflaeche", "spiegelung"]
+text      = """
+Das Wasser ist klar genug, dass du den Grund erahnen kannst. Auf der
+Oberfläche spiegeln sich Himmel und Ufer, und kleine Wellen brechen das Bild."""
+geruch    = "Es riecht frisch und ein wenig nach Wasserpflanzen."
+gefuehl   = "Das Wasser ist kalt und lässt deine Finger kribbeln."
+
+[[beschreibung]]
+id        = "bach"
+woerter   = ["baechlein", "rinnsal"]
+text      = """
+Ein munterer Bach springt über Steine und kleine Stufen. Im klaren Wasser
+huschen winzige Fische davon, sobald dein Schatten auf sie fällt."""
+geraeusch = "Der Bach plätschert und gluckert unermüdlich."
+gefuehl   = "Das Wasser ist eiskalt und fließt dir schnell über die Hand."
+nutzt     = ["wasser", "steine"]
+
+[[beschreibung]]
+id        = "fluss"
+woerter   = ["stroemung", "strom"]
+text      = """
+Ein breiter Fluss strömt träge dahin. Treibholz dreht sich in Strudeln,
+und am Ufer hat das Wasser Sandbänke angespült."""
+geraeusch = "Das Wasser rauscht tief und gleichmäßig."
+nutzt     = ["wasser", "ufer"]
+
+[[beschreibung]]
+id        = "see"
+woerter   = ["teich", "weiher", "tuempel"]
+text      = """
+Ein stilles Gewässer, dunkel in der Mitte und hell am flachen Rand. Libellen
+schwirren über die Oberfläche, und manchmal springt ein Fisch."""
+geraeusch = "Frösche quaken irgendwo am Ufer."
+nutzt     = ["wasser", "ufer", "schilf"]
+
+[beschreibung.details]
+libellen = "Schillernde Libellen in Blau und Grün stehen in der Luft, wenden blitzschnell und sind fort."
+seerosen = "Runde, flache Blätter treiben auf dem Wasser, dazwischen weiße und rosa Blüten."
+
+[[beschreibung]]
+id        = "meer"
+woerter   = ["ozean", "wellen", "brandung", "gischt"]
+text      = """
+Das Meer erstreckt sich bis zum Horizont, mal grau, mal grün, mal tiefblau.
+Wellen rollen heran, brechen sich in weißer Gischt und ziehen sich zischend
+zurück."""
+geruch    = "Die Luft schmeckt nach Salz und Tang."
+geraeusch = "Die Brandung rauscht in einem ewigen, gleichmäßigen Rhythmus."
+gefuehl   = "Das Wasser ist kalt und salzig, die Gischt sprüht dir ins Gesicht."
+
+[beschreibung.details]
+tang     = "Braune und grüne Algen, die das Meer an Land gespült hat."
+muscheln = "Zerbrochene Muschelschalen, innen perlmuttfarben schimmernd."
+
+[[beschreibung]]
+id      = "ufer"
+woerter = ["uferboeschung", "wasserrand"]
+text    = """
+Am Ufer geht der Boden in feuchten Schlamm und Kies über. Abdrücke von
+Vogelfüßen und Tierpfoten führen ans Wasser."""
+nutzt   = ["schlamm"]
+
+[beschreibung.details]
+spuren = "Spuren von Vögeln, ein paar Rehe und etwas Großes mit Krallen. Sie führen alle zum Wasser."
+
+
+# ---------------------------------------------------------------------
+#  TIERE (Hintergrund – keine Monster)
+# ---------------------------------------------------------------------
+
+[[beschreibung]]
+id        = "voegel"
+woerter   = ["vogel", "vogelgesang", "spatzen", "amseln"]
+text      = """
+Vögel flattern zwischen den Zweigen umher: ein Rotkehlchen, ein paar
+Spatzen und hoch oben ein kreisender Bussard."""
+geraeusch = "Vögel zwitschern und trillern um die Wette."
+
+[[beschreibung]]
+id        = "insekten"
+woerter   = ["insekt", "bienen", "fliegen", "muecken", "kaefer", "schmetterlinge", "grillen"]
+text      = """
+Überall summt und krabbelt es: Bienen an den Blüten, Käfer im Gras und
+Mücken, die in kleinen Wolken tanzen."""
+geraeusch = "Ein ständiges Summen und Zirpen erfüllt die Luft."
+
+
+# ---------------------------------------------------------------------
+#  WEGE UND BAUWERKE (draußen)
+# ---------------------------------------------------------------------
+
+[[beschreibung]]
+id      = "weg"
+woerter = ["pfad", "trampelpfad", "spur", "wagenspuren"]
+text    = """
+Ein festgetretener Weg aus Erde und Kies. Tiefe Wagenspuren und unzählige
+Fußabdrücke zeigen, dass hier viele unterwegs sind."""
+nutzt   = ["staub"]
+
+[[beschreibung]]
+id      = "pflaster"
+woerter = ["kopfsteinpflaster", "pflastersteine", "strasse", "gasse"]
+text    = """
+Runde, abgetretene Pflastersteine, zwischen denen Gras und Moos wachsen.
+Einige Steine wackeln, wenn man darauftritt."""
+geraeusch = "Schritte klappern auf dem Pflaster."
+gefuehl   = "Die Steine sind glatt gelaufen und uneben."
+
+[[beschreibung]]
+id      = "mauer"
+woerter = ["mauern", "steinmauer", "mauerwerk"]
+text    = """
+Eine Mauer aus grob behauenen Steinen, mit Mörtel verfugt. Wind und Wetter
+haben die Kanten rund gewaschen, und in den Fugen wächst Moos."""
+gefuehl = "Die Steine sind kühl und rau, der Mörtel bröckelt unter deinen Fingern."
+nutzt   = ["moos"]
+
+[[beschreibung]]
+id      = "zaun"
+woerter = ["zaeune", "lattenzaun", "pfosten"]
+text    = """
+Ein einfacher Holzzaun aus grauen, verwitterten Latten. Einige hängen
+schief, und an einem Pfosten fehlt ein Nagel."""
+gefuehl = "Das Holz ist rissig, pass auf, dass du dir keinen Splitter holst."
+
+[[beschreibung]]
+id      = "dach"
+woerter = ["daecher", "dachziegel", "ziegel", "strohdach"]
+text    = """
+Dächer aus roten Ziegeln oder dickem Stroh. Auf einem First sitzt eine
+Taube und blickt gelangweilt herab."""
+
+[[beschreibung]]
+id      = "schornstein"
+woerter = ["rauch", "schlot"]
+text    = "Aus einem gemauerten Schornstein steigt dünner, grauer Rauch."
+geruch  = "Es riecht nach Holzfeuer."
+
+
+# ---------------------------------------------------------------------
+#  IN GEBÄUDEN
+# ---------------------------------------------------------------------
+
+[[beschreibung]]
+id      = "wand"
+woerter = ["waende", "wandputz"]
+text    = """
+Die Wände sind aus Lehm und Holz, weiß gekalkt, doch der Putz ist an
+einigen Stellen abgeplatzt. Darunter kommen Strohhalme und Fachwerk zum
+Vorschein."""
+gefuehl = "Die Wand ist kühl und ein wenig staubig."
+
+[[beschreibung]]
+id      = "dielen"
+woerter = ["fussboden", "holzboden", "bretter", "planken"]
+text    = """
+Breite, abgetretene Holzdielen. In den Ritzen sammelt sich der Staub
+vieler Jahre."""
+geraeusch = "Die Dielen knarren bei jedem Schritt."
+
+[[beschreibung]]
+id      = "decke"
+woerter = ["zimmerdecke"]
+text    = "Die Decke ist niedrig und von dunklen Holzbalken getragen. In einer Ecke hängt eine Spinnwebe."
+nutzt   = ["balken", "spinnweben"]
+
+[[beschreibung]]
+id      = "balken"
+woerter = ["holzbalken", "dachbalken", "fachwerk"]
+text    = "Schwere, dunkle Holzbalken, von Axthieben gezeichnet und vom Rauch vieler Jahre geschwärzt."
+geruch  = "Das alte Holz riecht leicht nach Rauch."
+
+[[beschreibung]]
+id      = "tuer"
+woerter = ["tueren", "eingang", "tuerrahmen", "klinke"]
+text    = """
+Eine schwere Holztür mit eisernen Beschlägen. Die Klinke ist von vielen
+Händen blank poliert."""
+geraeusch = "Die Angeln quietschen leise."
+gefuehl   = "Das Holz ist massiv, das Eisen der Beschläge kalt."
+
+[[beschreibung]]
+id      = "fenster"
+woerter = ["fensterscheibe", "scheibe", "scheiben", "fensterladen", "fensterlaeden"]
+text    = """
+Ein kleines Fenster mit Butzenscheiben aus dickem, grünlichem Glas. Die
+Welt draußen erscheint dahinter verzerrt und wellig."""
+gefuehl = "Das Glas ist kühl und uneben."
+
+[[beschreibung]]
+id      = "treppe"
+woerter = ["stufen", "stufe", "treppenstufen", "gelaender"]
+text    = "Eine steile Holztreppe, deren Stufen in der Mitte ausgetreten sind."
+geraeusch = "Jede Stufe knarrt in einem anderen Ton."
+
+[[beschreibung]]
+id      = "feuer"
+woerter = ["flammen", "glut", "kamin", "feuerstelle", "herd"]
+text    = """
+Ein Feuer brennt in einer gemauerten Feuerstelle. Die Flammen tanzen gelb
+und orange, und darunter glüht die Holzkohle tiefrot."""
+geruch    = "Es riecht nach brennendem Holz und warmem Stein."
+geraeusch = "Das Feuer knistert und knackt, ab und zu stiebt ein Funkenregen auf."
+gefuehl   = "Die Hitze ist angenehm auf deinem Gesicht, zu nah heran solltest du aber nicht."
+
+[[beschreibung]]
+id      = "kerze"
+woerter = ["kerzen", "kerzenlicht", "docht", "wachs"]
+text    = """
+Kerzen aus gelblichem Wachs, die ein warmes, flackerndes Licht verbreiten.
+Wachs ist an ihnen heruntergelaufen und zu kleinen Bächen erstarrt."""
+geruch  = "Es riecht nach warmem Bienenwachs."
+gefuehl = "Das Wachs ist warm und weich, die Flamme heiß."
+
+[[beschreibung]]
+id      = "spinnweben"
+woerter = ["spinnwebe", "spinnennetz", "spinnennetze", "netz"]
+text    = """
+Graue Spinnweben hängen in den Ecken, schwer von Staub. In einer sitzt eine
+kleine Spinne und wartet geduldig."""
+gefuehl = "Die Spinnweben kleben an deinen Fingern. Igitt."
+nutzt   = ["staub"]
+
+
+# ---------------------------------------------------------------------
+#  MÖBEL UND EINRICHTUNG
+# ---------------------------------------------------------------------
+
+[[beschreibung]]
+id      = "tisch"
+woerter = ["tische", "tischplatte", "holztisch"]
+text    = """
+Ein schwerer Holztisch, dessen Platte von Messerkerben, Brandflecken und
+Bierrändern gezeichnet ist."""
+gefuehl = "Die Tischplatte ist glatt gescheuert und ein wenig klebrig."
+
+[[beschreibung]]
+id      = "stuhl"
+woerter = ["stuehle", "hocker", "schemel", "sitz"]
+text    = "Einfache Holzstühle und dreibeinige Hocker, keiner gleicht dem anderen."
+geraeusch = "Ein Stuhl kratzt über den Boden."
+
+[[beschreibung]]
+id      = "bank"
+woerter = ["baenke", "sitzbank", "holzbank"]
+text    = "Eine lange Holzbank, blank gesessen von unzähligen Hosenböden."
+
+[[beschreibung]]
+id      = "bett"
+woerter = ["betten", "lager", "strohsack", "decken"]
+text    = """
+Ein einfaches Bett aus Holz mit einem Strohsack und einer kratzigen
+Wolldecke. Es sieht nicht bequem aus, aber nach einem langen Tag würdest
+du überall schlafen."""
+geruch  = "Das Stroh riecht ein wenig muffig."
+gefuehl = "Die Wolldecke ist rau, der Strohsack knistert."
+
+[[beschreibung]]
+id      = "regal"
+woerter = ["regale", "bord", "wandbrett"]
+text    = "Ein Holzregal voller Krüge, Töpfe, Schachteln und Dinge, deren Zweck du nur erraten kannst."
+
+[[beschreibung]]
+id      = "truhe"
+woerter = ["truhen", "kiste", "kisten", "kasten"]
+text    = """
+Eine Truhe aus dunklem Holz mit eisernen Bändern und einem schweren
+Schloss. Der Deckel ist zerkratzt."""
+gefuehl = "Das Eisen der Beschläge ist kalt, das Holz glatt."
+
+[[beschreibung]]
+id      = "fass"
+woerter = ["faesser", "weinfass", "bierfass", "tonne"]
+text    = """
+Bauchige Fässer aus Eichendauben, von eisernen Reifen zusammengehalten.
+Aus einem Spundloch tropft es langsam."""
+geruch  = "Es riecht säuerlich nach Wein und Bier."
+geraeusch = "Wenn du daran klopfst, klingt es dumpf. Es ist noch etwas drin."
+gefuehl = "Das Holz ist feucht und klebrig."
+
+[[beschreibung]]
+id      = "theke"
+woerter = ["tresen", "schanktisch", "bar"]
+text    = """
+Eine lange Theke aus dunklem, poliertem Holz. Dahinter stehen Krüge,
+Becher und ein Fass mit Zapfhahn."""
+geruch  = "Die Theke riecht nach Bier, Bohnerwachs und Tabak."
+gefuehl = "Das Holz ist glatt poliert und an einigen Stellen klebrig."
+
+[[beschreibung]]
+id      = "teppich"
+woerter = ["teppiche", "laeufer", "matte"]
+text    = "Ein abgetretener Teppich mit verblassten Mustern in Rot und Braun."
+gefuehl = "Der Teppich ist dünn gelaufen, an den Rändern franst er aus."
+
+
+# ---------------------------------------------------------------------
+#  IM DORF
+# ---------------------------------------------------------------------
+
+[[beschreibung]]
+id        = "brunnen"
+woerter   = ["ziehbrunnen", "wasserstelle"]
+text      = """
+Ein Brunnen mit einer gemauerten Einfassung und einer hölzernen Winde, von
+der ein Seil mit einem Eimer in die Tiefe führt."""
+geraeusch = "Tief unten tropft und plätschert Wasser."
+gefuehl   = "Die Steine der Einfassung sind kühl und feucht."
+nutzt     = ["wasser"]
+
+[beschreibung.details]
+eimer = { text = "Ein Holzeimer mit eisernem Henkel, dunkel vom Wasser.", geruch = "Der Eimer riecht modrig." }
+winde = "Eine hölzerne Kurbel, die quietscht, wenn man sie dreht."
+seil  = "Ein dickes, an einigen Stellen ausgefranstes Hanfseil."
+
+[[beschreibung]]
+id        = "markt"
+woerter   = ["marktstaende", "stand", "buden", "waren"]
+text      = """
+Hölzerne Stände mit bunten Planen, Körben voller Äpfel, Kohl und Rüben,
+dazwischen Tücher, Töpfe und allerlei Krimskrams."""
+geruch    = "Es riecht nach frischem Brot, reifem Obst und ein wenig nach Fisch."
+geraeusch = "Händler preisen lautstark ihre Waren an."
