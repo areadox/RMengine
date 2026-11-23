@@ -46,7 +46,7 @@ Wie man den Editor bedient, steht in der [ANLEITUNG.md](ANLEITUNG.md#der-grafisc
 
 ## Eine neue Version veröffentlichen
 
-1. In `Cargo.toml` die `version` erhöhen, z.B. auf `0.2.0`, und committen.
+1. In `Cargo.toml` und `editor/Cargo.toml` die `version` erhöhen (wir zählen hinten weiter: 0.2.1, 0.2.2, …) und committen.
 2. Auf GitHub unter **Actions → Release → Run workflow** starten. Ins Feld *„Was ist neu?“* die Neuerungen schreiben: Sie erscheinen im Release und beim Update.
 
    Alternativ ein Tag hochladen:
@@ -82,6 +82,7 @@ das Update und veröffentlicht alles als Release.
 - **Kampf in Echtzeit, ohne Runden:** Erholungszeit je nach Waffe, Ausdauer, Ausweichen, Haltungen, Flucht, Kampfzauber, aggressive und zaubernde Monster, Beute
 - **Stufen und Erfahrung**, Punkte zum Verteilen, dazu steigende Fertigkeiten
 - **Tod und Wiederbelebung:** Mitspieler können 5 Minuten lang helfen, sonst (oder mit `aufgeben`) erwacht man im Tempel
+- **Befehle anpassen:** Wörter, Rollen, Hilfetexte und Abschalten über `daten/befehle/`, dazu eigene **Gesten** (`winke`, `verbeuge` …)
 - **Grafischer Welteditor** (`rmeditor`): Räume auf einer Karte anlegen, verschieben, verbinden und beschreiben. Kommentare in den TOML-Dateien bleiben beim Speichern erhalten.
 
 ## Code-Überblick (`src/`)
@@ -100,6 +101,8 @@ das Update und veröffentlicht alles als Release.
 | `beschreibung.rs` | Details, Sinne und Bibliothek                          |
 | `gespraech.rs` | NPC-Gespräche                                              |
 | `kampf.rs`   | Kampf, Stufen, Tod und Wiederbelebung                        |
+| `befehlsliste.rs` | alle eingebauten Befehle (auch vom Editor benutzt)      |
+| `befehlskonfig.rs` | befehle.toml: Anpassungen und Gesten                   |
 
 Der Welteditor (`editor/src/`):
 

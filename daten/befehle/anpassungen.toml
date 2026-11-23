@@ -1,0 +1,31 @@
+# =====================================================================
+#  Eingebaute Befehle anpassen
+# =====================================================================
+#  Jeder eingebaute Befehl hat einen festen Namen (die id). Hier kannst du
+#  für jeden Befehl ändern:
+#
+#    woerter = [...]   alle Wörter, mit denen man ihn aufruft (ersetzt die
+#                      Standardwörter; das erste ist der Hauptname)
+#    rolle   = "..."   wer ihn benutzen darf: spieler, baumeister oder admin
+#    aktiv   = false   Befehl abschalten
+#    hilfe   = "..."   Text in der Hilfe
+#    syntax  = "..."   wie man ihn aufruft, z.B. "toete <monster>"
+#
+#  Was du nicht angibst, bleibt wie es ist. Die Liste aller Befehle mit
+#  ihren ids und Standardwerten zeigt der Welteditor unter "Befehle"
+#  oder im Spiel:  hilfe <befehl>
+#
+#  Befehle dürfen auch auf mehrere Dateien in diesem Ordner verteilt werden.
+# =====================================================================
+
+# Beispiel: "töte" darf man auch mit "attacke" aufrufen
+[befehl.toete]
+woerter = ["toete", "tote", "angriff", "angreifen", "attacke", "greif", "greife", "attackiere", "kill", "kaempfe", "schlag", "schlage"]
+
+# Beispiel: Die Weltkarte gibt es nur für Baumeister (ausgeschaltet)
+# [befehl.weltkarte]
+# rolle = "baumeister"
+
+# Beispiel: Englische Abkürzungen weglassen
+# [befehl.inventar]
+# woerter = ["inventar", "i"]

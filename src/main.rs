@@ -7,6 +7,8 @@
 //!   rmengine --version                Version anzeigen
 
 mod befehle;
+mod befehlskonfig;
+mod befehlsliste;
 mod beschreibung;
 mod daten;
 mod gespraech;

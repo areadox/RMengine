@@ -487,6 +487,9 @@ pub struct MonsterDef {
     pub name: String,
     #[serde(default)]
     pub akkusativ: String,
+    /// "dem Wirt" – für Gesten wie "Du winkst {ziel_dativ} zu."
+    #[serde(default)]
+    pub dativ: String,
     #[serde(default)]
     pub beschreibung: String,
     #[serde(default)]
@@ -717,6 +720,8 @@ pub struct Daten {
     /// Anzeigenamen für IDs, z.B. staerke -> "Stärke"
     pub namen: BTreeMap<String, String>,
     pub kampf: KampfConfig,
+    /// Befehle und Gesten aus befehle.toml / befehle/*.toml
+    pub befehle: crate::befehlskonfig::Befehle,
     pub oberwelt: Option<Oberwelt>,
     /// Allgemeine Beschreibungen (Bäume, Himmel, Steine ...), auf die man mit `nutzt` verweist
     pub bibliothek: BTreeMap<String, BeschreibungDef>,
@@ -888,6 +893,7 @@ pub fn laden(ordner: &Path) -> Result<Daten, Vec<String>> {
         deko_farben: wd.deko,
         namen: wd.namen,
         kampf: wd.kampf,
+        befehle: Default::default(),
         oberwelt: None,
         bibliothek: BTreeMap::new(),
         warnungen: Vec::new(),
@@ -946,6 +952,7 @@ pub fn laden(ordner: &Path) -> Result<Daten, Vec<String>> {
     }
 
     d.oberwelt = oberwelt::laden(ordner, &mut fehler);
+    d.befehle = crate::befehlskonfig::laden(ordner, &mut fehler, &mut warnungen);
     pruefen(&mut d, &mut fehler, &mut warnungen);
 
     if fehler.is_empty() {
@@ -992,7 +999,11 @@ fn toml_dateien_sammeln(ordner: &Path, liste: &mut Vec<PathBuf>) {
         let p = e.path();
         if p.is_dir() {
             toml_dateien_sammeln(&p, liste);
-        } else if p.extension().is_some_and(|x| x == "toml") && !p.ends_with("oberwelt/oberwelt.toml") {
+        } else if p.extension().is_some_and(|x| x == "toml")
+            && !p.ends_with("oberwelt/oberwelt.toml")
+            && !p.ends_with("befehle.toml")
+            && !p.parent().is_some_and(|o| o.ends_with("befehle"))
+        {
             liste.push(p);
         }
     }

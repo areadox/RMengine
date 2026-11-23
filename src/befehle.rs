@@ -4,6 +4,8 @@ use crate::beschreibung::{self, Detail, Sinn};
 use crate::daten::{Daten, Richtung};
 use crate::gespraech;
 use crate::kampf::{self, Haltung};
+use crate::befehlskonfig::Treffer;
+use crate::befehlsliste;
 use crate::karte;
 use crate::spieler::{self, Rolle};
 use crate::text::{self, aufzaehlen, gross, normalisieren, umbrechen};
@@ -26,41 +28,74 @@ pub fn ausfuehren(w: &mut Welt, sid: u64, eingabe: &str) -> Folge {
         return Folge::Beenden;
     }
     let eingabe = eingabe.trim();
-    let (befehl, rest) = if let Some(r) = eingabe.strip_prefix('\'') {
-        ("sage".to_string(), r.trim())
+    // 'text und :text sind immer "sage" und "emote" – egal wie die Befehle heißen
+    let (befehl, rest, fest) = if let Some(r) = eingabe.strip_prefix('\'') {
+        (String::new(), r.trim(), Some(Treffer::Befehl("sage")))
     } else if let Some(r) = eingabe.strip_prefix(':') {
-        ("emote".to_string(), r.trim())
+        (String::new(), r.trim(), Some(Treffer::Befehl("emote")))
     } else {
         match eingabe.split_once(char::is_whitespace) {
-            Some((b, r)) => (normalisieren(b), r.trim()),
-            None => (normalisieren(eingabe), ""),
+            Some((b, r)) => (normalisieren(b), r.trim(), None),
+            None => (normalisieren(eingabe), "", None),
         }
     };
-    if befehl.is_empty() {
+    if befehl.is_empty() && fest.is_none() {
         prompt(w, sid);
         return Folge::Weiter;
     }
     let rolle = w.spieler[&sid].rolle;
     let baut = rolle >= Rolle::Baumeister;
+    let tot = kampf::ist_tot(w, sid);
+    const TOT: &str = "{grau}Du bist tot. Warte, bis dich jemand wiederbelebt, oder tippe 'aufgeben'.{/}";
+    const UNBEKANNT: &str = "Wie bitte? Tippe {gelb}hilfe{/} für eine Liste der Befehle.";
 
-    // Tote können nur wenig tun
-    const ALS_TOTER: &[&str] = &[
-        "aufgeben", "ende", "quit", "exit", "tschuess", "schau", "l", "look", "umsehen", "sage", "sag", "say", "emote",
-        "me", "rufe", "ruf", "shout", "wer", "who", "spielstand", "sp", "werte", "score", "status", "hilfe", "help",
-        "?", "spielerbuch", "buch", "karte", "map", "k", "inventar", "i", "inv",
-    ];
-    if kampf::ist_tot(w, sid) && !ALS_TOTER.contains(&befehl.as_str()) {
-        w.sende(sid, "{grau}Du bist tot. Warte, bis dich jemand wiederbelebt, oder tippe 'aufgeben'.{/}");
-        prompt(w, sid);
-        return Folge::Weiter;
-    }
+    // Was ist gemeint? (Wörter, Rollen und Abschalten stehen in befehle.toml)
+    let treffer = fest.or_else(|| w.d.befehle.aufloesen(&befehl));
+    let id: &str = match treffer {
+        Some(Treffer::Befehl(id)) => {
+            let noetig = Rolle::aus_text(&w.d.befehle.rolle(id)).unwrap_or(Rolle::Spieler);
+            if rolle < noetig {
+                if rolle == Rolle::Spieler {
+                    w.sende(sid, UNBEKANNT);
+                } else {
+                    w.sende(sid, &format!("Dafür brauchst du die Rolle {}.", noetig.name()));
+                }
+                prompt(w, sid);
+                return Folge::Weiter;
+            }
+            if tot && !befehlsliste::finde(id).is_some_and(|e| e.als_toter) {
+                w.sende(sid, TOT);
+                prompt(w, sid);
+                return Folge::Weiter;
+            }
+            id
+        }
+        Some(Treffer::Geste(i)) => {
+            if tot {
+                w.sende(sid, TOT);
+            } else {
+                geste(w, sid, i, rest);
+            }
+            prompt(w, sid);
+            return Folge::Weiter;
+        }
+        None => {
+            match Richtung::aus_text(&befehl) {
+                Some(_) if tot => w.sende(sid, TOT),
+                Some(r) => gehen(w, sid, r),
+                None => w.sende(sid, UNBEKANNT),
+            }
+            prompt(w, sid);
+            return Folge::Weiter;
+        }
+    };
 
-    match befehl.as_str() {
+    match id {
         "ende" | "quit" | "exit" | "tschuess" => {
             w.sende(sid, "Bis bald! Deine Figur wurde gespeichert.");
             return Folge::Beenden;
         }
-        "hilfe" | "help" | "?" => hilfe(w, sid, rolle),
+        "hilfe" | "help" | "?" => hilfe(w, sid, rolle, rest),
         "schau" | "schaue" | "l" | "look" | "umsehen" | "betrachte" | "untersuche" | "unt" | "x" => {
             if rest.is_empty() {
                 raum_anzeigen(w, sid);
@@ -155,16 +190,70 @@ pub fn ausfuehren(w: &mut Welt, sid: u64, eingabe: &str) -> Folge {
             w.speichern(&s.sp);
             w.sende(sid, "Gespeichert.");
         }
+        // Baumeister- und Admin-Befehle (die Rolle wurde oben schon geprüft)
         _ => {
-            if let Some(r) = Richtung::aus_text(&befehl) {
-                gehen(w, sid, r);
-            } else if !(baut && admin_befehl(w, sid, &befehl, rest)) {
-                w.sende(sid, "Wie bitte? Tippe {gelb}hilfe{/} für eine Liste der Befehle.");
+            if !admin_befehl(w, sid, id, rest) {
+                w.sende(sid, UNBEKANNT);
             }
         }
     }
     prompt(w, sid);
     Folge::Weiter
+}
+
+/// Eine Geste aus befehle.toml ausführen, z.B. "winke" oder "winke bert".
+fn geste(w: &Welt, sid: u64, i: usize, rest: &str) {
+    let Some(g) = w.d.befehle.gesten.get(i).cloned() else { return };
+    let noetig = Rolle::aus_text(&g.rolle).unwrap_or(Rolle::Spieler);
+    if w.spieler[&sid].rolle < noetig {
+        w.sende(sid, "Wie bitte? Tippe {gelb}hilfe{/} für eine Liste der Befehle.");
+        return;
+    }
+    let s = &w.spieler[&sid];
+    let (name, raum) = (s.sp.name.clone(), s.sp.raum.clone());
+    let fuellen = |t: &str, ziel: &str, dativ: &str| {
+        gross(&t.replace("{name}", &name).replace("{ziel_dativ}", dativ).replace("{ziel}", ziel))
+    };
+
+    if rest.is_empty() || g.selbst_ziel.trim().is_empty() {
+        if g.selbst.trim().is_empty() {
+            w.sende(sid, "Wem denn? (Diese Geste braucht ein Ziel.)");
+            return;
+        }
+        w.sende(sid, &fuellen(&g.selbst, "", ""));
+        if !g.andere.trim().is_empty() {
+            w.sende_raum(&raum, &fuellen(&g.andere, "", ""), &[sid]);
+        }
+        return;
+    }
+    // Ziel: ein Spieler oder ein Monster/NPC im Raum
+    let (ziel_name, ziel_dativ, ziel_sid) = if let Some(pid) = finde_spieler_im_raum(w, &raum, rest) {
+        let n = w.spieler[&pid].sp.name.clone();
+        (n.clone(), n, Some(pid))
+    } else if let Some(mid) = finde_monster(w, &raum, rest) {
+        let dativ = w
+            .monster
+            .get(&mid)
+            .and_then(|m| w.d.monster.get(&m.def))
+            .map(|d| d.dativ.clone())
+            .filter(|d| !d.is_empty())
+            .unwrap_or_else(|| w.monster_name(mid));
+        (w.monster_akk(mid), dativ, None)
+    } else {
+        w.sende(sid, "So jemanden siehst du hier nicht.");
+        return;
+    };
+    w.sende(sid, &fuellen(&g.selbst_ziel, &ziel_name, &ziel_dativ));
+    let mut ausser = vec![sid];
+    if let Some(pid) = ziel_sid.filter(|p| *p != sid) {
+        if !g.ziel.trim().is_empty() {
+            w.sende(pid, &fuellen(&g.ziel, &ziel_name, &ziel_dativ));
+        }
+        ausser.push(pid);
+    }
+    if !g.andere_ziel.trim().is_empty() {
+        w.sende_raum(&raum, &fuellen(&g.andere_ziel, &ziel_name, &ziel_dativ), &ausser);
+    }
 }
 
 pub fn prompt(w: &Welt, sid: u64) {
@@ -221,76 +310,70 @@ fn weltkarte(w: &Welt, sid: u64, admin: bool) {
     w.sende(sid, &ow.weltkarte(x, y));
 }
 
-fn hilfe(w: &Welt, sid: u64, rolle: Rolle) {
-    let mut t = String::from(
-        "{fett}Befehle{/}
-  {gelb}schau{/} [etwas]        Umsehen oder etwas genauer ansehen (kurz: l)
-  {gelb}riech{/} / {gelb}hoer{/} / {gelb}taste{/} [etwas]  Riechen, lauschen, anfassen
-  {gelb}n o s w no nw so sw{/}  In eine Richtung gehen; {gelb}h{/}och / {gelb}r{/}unter
-  {gelb}karte{/} [größe]        Die Karte der Umgebung zeigen
-  {gelb}weltkarte{/}            Die ganze Oberwelt (mit einer Landkarte)
-  {gelb}rein{/} / {gelb}raus{/}           Eine Stadt betreten oder verlassen
-  {gelb}nimm{/} <ding|alles>    Etwas aufheben
-  {gelb}lege{/} <ding|alles>    Etwas fallen lassen
-  {gelb}inventar{/}             Zeigen, was du bei dir hast (kurz: i)
-  {gelb}anlegen{/} <ding>       Waffe oder Rüstung anlegen
-  {gelb}ausziehen{/} <ding>     Ausrüstung wieder abnehmen
-  {gelb}benutze{/} <ding>       Trank trinken, Essen essen ...
-  {gelb}sage{/} <text>          Etwas sagen (kurz: 'text) – NPCs hören zu
-  {gelb}rede mit{/} <npc>       Ein Gespräch beginnen
-  {gelb}frage{/} <npc> nach <x> Einen NPC etwas fragen
-  {gelb}emote{/} <text>         Eine Handlung zeigen (kurz: :text)
-  {gelb}rufe{/} <text>          Etwas rufen, das alle hören
-  {gelb}wer{/}                  Wer ist gerade da?
-  {gelb}spielstand{/} (sp)      Deine Werte, Stufe, Ausrüstung und Fortschritte
-  {gelb}steigere{/} <wert>      Punkte aus dem Stufenaufstieg verteilen
+/// Die Hilfe entsteht aus der Befehlsliste und befehle.toml:
+/// umbenannte Befehle, eigene Hilfetexte und Gesten erscheinen automatisch.
+fn hilfe(w: &Welt, sid: u64, rolle: Rolle, rest: &str) {
+    let b = &w.d.befehle;
+    let darf = |r: &str| Rolle::aus_text(r).unwrap_or(Rolle::Spieler) <= rolle;
 
-{fett}Kampf{/} (in Echtzeit – jeder Angriff braucht Erholungszeit)
-  {gelb}toete{/} <monster>      Angreifen (danach geht es automatisch weiter)
-  {gelb}schaetze{/} <monster>   Wie gefährlich ist es?
-  {gelb}ausweichen{/}           Kurz in Deckung: Angriffe treffen seltener
-  {gelb}haltung{/} <art>        angriffslustig, ausgewogen oder defensiv
-  {gelb}flieh{/}                Aus dem Kampf fliehen (klappt nicht immer)
-  {gelb}stopp{/}                Nicht mehr angreifen
-  {gelb}wiederbeleben{/} <name> Einen toten Mitspieler zurückholen
-  {gelb}aufgeben{/}             Als Toter sofort im Tempel erwachen
-
-  {gelb}spielerbuch{/}          Einstellungen: Karte, Farben, Titel, Passwort ...
-  {gelb}fertigkeiten{/}         Deine Fertigkeiten
-  {gelb}zauber{/}               Deine Zaubersprüche
-  {gelb}zaubere{/} <zauber> [ziel]  Einen Zauber sprechen
-  {gelb}farbe{/} an|aus         Farben ein- oder ausschalten
-  {gelb}speichern{/}, {gelb}ende{/}",
-    );
-    if rolle >= Rolle::Baumeister {
-        t.push_str(
-            "
-
-{fett}{hellgelb}Baumeister-Befehle{/}
-  {gelb}neuladen{/}                 Alle Weltdaten neu laden (ohne Neustart)
-  {gelb}pruefen{/}                  Weltdaten prüfen, ohne sie zu laden
-  {gelb}wo{/}                       ID, Koordinaten und Datei des Raums
-  {gelb}springe{/} <raum-id>        Zu einem Raum springen
-  {gelb}erschaffe{/} <gegenstand-id> Einen Gegenstand erschaffen
-  {gelb}beschwoere{/} <monster-id>  Ein Monster herbeirufen
-  {gelb}liste{/} raeume|gegenstaende|monster|fertigkeiten|zauber|gelaende
-  {gelb}zuruecksetzen{/}            Gegenstände und Monster sofort auffüllen",
-        );
+    // hilfe <befehl>: alles über einen Befehl
+    if !rest.is_empty() {
+        let t = match b.aufloesen(rest) {
+            Some(Treffer::Befehl(id)) if darf(&b.rolle(id)) => format!(
+                "{{fett}}{}{{/}}\n  {}\n  {{grau}}Aufruf:{{/}} {}\n  {{grau}}Wörter:{{/}} {}",
+                b.hauptname(id),
+                b.hilfe(id),
+                b.syntax(id),
+                b.woerter(id).join(", ")
+            ),
+            Some(Treffer::Geste(i)) => {
+                let g = &b.gesten[i];
+                format!(
+                    "{{fett}}{}{{/}} (Geste)\n  {}\n  {{grau}}Wörter:{{/}} {}{}",
+                    g.woerter.first().cloned().unwrap_or_default(),
+                    g.hilfe,
+                    g.woerter.join(", "),
+                    if g.selbst_ziel.is_empty() { "" } else { "\n  Auch mit Ziel: z.B. mit dem Namen eines Spielers" }
+                )
+            }
+            _ => "Diesen Befehl kenne ich nicht.".to_string(),
+        };
+        w.sende(sid, &t);
+        return;
     }
-    if rolle >= Rolle::Admin {
-        t.push_str(
-            "
 
-{fett}{hellrot}Admin-Befehle{/}
-  {gelb}rolle{/} <spieler> spieler|baumeister|admin   Rolle vergeben (auch offline)
-  {gelb}rauswerfen{/} <spieler> [grund]   Spieler vom Server werfen
-  {gelb}verkuende{/} <text>               Nachricht an alle
-  {gelb}lehre{/} <spieler> <fertigkeit-/zauber-id> [stufe]
-  {gelb}erfahrung{/} <spieler> <menge>     Erfahrungspunkte geben (zum Testen)
-  {gelb}speichernalle{/}                  Alle Spieler sofort speichern",
-        );
+    let mut t = String::new();
+    for kat in befehlsliste::KATEGORIEN {
+        let zeilen: Vec<String> = befehlsliste::EINGEBAUT
+            .iter()
+            .filter(|e| e.kategorie == *kat && b.aktiv(e.id) && darf(&b.rolle(e.id)))
+            .map(|e| {
+                let syntax = b.syntax(e.id);
+                let kopf = format!("{{gelb}}{}{{/}}", if syntax.is_empty() { b.hauptname(e.id) } else { syntax });
+                format!("  {} {}", text::auffuellen(&kopf, 30), b.hilfe(e.id))
+            })
+            .collect();
+        if zeilen.is_empty() {
+            continue;
+        }
+        let farbe = match *kat {
+            "Baumeister" => "{hellgelb}",
+            "Admin" => "{hellrot}",
+            _ => "",
+        };
+        t.push_str(&format!("\n{{fett}}{farbe}{kat}{{/}}\n{}\n", zeilen.join("\n")));
     }
-    w.sende(sid, &t);
+    let gesten: Vec<String> = b
+        .gesten
+        .iter()
+        .filter(|g| g.aktiv && darf(&g.rolle))
+        .filter_map(|g| g.woerter.first().cloned())
+        .collect();
+    if !gesten.is_empty() {
+        t.push_str(&format!("\n{{fett}}Gesten{{/}}\n  {}\n", gesten.join(", ")));
+    }
+    t.push_str("\n{grau}Mehr zu einem Befehl: hilfe <befehl>{/}");
+    w.sende(sid, t.trim_start());
 }
 
 // ---------------------------------------------------------------------------
@@ -1250,16 +1333,7 @@ fn wirkung_anwenden(w: &mut Welt, sid: u64, art: &str, wert: i32, raum: &str) {
 // Baumeister-Befehle
 // ---------------------------------------------------------------------------
 
-/// Befehle, die nur Admins benutzen dürfen (Baumeister nicht).
-const NUR_ADMIN: &[&str] = &[
-    "rolle", "rauswerfen", "kick", "verkuende", "verkuenden", "lehre", "teach", "speichernalle", "erfahrung",
-];
-
 fn admin_befehl(w: &mut Welt, sid: u64, befehl: &str, rest: &str) -> bool {
-    if NUR_ADMIN.contains(&befehl) && w.spieler[&sid].rolle < Rolle::Admin {
-        w.sende(sid, "Das dürfen nur Admins.");
-        return true;
-    }
     match befehl {
         "rolle" => rolle_vergeben(w, sid, rest),
         "rauswerfen" | "kick" => {

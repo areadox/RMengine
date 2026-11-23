@@ -6,6 +6,7 @@
 id        = "schmied"
 name      = "der Schmied"
 akkusativ = "den Schmied"
+dativ     = "dem Schmied"
 schluesselwoerter = ["schmied", "harald"]
 raumtext  = "Der Schmied hämmert auf ein glühendes Eisen."
 beschreibung = """

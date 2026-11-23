@@ -6,6 +6,7 @@
 id        = "kraemerin"
 name      = "die Krämerin"
 akkusativ = "die Krämerin"
+dativ     = "der Krämerin"
 schluesselwoerter = ["kraemerin", "frau", "greta"]
 raumtext  = "Die Krämerin zählt hinter dem Tresen ihre Münzen."
 beschreibung = "Greta, die Krämerin, ist eine hagere Frau mit flinken Augen und einem Bleistift hinter dem Ohr."

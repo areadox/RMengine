@@ -152,6 +152,7 @@ daten/
   monster/*.toml       Monster und Tiere
   npcs/*.toml          NPCs mit Gesprächen, ein NPC pro Datei
   beschreibungen/      allgemeine Beschreibungen (Bäume, Himmel, Möbel ...)
+  befehle/             Befehle anpassen und eigene Gesten
   fertigkeiten/*.toml  Fertigkeiten
   zauber/*.toml        Zaubersprüche
   oberwelt/            die Landschaft (siehe Abschnitt 6)
@@ -813,7 +814,50 @@ Admins können mit `erfahrung <spieler> <menge>` zum Testen Erfahrung vergeben.
 
 ---
 
-## 11. Fertigkeiten
+## 11. Befehle anpassen und eigene Gesten
+  fertigkeiten/*.toml  Fertigkeiten
+  zauber/*.toml        Zaubersprüche
+  oberwelt/            die Landschaft (siehe Abschnitt 6)
+```
+
+Die Ordner sind nur eine Ordnungshilfe. Der Treiber liest **alle** `.toml`-Dateien
+im Datenordner und in allen Unterordnern, und jede Datei darf jede Art von
+Eintrag enthalten. Du kannst also auch ein ganzes Gebiet mit Räumen, Monstern und
+Gegenständen in eine Datei `gebiete/sumpf.toml` schreiben.
+
+### Grundregeln für TOML-Dateien
+
+```toml
+# Ein Kommentar (wird ignoriert)
+text     = "In Anführungszeichen"
+zahl     = 42
+schalter = true                       # oder false
+liste    = ["eins", "zwei"]
+tabelle  = { nord = "raum_a", ost = "raum_b" }
+langtext = """
+Ein Text über
+mehrere Zeilen."""
+```
+
+`[[raum]]` beginnt einen **neuen** Raum, `[[gegenstand]]` einen neuen Gegenstand
+und so weiter.
+
+### IDs
+
+Jeder Eintrag hat eine `id`. Über die ID verweisen Einträge aufeinander. IDs
+bestehen nur aus Kleinbuchstaben ohne Umlaute, Ziffern und `_`, zum Beispiel
+`alte_eiche` oder `heiltrank2`.
+
+### Farben
+
+In allen Texten kannst du Farben setzen: `"Ein {rot}gefährlicher{/} Ort"`.
+`{/}` schaltet die Farbe wieder aus.
+Verfügbar sind: `rot gruen gelb blau magenta cyan weiss grau schwarz hellrot
+hellgruen hellgelb hellblau hellmagenta hellcyan hellweiss fett`.
+
+---
+
+## 12. Fertigkeiten
 
 ```toml
 [[fertigkeit]]
@@ -829,7 +873,7 @@ beschreibung = "Wunden heilen."
 
 ---
 
-## 12. Zauber
+## 13. Zauber
 
 ```toml
 [[zauber]]
@@ -864,7 +908,7 @@ Mit dem Zaubern übt man die zugehörige Fertigkeit und kann dabei aufsteigen.
 
 ---
 
-## 13. Rollen: Spieler, Baumeister, Admin
+## 14. Rollen: Spieler, Baumeister, Admin
 
 Jede Figur hat eine von drei Rollen:
 
@@ -920,7 +964,7 @@ technische Werte sowie Unterdetails und Sinne eines Details.
 
 ---
 
-## 14. Wenn etwas nicht stimmt
+## 15. Wenn etwas nicht stimmt
 
 Der Treiber prüft beim Laden alles und meldet Fehler mit Datei und Ort, oft mit
 einem Vorschlag:

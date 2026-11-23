@@ -4,7 +4,7 @@
 #  Jeder NPC hat seine eigene Datei mit genau einem [npc].
 #  In einen Raum setzt man ihn mit:  npcs = ["wirt"]
 #
-#  Alle Felder wie bei Monstern (name, beschreibung, sprueche, details ...),
+#  Alle Felder wie bei Monstern (name, akkusativ, dativ, beschreibung, sprueche, details ...),
 #  dazu kommen die Gespräche:
 #
 #  [npc.gespraech]  Antworten auf Standardfragen. Statt eines Textes darf
@@ -32,6 +32,7 @@
 id        = "wirt"
 name      = "der Wirt"
 akkusativ = "den Wirt"
+dativ     = "dem Wirt"
 schluesselwoerter = ["wirt", "mann", "bodo"]
 raumtext  = "Der dicke Wirt poliert hinter der Theke ein Glas."
 beschreibung = """

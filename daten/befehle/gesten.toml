@@ -1,0 +1,88 @@
+# =====================================================================
+#  Gesten: eigene Befehle mit Texten
+# =====================================================================
+#  [[geste]]
+#  woerter     = ["winke", "winken"]      # womit man sie aufruft
+#  hilfe       = "Jemandem zuwinken"      # erscheint in der Hilfe
+#  rolle       = "spieler"                # optional: baumeister, admin
+#
+#  # ohne Ziel ("winke"):
+#  selbst      = "Du winkst."             # was du liest
+#  andere      = "{name} winkt."          # was die anderen im Raum lesen
+#
+#  # mit Ziel ("winke bert" oder "winke wirt"):
+#  selbst_ziel = "Du winkst {ziel_dativ} zu."
+#  ziel        = "{name} winkt dir zu."   # nur, wenn das Ziel ein Spieler ist
+#  andere_ziel = "{name} winkt {ziel_dativ} zu."
+#
+#  {name} = wer die Geste macht
+#  {ziel} = Spieler- oder NPC-Name ("den Wirt"), {ziel_dativ} = "dem Wirt"
+#  Lässt du die *_ziel-Texte weg, gibt es die Geste nur ohne Ziel.
+# =====================================================================
+
+[[geste]]
+woerter     = ["winke", "winken"]
+hilfe       = "Winken oder jemandem zuwinken"
+selbst      = "Du winkst fröhlich."
+andere      = "{name} winkt fröhlich."
+selbst_ziel = "Du winkst {ziel_dativ} zu."
+ziel        = "{name} winkt dir zu."
+andere_ziel = "{name} winkt {ziel_dativ} zu."
+
+[[geste]]
+woerter     = ["verbeuge", "verbeugen", "verneige"]
+hilfe       = "Sich (vor jemandem) verbeugen"
+selbst      = "Du verbeugst dich elegant."
+andere      = "{name} verbeugt sich elegant."
+selbst_ziel = "Du verbeugst dich vor {ziel_dativ}."
+ziel        = "{name} verbeugt sich vor dir."
+andere_ziel = "{name} verbeugt sich vor {ziel_dativ}."
+
+[[geste]]
+woerter     = ["lache", "lachen", "lol"]
+hilfe       = "Lachen (oder jemanden auslachen)"
+selbst      = "Du lachst laut auf."
+andere      = "{name} lacht laut auf."
+selbst_ziel = "Du lachst {ziel} aus."
+ziel        = "{name} lacht dich aus!"
+andere_ziel = "{name} lacht {ziel} aus."
+
+[[geste]]
+woerter     = ["nicke", "nicken"]
+hilfe       = "Nicken"
+selbst      = "Du nickst."
+andere      = "{name} nickt."
+selbst_ziel = "Du nickst {ziel_dativ} zu."
+ziel        = "{name} nickt dir zu."
+andere_ziel = "{name} nickt {ziel_dativ} zu."
+
+[[geste]]
+woerter     = ["seufze", "seufzen"]
+hilfe       = "Tief seufzen"
+selbst      = "Du seufzt tief."
+andere      = "{name} seufzt tief."
+
+[[geste]]
+woerter     = ["grinse", "grinsen"]
+hilfe       = "Grinsen"
+selbst      = "Du grinst breit."
+andere      = "{name} grinst breit."
+selbst_ziel = "Du grinst {ziel} an."
+ziel        = "{name} grinst dich an."
+andere_ziel = "{name} grinst {ziel} an."
+
+[[geste]]
+woerter     = ["umarme", "umarmen", "knuddel", "knuddle"]
+hilfe       = "Jemanden umarmen"
+selbst_ziel = "Du umarmst {ziel} herzlich."
+ziel        = "{name} umarmt dich herzlich."
+andere_ziel = "{name} umarmt {ziel} herzlich."
+
+[[geste]]
+woerter     = ["tanze", "tanzen"]
+hilfe       = "Ein Tänzchen wagen"
+selbst      = "Du tanzt ausgelassen im Kreis."
+andere      = "{name} tanzt ausgelassen im Kreis."
+selbst_ziel = "Du tanzt mit {ziel_dativ}."
+ziel        = "{name} tanzt mit dir!"
+andere_ziel = "{name} tanzt mit {ziel_dativ}."
