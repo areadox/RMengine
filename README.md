@@ -42,7 +42,9 @@ cargo run --release -- --pruefen # nur die Weltdaten prüfen
 ## Eine neue Version veröffentlichen
 
 1. In `Cargo.toml` die `version` erhöhen, z.B. auf `0.2.0`, und committen.
-2. Ein Tag anlegen und hochladen:
+2. Auf GitHub unter **Actions → Release → Run workflow** starten.
+
+   Alternativ ein Tag hochladen:
 
    ```bash
    git tag v0.2.0
