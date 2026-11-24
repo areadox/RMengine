@@ -5,12 +5,15 @@
 //!   rmengine [datenordner] --pruefen  Nur die Weltdaten prüfen
 //!   rmengine --update                 Auf die neueste Version aktualisieren
 //!   rmengine --version                Version anzeigen
+//!   rmengine --fernwartung            Fernwartung für den Welteditor einrichten
 
 mod befehle;
 mod befehlskonfig;
 mod befehlsliste;
 mod beschreibung;
 mod daten;
+mod fernwartung;
+mod fernwartung_protokoll;
 mod gespraech;
 mod kampf;
 mod karte;
@@ -31,6 +34,9 @@ Benutzung:
   rmengine [datenordner] --pruefen   Weltdaten nur prüfen
   rmengine --update                  Neueste Version installieren
   rmengine --version                 Version anzeigen
+  rmengine --fernwartung             Fernwartung für den Welteditor einrichten
+                                     (erzeugt einen neuen Zugangsschlüssel)
+  rmengine --fernwartung-aus         Fernwartung abschalten
   rmengine --keine-updatepruefung    Beim Start nicht nach Updates suchen
 
 Ohne Angabe wird der Ordner 'daten' im aktuellen Verzeichnis benutzt,
@@ -70,6 +76,28 @@ async fn main() {
         .find(|a| !a.starts_with("--"))
         .map(PathBuf::from)
         .unwrap_or_else(datenordner_suchen);
+
+    if hat(&["--fernwartung"]) {
+        match fernwartung::einrichten(&ordner) {
+            Ok(()) => warten_und_beenden(0),
+            Err(e) => {
+                eprintln!("Fernwartung konnte nicht eingerichtet werden: {e}");
+                warten_und_beenden(1);
+            }
+        }
+    }
+    if hat(&["--fernwartung-aus"]) {
+        let pfad = ordner.parent().unwrap_or(std::path::Path::new(".")).join("fernwartung.toml");
+        match std::fs::read_to_string(&pfad) {
+            Ok(t) => {
+                let neu = t.replace("aktiv = true", "aktiv = false");
+                let _ = std::fs::write(&pfad, neu);
+                println!("Fernwartung abgeschaltet (wirkt nach dem nächsten Start).");
+            }
+            Err(_) => println!("Die Fernwartung war nicht eingerichtet."),
+        }
+        warten_und_beenden(0);
+    }
 
     println!("RMengine {}", update::VERSION);
     println!("Lade Weltdaten aus '{}' ...", ordner.display());

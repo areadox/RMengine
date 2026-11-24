@@ -1,6 +1,6 @@
 [package]
 name = "rmengine"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 description = "RMengine – ein datengetriebener MUD-Treiber: Welten werden in TOML-Dateien gebaut, nicht programmiert."
 repository = "https://github.com/areadox/RMengine"
@@ -13,6 +13,10 @@ toml = "0.8"
 sha2 = "0.10"
 rand = "0.8"
 ureq = { version = "2", default-features = false, features = ["tls", "native-certs", "json", "proxy-from-env"] }
+# Fernwartung: verschlüsselte Verbindung zum Welteditor
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"] }
+rcgen = { version = "0.13", default-features = false, features = ["ring", "pem", "crypto"] }
 
 [profile.release]
 strip = true

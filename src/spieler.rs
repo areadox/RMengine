@@ -216,12 +216,12 @@ pub fn speichern(verzeichnis: &Path, sp: &SpielerDaten) -> Result<(), String> {
     fs::rename(&tmp, &pfad).map_err(|e| e.to_string())
 }
 
-fn neues_salz() -> String {
+pub(crate) fn neues_salz() -> String {
     let bytes: [u8; 16] = rand::thread_rng().gen();
     hex(&bytes)
 }
 
-fn passwort_hash(pw: &str, salz: &str) -> String {
+pub(crate) fn passwort_hash(pw: &str, salz: &str) -> String {
     let mut h = Sha256::digest(format!("{salz}:{pw}").as_bytes()).to_vec();
     for _ in 0..20_000 {
         h = Sha256::digest(&h).to_vec();

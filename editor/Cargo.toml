@@ -1,6 +1,6 @@
 [package]
 name = "rmeditor"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 description = "Grafischer Welteditor für RMengine: Räume auf einer Karte bauen, verbinden und beschreiben."
 repository = "https://github.com/areadox/RMengine"
@@ -9,4 +9,9 @@ repository = "https://github.com/areadox/RMengine"
 eframe = { version = "0.37", default-features = false, features = ["default_fonts", "glow", "wayland", "x11"] }
 egui = { version = "0.37", features = ["monochrome_emoji_fonts"] }
 toml_edit = "0.25"
-
+# Update-Funktion und Fernwartung (gemeinsamer Code mit der Engine)
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+ureq = { version = "2", default-features = false, features = ["tls", "native-certs", "json", "proxy-from-env"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }

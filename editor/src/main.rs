@@ -12,10 +12,19 @@ mod bereiche;
 #[allow(dead_code)]
 #[path = "../../src/befehlsliste.rs"]
 mod befehlsliste;
+mod fenster;
+mod fernwartung;
+#[allow(dead_code)]
+#[path = "../../src/fernwartung_protokoll.rs"]
+mod fernwartung_protokoll;
+#[allow(dead_code)]
+#[path = "../../src/update.rs"]
+mod update;
 mod welt;
 mod zauber;
 
 fn main() -> eframe::Result {
+    update::aufraeumen();
     let ordner = app::ordner_suchen(std::env::args().nth(1));
     let optionen = eframe::NativeOptions {
         viewport: eframe::egui::ViewportBuilder::default()

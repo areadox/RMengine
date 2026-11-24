@@ -84,6 +84,7 @@ das Update und veröffentlicht alles als Release.
 - **Tod und Wiederbelebung:** Mitspieler können 5 Minuten lang helfen, sonst (oder mit `aufgeben`) erwacht man im Tempel
 - **Befehle anpassen:** Wörter, Rollen, Hilfetexte und Abschalten über `daten/befehle/`, dazu eigene **Gesten** (`winke`, `verbeuge` …)
 - **Vorlagen und Vererbung** (`erbt = "..."`, `vorlage = true`) für Gegenstände, Monster, NPCs, Zauber, Fertigkeiten und Beschreibungen
+- **Fernwartung:** Server unter Linux, Welteditor am PC – Welt holen, bearbeiten und hochladen, verschlüsselt und mit Prüfung vor dem Übernehmen
 - **Grafischer Welteditor** (`rmeditor`): Räume auf einer Karte anlegen, verschieben, verbinden und beschreiben; Zauber und Befehle/Gesten bearbeiten. Kommentare in den TOML-Dateien bleiben beim Speichern erhalten.
 
 ## Code-Überblick (`src/`)
@@ -102,6 +103,8 @@ das Update und veröffentlicht alles als Release.
 | `beschreibung.rs` | Details, Sinne und Bibliothek                          |
 | `gespraech.rs` | NPC-Gespräche                                              |
 | `kampf.rs`   | Kampf, Stufen, Tod und Wiederbelebung                        |
+| `fernwartung.rs` | Fernwartung: verschlüsselter Zugang für den Welteditor   |
+| `fernwartung_protokoll.rs` | Nachrichten der Fernwartung (auch vom Editor benutzt) |
 | `befehlsliste.rs` | alle eingebauten Befehle (auch vom Editor benutzt)      |
 | `befehlskonfig.rs` | befehle.toml: Anpassungen und Gesten                   |
 
@@ -115,3 +118,5 @@ Der Welteditor (`editor/src/`):
 | `zauber.rs` | Zauber laden, mit Vererbung anzeigen, prüfen und speichern          |
 | `befehle.rs` | Befehle und Gesten laden, prüfen und speichern                     |
 | `bereiche.rs` | Oberfläche der Bereiche Zauber und Befehle                        |
+| `fernwartung.rs` | Verbindung zum Server, Arbeitskopie holen und hochladen       |
+| `fenster.rs` | Fenster „Server“ und „Updates“                                      |

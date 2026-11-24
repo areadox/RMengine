@@ -56,9 +56,18 @@ Rollen vergeben (siehe „Rollen: Spieler, Baumeister, Admin“).
 
 ### Aktualisieren
 
-Beim Start meldet RMengine, wenn es eine neue Version gibt. Aktualisieren kannst
-du so:
+Beim Start meldet RMengine, wenn es eine neue Version gibt. Engine und
+Welteditor haben immer dieselbe Versionsnummer und werden **gemeinsam**
+aktualisiert:
 
+- **Im Welteditor:** oben rechts **⟳ Updates**. Dort wählst du aus, was
+  aktualisiert wird:
+  - der Welteditor selbst,
+  - die Engine auf diesem PC (falls sie neben dem Editor liegt),
+  - die Engine auf dem Server (wenn du über die Fernwartung arbeitest). Der
+    Server speichert dabei alle Spieler und startet mit der neuen Version neu.
+
+  Danach startet der Editor auf Knopfdruck neu.
 - **Windows:** Startmenü → *RMengine* → *Nach Updates suchen*, oder den neuen
   Installer einfach über die alte Version installieren.
 - **Linux:**
@@ -67,9 +76,10 @@ du so:
   rmengine --update
   ```
 
+  Das aktualisiert Engine und Editor zusammen.
+
 Dabei wird nur das Programm ausgetauscht. **Deine Welt im Ordner `daten` und die
-Spielstände im Ordner `spieler` bleiben unverändert.** Beende den Server vor dem
-Update.
+Spielstände im Ordner `spieler` bleiben unverändert.**
 
 ### Für Entwickler
 
@@ -79,7 +89,116 @@ Quellcode mit `cargo run --release` und prüfst die Daten mit
 
 ---
 
-## 2. Befehle für Spieler
+## 2. Server unter Linux, Editor am PC (Fernwartung)
+
+Ein häufiger Aufbau: Die Engine läuft dauerhaft auf einem Linux-Server, und du
+baust die Welt bequem am Windows-PC. Der Welteditor holt dazu die Welt vom
+Server, du bearbeitest sie und lädt die Änderungen wieder hoch.
+
+### 1. Auf dem Server einrichten
+
+```bash
+curl -fsSL https://github.com/areadox/RMengine/releases/latest/download/install.sh | bash
+```
+
+```bash
+rmengine --fernwartung
+```
+
+Das zeigt drei Dinge an. Schreib sie dir auf:
+
+- den **Port** (4001), den du in der Firewall freigeben musst, zusammen mit dem
+  Spielport 4000,
+- den **Zugangsschlüssel** (z.B. `WFRTF-GGZTZ-RK82T-UL2SY-UZD4W`). Er wird nur
+  dieses eine Mal angezeigt,
+- den **Fingerabdruck** des Servers.
+
+Firewall freigeben, zum Beispiel mit `ufw`:
+
+```bash
+sudo ufw allow 4000/tcp
+```
+
+```bash
+sudo ufw allow 4001/tcp
+```
+
+Danach den Server starten (oder neu starten). Im Protokoll steht dann
+„Fernwartung aktiv auf Port 4001“.
+
+### 2. Am PC verbinden
+
+1. Den Welteditor öffnen. Auf der Startseite oder oben rechts
+   **🌐 Server** anklicken.
+2. Adresse des Servers (z.B. `meinserver.de` oder `203.0.113.5`) und den
+   Zugangsschlüssel eintragen. Die Arbeitskopie landet standardmäßig unter
+   *Dokumente\RMengine-Server\<servername>*.
+3. **Verbinden und Welt holen.** Beim ersten Mal zeigt der Editor den
+   Fingerabdruck des Servers. Vergleiche ihn mit dem aus Schritt 1, und nur
+   wenn er übereinstimmt, klickst du auf *Stimmt überein – verbinden*.
+
+### 3. Arbeiten
+
+- Bearbeite die Welt wie gewohnt: Räume, Zauber, Befehle.
+- **⬆ Hochladen** überträgt alle geänderten Dateien. Ungespeicherte Änderungen
+  speichert der Editor vorher selbst. Der Server **prüft die Welt zuerst in
+  einer Kopie**. Nur wenn sie fehlerfrei ist, übernimmt er sie und lädt sie (wenn
+  angehakt) sofort im laufenden Spiel neu. Bei Fehlern bleibt auf dem Server
+  alles, wie es war, und du siehst die Fehlerliste.
+- Hat jemand auf dem Server dieselben Dateien inzwischen geändert, warnt der
+  Editor, bevor er etwas überschreibt.
+- **⬇ Neu vom Server holen** holt den aktuellen Stand. Der Editor warnt, wenn
+  dabei lokale Änderungen verloren gingen.
+- **Auf dem Server prüfen** und **Im Spiel neu laden** wirken direkt auf dem
+  Server.
+
+### Sicherheit
+
+- Die Verbindung ist **verschlüsselt** (TLS). Der Editor prüft bei jeder
+  Verbindung den Fingerabdruck. Meldet er einen *anderen* Fingerabdruck als
+  beim ersten Mal, verbinde dich nicht. Ausnahme: Du hast auf dem Server das
+  Zertifikat bewusst neu erzeugt.
+- Ohne Zugangsschlüssel geht nichts, und falsche Versuche werden ausgebremst.
+  Auf dem Server liegt nur ein Hash des Schlüssels.
+- Über die Fernwartung sind **nur die Welt-Dateien** erreichbar. Spielstände
+  und Programme sind ausgeschlossen.
+- **Neuer Schlüssel:** noch einmal `rmengine --fernwartung` ausführen. Der alte
+  gilt dann nicht mehr.
+- **Abschalten:** `rmengine --fernwartung-aus`.
+- Die Dateien `fernwartung.toml`, `fernwartung.crt` und `fernwartung.key`
+  liegen neben dem Datenordner. `fernwartung.key` darf niemand sonst bekommen.
+
+### Den Server dauerhaft laufen lassen (systemd)
+
+Damit die Engine nach einem Neustart des Servers von selbst startet, legst du
+einen Dienst an. Die Datei `/etc/systemd/system/rmengine.service` (als root;
+`BENUTZER` durch deinen Benutzernamen ersetzen):
+
+```ini
+[Unit]
+Description=RMengine MUD-Server
+After=network-online.target
+
+[Service]
+User=BENUTZER
+WorkingDirectory=/home/BENUTZER/.local/share/rmengine
+ExecStart=/home/BENUTZER/.local/share/rmengine/rmengine --keine-updatepruefung
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl enable --now rmengine
+```
+
+Das Protokoll siehst du mit `journalctl -u rmengine -f`. Updates über den Editor
+funktionieren auch hier: Die Engine tauscht sich aus und startet sich selbst neu.
+
+---
+
+## 3. Befehle für Spieler
 
 Die wichtigsten Befehle zeigt `hilfe`. Zwei davon gehören jeder Figur:
 
@@ -142,7 +261,7 @@ koerper = "Körper"
 
 ---
 
-## 3. Der Aufbau des Datenordners
+## 4. Der Aufbau des Datenordners
 
 ```
 daten/
@@ -156,7 +275,7 @@ daten/
   vorlagen/            Vorlagen, von denen andere Einträge erben
   fertigkeiten/*.toml  Fertigkeiten
   zauber/*.toml        Zaubersprüche
-  oberwelt/            die Landschaft (siehe Abschnitt 6)
+  oberwelt/            die Landschaft (siehe Abschnitt 7)
 ```
 
 Die Ordner sind nur eine Ordnungshilfe. Der Treiber liest **alle** `.toml`-Dateien
@@ -238,7 +357,7 @@ Rüstungen, Tränke, Essen, Raubtiere, Dorfbewohner, Heil- und Kampfzauber.
 
 ---
 
-## 4. Räume und die Karte
+## 5. Räume und die Karte
 
 ```toml
 [[raum]]
@@ -440,7 +559,7 @@ Dateien erhalten. Benennst du einen Raum um, passt er alle Verweise an: Ausgäng
 
 ---
 
-## 5. Ausführlich beschreiben
+## 6. Ausführlich beschreiben
 
 ### Details mit Unterdetails und allen Sinnen
 
@@ -527,7 +646,7 @@ der Bibliothek.
 
 ---
 
-## 6. Die Oberwelt (Landschaft)
+## 7. Die Oberwelt (Landschaft)
 
 Für Städte, Häuser und Höhlen baust du einzelne Räume wie oben. Für das **weite
 Land dazwischen** zeichnest du stattdessen eine Landkarte. Jedes Zeichen darin ist
@@ -652,7 +771,7 @@ der Eigenschaft `landkarte = 1`, Baumeister nicht.
 
 ---
 
-## 7. Gegenstände
+## 8. Gegenstände
 
 ```toml
 [[gegenstand]]
@@ -680,7 +799,7 @@ benutzen_text = "Du trinkst den Trank."
 
 ---
 
-## 8. Monster
+## 9. Monster
 
 ```toml
 [[monster]]
@@ -710,7 +829,7 @@ aufgefüllt.
 
 ---
 
-## 9. NPCs und Gespräche
+## 10. NPCs und Gespräche
 
 Jeder NPC hat seine **eigene Datei** in `daten/npcs/`, zum Beispiel
 `daten/npcs/wirt.toml`, mit genau einem `[npc]`. Er hat alle Felder eines
@@ -767,7 +886,7 @@ Antwort, die mit `*` beginnt, ist eine Handlung („*nickt.“).
 
 ---
 
-## 10. Kampf, Stufen und Tod
+## 11. Kampf, Stufen und Tod
 
 Gekämpft wird **in Echtzeit, ohne Runden**. Jeder Angriff hat eine
 **Erholungszeit**: Mit einem Dolch schlägt man alle 1,3 Sekunden zu, mit einer
@@ -875,7 +994,7 @@ Admins können mit `erfahrung <spieler> <menge>` zum Testen Erfahrung vergeben.
 
 ---
 
-## 11. Befehle anpassen und eigene Gesten
+## 12. Befehle anpassen und eigene Gesten
 
 Alle Befehle lassen sich anpassen, ohne zu programmieren. Die Dateien liegen im
 Ordner `daten/befehle/` (alternativ eine einzelne Datei `daten/befehle.toml`).
@@ -918,7 +1037,7 @@ Baumeister oder Admins gelten, mit `aktiv = false` wird sie abgeschaltet.
 
 ---
 
-## 12. Fertigkeiten
+## 13. Fertigkeiten
 
 ```toml
 [[fertigkeit]]
@@ -934,7 +1053,7 @@ beschreibung = "Wunden heilen."
 
 ---
 
-## 13. Zauber
+## 14. Zauber
 
 ```toml
 [[zauber]]
@@ -969,7 +1088,7 @@ Mit dem Zaubern übt man die zugehörige Fertigkeit und kann dabei aufsteigen.
 
 ---
 
-## 14. Rollen: Spieler, Baumeister, Admin
+## 15. Rollen: Spieler, Baumeister, Admin
 
 Jede Figur hat eine von drei Rollen:
 
@@ -1025,7 +1144,7 @@ technische Werte sowie Unterdetails und Sinne eines Details.
 
 ---
 
-## 15. Wenn etwas nicht stimmt
+## 16. Wenn etwas nicht stimmt
 
 Der Treiber prüft beim Laden alles und meldet Fehler mit Datei und Ort, oft mit
 einem Vorschlag:

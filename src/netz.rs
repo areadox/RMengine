@@ -39,6 +39,9 @@ pub async fn starten(welt: GeteilteWelt) -> io::Result<()> {
         }
     });
 
+    // Fernwartung für den Welteditor (nur, wenn mit --fernwartung eingerichtet)
+    tokio::spawn(crate::fernwartung::starten(welt.clone()));
+
     // Der Kampftakt: mehrmals pro Sekunde, damit Kämpfe in Echtzeit laufen
     let w = welt.clone();
     tokio::spawn(async move {

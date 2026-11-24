@@ -1,6 +1,8 @@
 //! Die Oberfläche des Welteditors.
 
 use crate::befehle::Befehlswerk;
+use crate::fernwartung::Arbeitskopie;
+use crate::fenster::{self, ServerFenster, UpdateFenster};
 use crate::bereiche::{self, BefehlsAuswahl};
 use crate::welt::{self, Problem, Raum, Welt, RICHTUNGEN};
 use crate::zauber::Zauberbuch;
@@ -40,6 +42,8 @@ enum Ziehen {
 }
 
 pub struct App {
+    server_fenster: ServerFenster,
+    update_fenster: UpdateFenster,
     bereich: Bereich,
     zauberbuch: Option<Zauberbuch>,
     befehlswerk: Option<Befehlswerk>,
@@ -93,6 +97,8 @@ impl App {
     pub fn neu(cc: &eframe::CreationContext<'_>, ordner: PathBuf) -> App {
         cc.egui_ctx.set_visuals(egui::Visuals::dark());
         let mut app = App {
+            server_fenster: ServerFenster::default(),
+            update_fenster: UpdateFenster::default(),
             bereich: Bereich::Raeume,
             zauberbuch: None,
             befehlswerk: None,
@@ -532,6 +538,7 @@ impl eframe::App for App {
 
         if self.welt.is_none() {
             egui::CentralPanel::default().show(ui, |ui| self.startseite(ui));
+            self.netz_fenster(&ctx);
             return;
         }
 
@@ -572,6 +579,7 @@ impl eframe::App for App {
             // Prüfung laufend aktualisieren (Änderungen passieren direkt im Formular)
             self.probleme = self.alle_probleme();
             self.fenster(&ctx);
+            self.netz_fenster(&ctx);
             return;
         }
 
@@ -598,6 +606,35 @@ impl eframe::App for App {
             }
         });
         self.fenster(&ctx);
+        self.netz_fenster(&ctx);
+    }
+}
+
+impl App {
+    /// Die Fenster für Fernwartung und Updates.
+    fn netz_fenster(&mut self, ctx: &egui::Context) {
+        let daten = PathBuf::from(self.ordner_eingabe.trim());
+        let ungespeichert = self.geaendert();
+        if self.server_fenster.offen {
+            match self.server_fenster.zeichnen(ctx, &daten, ungespeichert) {
+                Some(fenster::Aktion::Oeffnen(pfad)) => {
+                    self.ordner_eingabe = pfad.display().to_string();
+                    self.auswahl = None;
+                    self.laden();
+                }
+                Some(fenster::Aktion::Speichern) => self.speichern(),
+                None => {}
+            }
+        }
+        if self.update_fenster.offen {
+            let server = self.server_fenster.verbindung(&daten).map(|(_, k, s)| (k, s));
+            if self.update_fenster.zeichnen(ctx, server, ungespeichert) {
+                // Mit der neuen Version neu starten
+                let _ = std::process::Command::new(crate::update::eigener_pfad()).arg(&self.ordner_eingabe).spawn();
+                self.darf_schliessen = true;
+                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+            }
+        }
     }
 }
 
@@ -616,6 +653,20 @@ impl App {
             ui.add_space(8.0);
             ui.colored_label(Color32::from_rgb(240, 110, 110), f);
         }
+        ui.add_space(20.0);
+        ui.separator();
+        ui.add_space(8.0);
+        ui.label(egui::RichText::new("Die Welt liegt auf einem Server?").strong());
+        ui.label("Dann hol sie dir über die Fernwartung auf diesen Rechner, bearbeite sie hier und lade sie wieder hoch.");
+        ui.add_space(4.0);
+        ui.horizontal(|ui| {
+            if ui.button("🌐 Mit einem Server verbinden").clicked() {
+                self.server_fenster.offen = true;
+            }
+            if ui.button("⟳ Nach Updates suchen").clicked() {
+                self.update_fenster.oeffnen(ui.ctx());
+            }
+        });
     }
 
     fn tastatur(&mut self, ctx: &egui::Context) {
@@ -695,10 +746,24 @@ impl App {
                     self.engine_pruefen();
                 }
                 ui.separator();
-                ui.label(egui::RichText::new(&self.ordner_eingabe).weak());
+                // Nur die letzten Ordner zeigen, damit die Knöpfe rechts Platz haben
+                let teile: Vec<&str> = self.ordner_eingabe.split(['/', '\\']).filter(|t| !t.is_empty()).collect();
+                let kurz = if teile.len() > 3 { format!("…/{}", teile[teile.len() - 3..].join("/")) } else { self.ordner_eingabe.clone() };
+                ui.label(egui::RichText::new(kurz).weak()).on_hover_text(&self.ordner_eingabe);
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if ui.button("❓ Hilfe").clicked() {
                         self.zeige_hilfe = !self.zeige_hilfe;
+                    }
+                    if ui.button("⟳ Updates").on_hover_text("Nach einer neuen Version suchen").clicked() {
+                        self.update_fenster.oeffnen(ui.ctx());
+                    }
+                    let server = Arbeitskopie::zu_datenordner(Path::new(self.ordner_eingabe.trim()));
+                    let text = match &server {
+                        Some((_, k)) => format!("🌐 {}", k.adresse),
+                        None => "🌐 Server".to_string(),
+                    };
+                    if ui.button(text).on_hover_text("Fernwartung: Welt von einem Server holen und wieder hochladen").clicked() {
+                        self.server_fenster.offen = !self.server_fenster.offen;
                     }
                 });
             });

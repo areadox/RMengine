@@ -1,6 +1,9 @@
 //! Update-Funktion: prüft auf GitHub, ob es eine neue Version gibt,
-//! und tauscht das Programm aus. Die Weltdaten (Ordner `daten`) und die
+//! und tauscht Programme aus. Die Weltdaten (Ordner `daten`) und die
 //! Spielstände (Ordner `spieler`) werden dabei NIE angefasst.
+//!
+//! Diese Datei benutzen Engine UND Welteditor (dort per `#[path]` eingebunden).
+//! Beide haben dieselbe Versionsnummer.
 
 use std::fs;
 use std::io::{Read, Write};
@@ -9,6 +12,10 @@ use std::time::Duration;
 
 pub const REPO: &str = "areadox/RMengine";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// Die Programme, die zu RMengine gehören.
+pub const ENGINE: &str = "rmengine";
+pub const EDITOR: &str = "rmeditor";
 
 /// Name einer Programmdatei im Release für dieses Betriebssystem,
 /// z.B. programm = "rmengine" -> "rmengine-windows-x86_64.exe".
@@ -22,6 +29,13 @@ fn asset_name(programm: &str) -> Option<String> {
     }
 }
 
+/// Wo liegt ein Programm? Neben dem gerade laufenden.
+pub fn programm_pfad(programm: &str) -> Option<PathBuf> {
+    let name = if cfg!(windows) { format!("{programm}.exe") } else { programm.to_string() };
+    std::env::current_exe().ok().and_then(|p| p.parent().map(|o| o.join(name)))
+}
+
+#[derive(Clone)]
 pub struct Release {
     pub version: String,
     pub notizen: String,
@@ -67,7 +81,7 @@ pub fn neueste_version(zeit: Duration) -> Result<Release, String> {
 }
 
 /// Nur den Abschnitt "## Was ist neu?" aus dem Release-Text.
-fn neuerungen(notizen: &str) -> Option<String> {
+pub fn neuerungen(notizen: &str) -> Option<String> {
     let start = notizen.find("## Was ist neu?")? + "## Was ist neu?".len();
     let rest = &notizen[start..];
     let ende = rest.find("\n## ").unwrap_or(rest.len());
@@ -77,9 +91,7 @@ fn neuerungen(notizen: &str) -> Option<String> {
 
 /// "1.2.10" > "1.2.9"
 pub fn ist_neuer(neu: &str, alt: &str) -> bool {
-    let zahlen = |v: &str| -> Vec<u64> {
-        v.split(['.', '-']).take(3).map(|t| t.parse().unwrap_or(0)).collect()
-    };
+    let zahlen = |v: &str| -> Vec<u64> { v.split(['.', '-']).take(3).map(|t| t.parse().unwrap_or(0)).collect() };
     zahlen(neu) > zahlen(alt)
 }
 
@@ -97,7 +109,46 @@ pub fn beim_start_pruefen() {
     });
 }
 
-/// Der eigentliche Update-Vorgang (`rmengine --update`).
+/// Tauscht die gewählten Programme (z.B. ["rmengine", "rmeditor"]) gegen die Version
+/// aus dem Release aus. Programme, die nicht neben diesem liegen, werden übersprungen.
+/// Gibt die Namen der aktualisierten Programme zurück.
+pub fn programme_aktualisieren(r: &Release, programme: &[&str], melden: &mut dyn FnMut(String)) -> Result<Vec<String>, String> {
+    let mut fertig = Vec::new();
+    for programm in programme {
+        let Some(pfad) = programm_pfad(programm).filter(|p| p.exists()) else {
+            melden(format!("{programm}: liegt nicht hier – übersprungen."));
+            continue;
+        };
+        let name = asset_name(programm).ok_or("Für dieses Betriebssystem gibt es kein automatisches Update.")?;
+        let url = r
+            .dateien
+            .iter()
+            .find(|(n, _)| *n == name)
+            .map(|(_, u)| u.clone())
+            .ok_or_else(|| format!("Im Release fehlt die Datei '{name}'."))?;
+        melden(format!("Lade {name} herunter ..."));
+        let daten = herunterladen(&url)?;
+        if daten.len() < 100_000 {
+            return Err(format!("{name}: Die heruntergeladene Datei ist zu klein – Update abgebrochen."));
+        }
+        programm_ersetzen(&pfad, &daten)?;
+        melden(format!("{programm} aktualisiert."));
+        fertig.push(programm.to_string());
+    }
+    // Anleitung mitaktualisieren (die Weltdaten bleiben unberührt)
+    if let (Some((_, u)), Some(ordner)) = (
+        r.dateien.iter().find(|(n, _)| n == "ANLEITUNG.md"),
+        std::env::current_exe().ok().and_then(|p| p.parent().map(Path::to_path_buf)),
+    ) {
+        if let Ok(text) = herunterladen(u) {
+            let _ = fs::write(ordner.join("ANLEITUNG.md"), text);
+        }
+    }
+    Ok(fertig)
+}
+
+/// Der Update-Vorgang der Engine (`rmengine --update`): Engine und Editor.
+#[allow(dead_code)]
 pub fn aktualisieren() -> Result<(), String> {
     println!("RMengine {VERSION} – suche nach Updates ...");
     let r = neueste_version(Duration::from_secs(20))?;
@@ -109,48 +160,7 @@ pub fn aktualisieren() -> Result<(), String> {
     if let Some(neu) = neuerungen(&r.notizen) {
         println!("Was ist neu?\n{neu}\n");
     }
-
-    let name = asset_name("rmengine").ok_or("Für dieses Betriebssystem gibt es kein automatisches Update.")?;
-    let url = r
-        .dateien
-        .iter()
-        .find(|(n, _)| *n == name)
-        .map(|(_, u)| u.clone())
-        .ok_or_else(|| format!("Im Release fehlt die Datei '{name}'."))?;
-
-    let programm = std::env::current_exe().map_err(|e| format!("Kann das Programm nicht finden: {e}"))?;
-    let ordner = programm.parent().unwrap_or(Path::new(".")).to_path_buf();
-
-    println!("Lade {name} herunter ...");
-    let daten = herunterladen(&url)?;
-    if daten.len() < 100_000 {
-        return Err("Die heruntergeladene Datei ist zu klein – Update abgebrochen.".into());
-    }
-    programm_ersetzen(&programm, &daten)?;
-
-    // Den Welteditor gleich mit aktualisieren, wenn er daneben liegt
-    let editor = ordner.join(if cfg!(windows) { "rmeditor.exe" } else { "rmeditor" });
-    if editor.exists() {
-        let url = asset_name("rmeditor").and_then(|n| r.dateien.iter().find(|(d, _)| *d == n).map(|(_, u)| u.clone()));
-        match url {
-            Some(url) => {
-                println!("Lade den Welteditor herunter ...");
-                match herunterladen(&url).and_then(|d| programm_ersetzen(&editor, &d)) {
-                    Ok(()) => println!("Welteditor aktualisiert."),
-                    Err(e) => println!("Der Welteditor konnte nicht aktualisiert werden: {e}"),
-                }
-            }
-            None => println!("(Im Release gibt es keinen Welteditor für dieses System.)"),
-        }
-    }
-
-    // Anleitung mitaktualisieren (die Weltdaten bleiben unberührt)
-    if let Some((_, u)) = r.dateien.iter().find(|(n, _)| n == "ANLEITUNG.md") {
-        if let Ok(text) = herunterladen(u) {
-            let _ = fs::write(ordner.join("ANLEITUNG.md"), text);
-        }
-    }
-
+    programme_aktualisieren(&r, &[ENGINE, EDITOR], &mut |t| println!("{t}"))?;
     println!("Fertig! RMengine ist jetzt auf Version {}.", r.version);
     println!("Deine Welt im Ordner 'daten' und die Spielstände wurden nicht verändert.");
     Ok(())
@@ -167,7 +177,7 @@ fn herunterladen(url: &str) -> Result<Vec<u8>, String> {
     Ok(daten)
 }
 
-/// Tauscht die laufende Programmdatei aus. Auch unter Windows erlaubt:
+/// Tauscht eine Programmdatei aus. Auch unter Windows erlaubt:
 /// Eine laufende .exe kann man umbenennen, nur nicht überschreiben.
 fn programm_ersetzen(programm: &Path, daten: &[u8]) -> Result<(), String> {
     let neu = mit_endung(programm, "neu");
@@ -196,13 +206,43 @@ fn mit_endung(p: &Path, endung: &str) -> PathBuf {
     PathBuf::from(s)
 }
 
-/// Räumt die Sicherung vom letzten Update weg.
+static START_PFAD: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+
+/// Der Pfad des Programms beim Start. Nach einem Update zeigt `current_exe()` unter
+/// Linux auf die umbenannte alte Datei – für den Neustart brauchen wir aber die neue.
+pub fn eigener_pfad() -> PathBuf {
+    START_PFAD.get().cloned().unwrap_or_else(|| std::env::current_exe().unwrap_or_default())
+}
+
+/// Beim Programmstart aufrufen: merkt sich den eigenen Pfad und
+/// räumt die Sicherungen vom letzten Update weg.
 pub fn aufraeumen() {
     if let Ok(p) = std::env::current_exe() {
-        let _ = fs::remove_file(mit_endung(&p, "alt"));
-        if let Some(o) = p.parent() {
-            let editor = o.join(if cfg!(windows) { "rmeditor.exe" } else { "rmeditor" });
-            let _ = fs::remove_file(mit_endung(&editor, "alt"));
+        let _ = START_PFAD.set(p);
+    }
+    for programm in [ENGINE, EDITOR] {
+        if let Some(p) = programm_pfad(programm) {
+            let _ = fs::remove_file(mit_endung(&p, "alt"));
         }
+    }
+}
+
+/// Startet das laufende Programm neu (mit denselben Argumenten) – nach einem Update.
+#[allow(dead_code)]
+pub fn neustart() -> ! {
+    let programm = eigener_pfad();
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        // exec ersetzt den laufenden Prozess; offene Verbindungen werden dabei geschlossen
+        let fehler = std::process::Command::new(&programm).args(&args).exec();
+        eprintln!("Neustart fehlgeschlagen: {fehler}");
+        std::process::exit(1);
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = std::process::Command::new(&programm).args(&args).spawn();
+        std::process::exit(0);
     }
 }
