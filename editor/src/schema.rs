@@ -110,7 +110,8 @@ impl Art {
 
 pub const GEGENSTAND_TYPEN: &[&str] =
     &["waffe", "ruestung", "trank", "nahrung", "schluessel", "werkzeug", "schmuck", "behaelter", "sonstiges"];
-pub const PLAETZE: &[&str] = &["waffe", "schild", "kopf", "koerper", "haende", "beine", "fuesse", "hals", "ring", "umhang", "licht"];
+pub const PLAETZE: &[&str] =
+    &["waffe", "schild", "kopf", "koerper", "haende", "beine", "fuesse", "hals", "ring", "umhang", "licht", "ruecken", "guertel"];
 pub const ZIELE: &[&str] = &["selbst", "spieler", "gegner", "raum"];
 pub const ZAUBER_TYPEN: &[&str] = &["zauber", "technik"];
 pub const WIRKUNGEN: &[&str] =
@@ -163,6 +164,7 @@ const GEGENSTAND: &[Feld] = felder![
     f("id", "ID", Typ::Text, "Eindeutiger Name in der Datei, nur Kleinbuchstaben, Ziffern und _."),
     f("name", "Name", Typ::Text, "Mit Artikel, z.B. \"ein roter Apfel\"."),
     f("akkusativ", "Akkusativ", Typ::Text, "\"Du nimmst ...\", z.B. \"einen roten Apfel\"."),
+    f("dativ", "Dativ", Typ::Text, "Behälter mit Adjektiv: \"einer bestickten Tasche\" (für \"aus der bestickten Tasche\")."),
     f("beschreibung", "Beschreibung", Typ::Mehrzeilig, ""),
     f("bodentext", "Text am Boden", Typ::Text, "z.B. \"Ein Apfel liegt im Gras.\""),
     f("schluesselwoerter", "Schlüsselwörter", Typ::Liste, "Wörter, mit denen man ihn anspricht."),
@@ -175,6 +177,10 @@ const GEGENSTAND: &[Feld] = felder![
     f("fertigkeit", "Fertigkeit", Typ::Verweis(Ziel::Fertigkeit), "Waffe: welche Fertigkeit geübt wird."),
     f("eigenschaften", "Eigenschaften", Typ::Werte(EIGENSCHAFTEN), "schaden, ruestung, heilung, mana oder Werte wie staerke."),
     f("benutzen_text", "Text beim Benutzen", Typ::Text, ""),
+    f("fassungsvermoegen", "Behälter: fasst", Typ::Zahl, "So viel Gewicht passt hinein. Leer/0 = kein Behälter."),
+    f("max_dinge", "Behälter: höchstens Dinge", Typ::Zahl, "Leer = beliebig viele."),
+    f("gewicht_reduktion", "Behälter: leichter %", Typ::Zahl, "Der Inhalt wiegt so viel Prozent weniger (0 bis 100)."),
+    f("nur_typen", "Behälter: nur Typen", Typ::Liste, "z.B. trank (leer = alles passt hinein)"),
     SINNE[0], SINNE[1], SINNE[2], SINNE[3],
     f("details", "Details", Typ::Details, "Was man genauer ansehen kann."),
     VERERBUNG[0], VERERBUNG[1],
@@ -382,6 +388,8 @@ const WELT: &[Feld] = felder![
     f("baumeister", "Baumeister", Typ::Liste, ""),
     f("waehrung", "Name des Geldes", Typ::Text, "z.B. Gold, Taler"),
     f("max_berufe", "Berufe höchstens", Typ::Zahl, ""),
+    f("tragkraft_basis", "Tragkraft", Typ::Zahl, "So viel Gewicht trägt jeder (beide 0 = unbegrenzt)."),
+    f("tragkraft_pro_staerke", "Tragkraft pro Stärke", Typ::Zahl, "Plus so viel pro Punkt Stärke."),
     f("karte_beim_umsehen", "Karte beim Umsehen", Typ::Schalter, ""),
     f("karten_radius", "Kartengröße", Typ::Zahl, "Räume in jede Richtung."),
     f("karte_daneben", "Text neben der Karte", Typ::Schalter, ""),

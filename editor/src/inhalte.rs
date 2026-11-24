@@ -558,7 +558,7 @@ fn wortliste(ui: &mut egui::Ui, id: egui::Id, liste: &[String], hinweis: &str) -
     if zerlegen(&puffer) != liste {
         puffer = verbunden;
     }
-    let a = ui.add(egui::TextEdit::singleline(&mut puffer).hint_text(hinweis).desired_width(f32::INFINITY));
+    let a = crate::kontext::feld(ui, egui::TextEdit::singleline(&mut puffer).hint_text(hinweis).desired_width(f32::INFINITY));
     ui.data_mut(|d| d.insert_temp(id, puffer.clone()));
     let neu = zerlegen(&puffer);
     (a.changed() && neu != liste).then_some(neu)
@@ -597,7 +597,7 @@ fn zahl_feld(ui: &mut egui::Ui, id: egui::Id, item: Option<&Item>, komma: bool, 
     if !ok {
         feld = feld.text_color(ROT);
     }
-    let a = ui.add(feld);
+    let a = crate::kontext::feld(ui, feld);
     ui.data_mut(|d| d.insert_temp(id, puffer.clone()));
     if !ok {
         ui.label(RichText::new("keine Zahl").color(ROT).small());
@@ -643,7 +643,7 @@ fn feld_zeigen(ui: &mut egui::Ui, ctx: &mut Kontext, t: &mut dyn TableLike, feld
                 } else {
                     egui::TextEdit::singleline(&mut v)
                 };
-                if ui.add(edit.hint_text(&hinweis).desired_width(f32::INFINITY)).changed() {
+                if crate::kontext::feld(ui, edit.hint_text(&hinweis).desired_width(f32::INFINITY)).changed() {
                     text_setzen(t, feld.name, &v);
                     geaendert = true;
                 }
@@ -658,7 +658,7 @@ fn feld_zeigen(ui: &mut egui::Ui, ctx: &mut Kontext, t: &mut dyn TableLike, feld
                     None => String::new(),
                 };
                 let hinweis = if hinweis.is_empty() { "Mehrere Zeilen = zufällige Auswahl".to_string() } else { hinweis.clone() };
-                if ui.add(egui::TextEdit::multiline(&mut v).desired_rows(2).hint_text(hinweis).desired_width(f32::INFINITY)).changed() {
+                if crate::kontext::feld(ui, egui::TextEdit::multiline(&mut v).desired_rows(2).hint_text(hinweis).desired_width(f32::INFINITY)).changed() {
                     let zeilen: Vec<String> = v.lines().map(|z| z.trim().to_string()).filter(|z| !z.is_empty()).collect();
                     match zeilen.len() {
                         0 => {
@@ -811,9 +811,9 @@ fn feld_zeigen(ui: &mut egui::Ui, ctx: &mut Kontext, t: &mut dyn TableLike, feld
                 let mut v = von.map(|x| x.to_string()).unwrap_or_default();
                 let mut b = bis.map(|x| x.to_string()).unwrap_or_default();
                 ui.label("von");
-                let a1 = ui.add(egui::TextEdit::singleline(&mut v).desired_width(60.0).hint_text(&hinweis));
+                let a1 = crate::kontext::feld(ui, egui::TextEdit::singleline(&mut v).desired_width(60.0).hint_text(&hinweis));
                 ui.label("bis");
-                let a2 = ui.add(egui::TextEdit::singleline(&mut b).desired_width(60.0));
+                let a2 = crate::kontext::feld(ui, egui::TextEdit::singleline(&mut b).desired_width(60.0));
                 if a1.changed() || a2.changed() {
                     match (v.trim().parse::<i64>().ok(), b.trim().parse::<i64>().ok()) {
                         (None, None) => {
@@ -899,7 +899,7 @@ fn werte_zeigen(
             // Eigene Namen (z.B. neue Eigenschaften) eintippen
             let pid = id.with("eigen");
             let mut eigen: String = ui.data_mut(|d| d.get_temp::<String>(pid)).unwrap_or_default();
-            let a = ui.add(egui::TextEdit::singleline(&mut eigen).hint_text("eigener Name").desired_width(100.0));
+            let a = crate::kontext::feld(ui, egui::TextEdit::singleline(&mut eigen).hint_text("eigener Name").desired_width(100.0));
             if a.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) && !eigen.trim().is_empty() {
                 neu.push((eigen.trim().to_string(), 1));
                 eigen.clear();
@@ -1127,7 +1127,7 @@ fn details_zeigen(ui: &mut egui::Ui, ctx: &mut Kontext, t: &mut dyn TableLike, f
                     });
                     if tl.get(name).is_some_and(|i| i.is_str()) {
                         let mut v = tl.get(name).and_then(|i| i.as_str()).unwrap_or_default().to_string();
-                        if ui.add(egui::TextEdit::multiline(&mut v).desired_rows(2).desired_width(f32::INFINITY)).changed() {
+                        if crate::kontext::feld(ui, egui::TextEdit::multiline(&mut v).desired_rows(2).desired_width(f32::INFINITY)).changed() {
                             setzen(tl, name, text_wert(&v));
                             geaendert = true;
                         }
@@ -1153,7 +1153,7 @@ fn details_zeigen(ui: &mut egui::Ui, ctx: &mut Kontext, t: &mut dyn TableLike, f
             ui.horizontal(|ui| {
                 pfad_id = pfad_id.with("name");
                 let mut neu: String = ui.data_mut(|d| d.get_temp::<String>(pfad_id)).unwrap_or_default();
-                ui.add(egui::TextEdit::singleline(&mut neu).hint_text("neues Detail, z.B. brunnen").desired_width(180.0));
+                crate::kontext::feld(ui, egui::TextEdit::singleline(&mut neu).hint_text("neues Detail, z.B. brunnen").desired_width(180.0));
                 let name = neu.trim().to_lowercase();
                 if ui.add_enabled(!name.is_empty() && !namen.contains(&name), egui::Button::new("+ Detail")).clicked() {
                     if t.get(feld.name).is_none() {
@@ -1240,7 +1240,7 @@ impl Inhalte {
                 }
             }
         });
-        ui.add(egui::TextEdit::singleline(&mut self.suche).hint_text("Suchen …").desired_width(f32::INFINITY));
+        crate::kontext::feld(ui, egui::TextEdit::singleline(&mut self.suche).hint_text("Suchen …").desired_width(f32::INFINITY));
         ui.separator();
         let such = self.suche.to_lowercase();
         let orte = self.orte(art);
@@ -1258,9 +1258,33 @@ impl Inhalte {
                 let vorlage = self.tabelle(art, o).and_then(|t| t.get("vorlage")).and_then(|i| i.as_bool()) == Some(true);
                 let text = if name.is_empty() { id.clone() } else { format!("{name}  ({id})") };
                 let text = if vorlage { RichText::new(format!("{text} [Vorlage]")).italics() } else { RichText::new(text) };
-                if ui.selectable_label(self.auswahl == Some(o), text).clicked() {
+                let eintrag = ui.selectable_label(self.auswahl == Some(o), text);
+                if eintrag.clicked() {
                     self.auswahl = Some(o);
                 }
+                eintrag.context_menu(|ui| {
+                    if ui.button("Kopie anlegen").clicked() {
+                        self.auswahl = Some(o);
+                        let datei = self.dateien[o.datei].rel.clone();
+                        let datei = if art.ablage == Ablage::EineDatei { format!("{}/{id}_kopie.toml", art.ordner) } else { datei };
+                        self.neu = Some(NeuDialog { id: format!("{id}_kopie"), datei, kopie_von: Some(o) });
+                        ui.close();
+                    }
+                    if ui.button("📋 ID kopieren").on_hover_text("Zum Einfügen in andere Felder, z.B. bei Räumen").clicked() {
+                        ui.ctx().copy_text(id.clone());
+                        ui.close();
+                    }
+                    if !name.is_empty() && ui.button("Name kopieren").clicked() {
+                        ui.ctx().copy_text(name.clone());
+                        ui.close();
+                    }
+                    ui.separator();
+                    if ui.button("🗑 Löschen …").clicked() {
+                        self.auswahl = Some(o);
+                        self.loeschen_fragen = Some(o);
+                        ui.close();
+                    }
+                });
             }
         });
     }
@@ -1347,7 +1371,7 @@ impl Inhalte {
                 .show(ui.ctx(), |ui| {
                     ui.horizontal(|ui| {
                         ui.label("ID:");
-                        ui.add(egui::TextEdit::singleline(&mut d.id).hint_text("z.B. eisenschwert").desired_width(200.0));
+                        crate::kontext::feld(ui, egui::TextEdit::singleline(&mut d.id).hint_text("z.B. eisenschwert").desired_width(200.0));
                     });
                     let gueltig = crate::welt::id_gueltig(&d.id);
                     let vergeben = self.ids_von(&[art.schluessel], true).contains(&d.id)
@@ -1372,7 +1396,7 @@ impl Inhalte {
                         });
                         ui.horizontal(|ui| {
                             ui.label("oder neue Datei:");
-                            ui.add(egui::TextEdit::singleline(&mut d.datei).desired_width(260.0));
+                            crate::kontext::feld(ui, egui::TextEdit::singleline(&mut d.datei).desired_width(260.0));
                         });
                         if !d.datei.ends_with(".toml") {
                             ui.label(RichText::new("Der Dateiname muss auf .toml enden.").color(ROT));

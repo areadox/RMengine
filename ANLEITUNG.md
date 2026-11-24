@@ -605,6 +605,10 @@ automatisch mit aktualisiert.
   Dort kannst du `ow:x:y` oder `x = … / y = …` kopieren oder das Feld direkt als
   Ausgang `raus` des zuletzt gewählten Raums eintragen.
 - **Strg+S** speichert, **Strg+Z** macht rückgängig, **Strg+Y** stellt wieder her.
+- **Rechtsklick** in ein Textfeld: Ausschneiden, Kopieren, Einfügen, Alles
+  markieren, Alles kopieren, Rückgängig. Rechtsklick auf einen Raum in der
+  Liste oder auf der Karte und auf Einträge unter 📚 Inhalte: ID kopieren,
+  Name kopieren, Kopie anlegen, Löschen und mehr.
 
 Oben schaltest du zwischen drei Bereichen um:
 
@@ -874,11 +878,45 @@ benutzen_text = "Du trinkst den Trank."
 ```
 
 - **typ:** `waffe ruestung trank nahrung schluessel werkzeug schmuck behaelter sonstiges`
-- **platz:** `waffe schild kopf koerper haende beine fuesse hals ring umhang licht`
-- **eigenschaften:** Hier darfst du beliebige Zahlen eintragen. Schon jetzt
-  wirken `heilung` und `mana`: Gegenstände mit diesen Eigenschaften kann man
-  benutzen, und sie werden dabei verbraucht. Werte wie `schaden` oder `ruestung`
-  wertet später das Kampfsystem aus.
+- **platz:** `waffe schild kopf koerper haende beine fuesse hals ring umhang licht ruecken guertel`
+- **eigenschaften:** Hier darfst du beliebige Zahlen eintragen. `heilung` und
+  `mana` machen einen Gegenstand benutzbar (er wird dabei verbraucht),
+  `schaden` und `ruestung` zählen im Kampf, Werte wie `staerke` erhöhen den Wert,
+  solange man den Gegenstand angelegt hat.
+
+### Behälter: Taschen, Beutel und Rucksäcke
+
+Ein Gegenstand mit `fassungsvermoegen` ist ein Behälter. Was darin liegt, wiegt
+um `gewicht_reduktion` Prozent weniger. In `vorlagen/gegenstaende.toml` gibt es
+die Vorlagen `vorlage_behaelter` und `vorlage_rucksack`.
+
+```toml
+[[gegenstand]]
+id   = "rucksack"
+erbt = "vorlage_rucksack"
+name = "ein Rucksack"
+akkusativ = "einen Rucksack"
+platz = "ruecken"           # kann man anlegen (muss man aber nicht)
+fassungsvermoegen = 40      # so viel Gewicht passt hinein
+max_dinge         = 0       # höchstens so viele Dinge (0 = beliebig)
+gewicht_reduktion = 25      # der Inhalt wiegt 25 % weniger
+nur_typen = []              # z.B. ["trank"] für einen Trankgürtel
+dativ = ""                  # nur bei Adjektiven nötig: "einer bestickten Tasche"
+```
+
+Im Spiel: `stecke brot in rucksack`, `stecke alles in rucksack`,
+`nimm brot aus rucksack`, `nimm alles aus rucksack`, `schau rucksack`.
+`inventar` zeigt den Inhalt aller Behälter. Einen gefüllten Behälter kann
+man nicht ablegen oder verkaufen. Behälter lassen sich nicht ineinander stecken.
+
+### Tragkraft
+
+Jede Figur kann nur so viel tragen: `tragkraft_basis + Stärke ×
+tragkraft_pro_staerke` (in `welt.toml`, Standard 40 + 3 je Stärkepunkt).
+Gezählt wird alles: Gepäck, angelegte Ausrüstung und der Inhalt von Behältern,
+abzüglich ihrer Gewichtsreduktion. Wer zu viel trägt, kann nichts mehr aufheben
+oder kaufen. Mit `tragkraft_basis = 0` und `tragkraft_pro_staerke = 0` gibt es
+keine Grenze.
 
 ---
 

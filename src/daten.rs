@@ -197,6 +197,10 @@ pub struct WeltConfig {
     pub karten_fertigkeit_max: i32,
     /// Wie viele Berufe man gleichzeitig haben darf
     pub max_berufe: u32,
+    /// Tragkraft: so viel Gewicht trägt jeder ...
+    pub tragkraft_basis: i32,
+    /// ... und so viel mehr pro Punkt Stärke (beides 0 = unbegrenzt)
+    pub tragkraft_pro_staerke: i32,
 }
 
 impl Default for WeltConfig {
@@ -226,6 +230,8 @@ impl Default for WeltConfig {
             karten_fertigkeit_stufen: 20,
             karten_fertigkeit_max: 3,
             max_berufe: 2,
+            tragkraft_basis: 40,
+            tragkraft_pro_staerke: 3,
         }
     }
 }
@@ -450,6 +456,9 @@ pub struct GegenstandDef {
     /// Wie der Name nach "Du nimmst ..." heißt, z.B. "einen roten Apfel".
     #[serde(default)]
     pub akkusativ: String,
+    /// "aus einem roten Beutel" – für Behälter (leer = aus dem Namen geraten)
+    #[serde(default)]
+    pub dativ: String,
     #[serde(default)]
     pub beschreibung: String,
     #[serde(default)]
@@ -476,6 +485,18 @@ pub struct GegenstandDef {
     pub eigenschaften: BTreeMap<String, i32>,
     #[serde(default)]
     pub benutzen_text: String,
+    /// Behälter: so viel Gewicht passt hinein (0 = kein Behälter)
+    #[serde(default)]
+    pub fassungsvermoegen: i32,
+    /// Behälter: höchstens so viele Dinge (0 = beliebig viele)
+    #[serde(default)]
+    pub max_dinge: u32,
+    /// Behälter: um so viel Prozent wird der Inhalt leichter (z.B. 50)
+    #[serde(default)]
+    pub gewicht_reduktion: u32,
+    /// Behälter: nur diese Typen passen hinein, z.B. ["trank"] (leer = alles)
+    #[serde(default)]
+    pub nur_typen: Vec<String>,
     #[serde(default)]
     pub details: BTreeMap<String, Detail>,
     /// Was man riecht, hört und fühlt (Befehle riech, hoer, taste)
@@ -950,8 +971,9 @@ fn wahr() -> bool {
 
 pub const GEGENSTAND_TYPEN: &[&str] =
     &["waffe", "ruestung", "trank", "nahrung", "schluessel", "werkzeug", "schmuck", "behaelter", "sonstiges"];
-pub const PLAETZE: &[&str] =
-    &["waffe", "schild", "kopf", "koerper", "haende", "beine", "fuesse", "hals", "ring", "umhang", "licht"];
+pub const PLAETZE: &[&str] = &[
+    "waffe", "schild", "kopf", "koerper", "haende", "beine", "fuesse", "hals", "ring", "umhang", "licht", "ruecken", "guertel",
+];
 pub const ZAUBER_ZIELE: &[&str] = &["selbst", "spieler", "gegner", "raum"];
 pub const WIRKUNGEN: &[&str] = &[
     "heilen", "mana", "ausdauer", "schaden", "teleport", "schild", "ruestung", "bonus", "kraft", "tempo", "betaeuben",
@@ -1804,6 +1826,17 @@ fn pruefen(d: &mut Daten, fehler: &mut Vec<String>, warn: &mut Vec<String>) {
         }
         if !g.platz.is_empty() && !PLAETZE.contains(&g.platz.as_str()) {
             warn.push(format!("{wo}: unbekannter Platz '{}'. Bekannt: {}", g.platz, PLAETZE.join(", ")));
+        }
+        if g.fassungsvermoegen < 0 || g.gewicht_reduktion > 100 {
+            fehler.push(format!("{wo}: 'fassungsvermoegen' darf nicht negativ sein, 'gewicht_reduktion' ist 0 bis 100 (Prozent)."));
+        }
+        if g.fassungsvermoegen == 0 && (g.max_dinge > 0 || g.gewicht_reduktion > 0 || !g.nur_typen.is_empty()) {
+            warn.push(format!("{wo}: hat Behälter-Angaben, aber kein 'fassungsvermoegen' – es passt nichts hinein."));
+        }
+        for t in &g.nur_typen {
+            if !GEGENSTAND_TYPEN.contains(&t.as_str()) {
+                warn.push(format!("{wo}: unbekannter Typ '{t}' in nur_typen."));
+            }
         }
         if (g.typ == "waffe" || g.typ == "ruestung") && g.platz.is_empty() {
             warn.push(format!("{wo}: ist eine {} ohne 'platz' und kann darum nicht angelegt werden.", g.typ));

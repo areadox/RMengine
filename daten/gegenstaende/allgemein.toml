@@ -103,3 +103,53 @@ schluesselwoerter = ["karte", "landkarte"]
 beschreibung = "Eine abgegriffene Karte des Landes. Mit 'weltkarte' kannst du sie ansehen."
 eigenschaften = { landkarte = 1 }
 wert = 15
+
+# ---------------------------------------------------------------------
+#  Behälter (Vorlagen in vorlagen/gegenstaende.toml)
+# ---------------------------------------------------------------------
+
+[[gegenstand]]
+id   = "lederbeutel"
+erbt = "vorlage_behaelter"
+name = "ein Lederbeutel"
+akkusativ = "einen Lederbeutel"
+schluesselwoerter = ["beutel", "lederbeutel"]
+beschreibung = "Ein kleiner Beutel aus weichem Leder mit einer Kordel."
+fassungsvermoegen = 8
+max_dinge = 10
+wert = 5
+
+[[gegenstand]]
+id   = "rucksack"
+erbt = "vorlage_rucksack"
+name = "ein Rucksack"
+akkusativ = "einen Rucksack"
+schluesselwoerter = ["rucksack"]
+beschreibung = "Ein robuster Rucksack aus gewachstem Segeltuch. Gut gepackt trägt er sich leichter."
+wert = 30
+
+[[gegenstand]]
+id   = "trankguertel"
+erbt = "vorlage_behaelter"
+name = "ein Trankgürtel"
+akkusativ = "einen Trankgürtel"
+schluesselwoerter = ["guertel", "trankguertel"]
+beschreibung = "Ein Gürtel mit sechs Schlaufen für kleine Fläschchen."
+platz = "guertel"
+fassungsvermoegen = 6
+max_dinge = 6
+nur_typen = ["trank"]
+gewicht_reduktion = 50
+wert = 20
+
+[[gegenstand]]
+id   = "zaubertasche"
+erbt = "vorlage_behaelter"
+name = "eine bestickte Zaubertasche"
+akkusativ = "eine bestickte Zaubertasche"
+dativ     = "einer bestickten Zaubertasche"   # "aus der bestickten Zaubertasche"
+schluesselwoerter = ["tasche", "zaubertasche"]
+beschreibung = "Silberne Runen glimmen auf dem Stoff. Was man hineinsteckt, wiegt fast nichts."
+fassungsvermoegen = 30
+gewicht_reduktion = 80
+wert = 150

@@ -707,7 +707,13 @@ fn spieler_stirbt(w: &mut Welt, sid: u64) {
         s.sp.erfahrung -= s.sp.erfahrung * k.tod_ep_verlust_prozent.min(100) as u64 / 100;
     }
     let fallen: Vec<String> =
-        if k.tod_gegenstaende == "fallen_lassen" { s.sp.inventar.drain(..).collect() } else { Vec::new() };
+        if k.tod_gegenstaende == "fallen_lassen" {
+            let mut alles: Vec<String> = s.sp.inventar.drain(..).collect();
+            alles.extend(crate::behaelter::alles_ausleeren(&mut s.sp));
+            alles
+        } else {
+            Vec::new()
+        };
     let (name, raum) = (s.sp.name.clone(), s.sp.raum.clone());
     let ort = w.d.raum(&raum).map(|r| r.name.clone()).unwrap_or_default();
     if !fallen.is_empty() {

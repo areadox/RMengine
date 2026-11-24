@@ -15,6 +15,7 @@ mod befehlsliste;
 mod fenster;
 mod fernwartung;
 mod inhalte;
+mod kontext;
 mod schema;
 #[allow(dead_code)]
 #[path = "../../src/fernwartung_protokoll.rs"]

@@ -176,7 +176,7 @@ impl ServerFenster {
                     ui.horizontal(|ui| {
                         ui.label("Zugangsschlüssel:");
                         let mut s = if self.schluessel.is_empty() { schluessel.clone() } else { self.schluessel.clone() };
-                        if ui.add(egui::TextEdit::singleline(&mut s).password(true).desired_width(260.0)).changed() {
+                        if crate::kontext::feld(ui, egui::TextEdit::singleline(&mut s).password(true).desired_width(260.0)).changed() {
                             self.schluessel = s;
                         }
                     });
@@ -264,15 +264,15 @@ impl ServerFenster {
                     ui.add_space(6.0);
                     egui::Grid::new("server_grid").num_columns(2).spacing([8.0, 6.0]).show(ui, |ui| {
                         ui.label("Adresse:");
-                        if ui.add(egui::TextEdit::singleline(&mut self.adresse).hint_text("meinserver.de oder 1.2.3.4 (Port 4001)").desired_width(320.0)).changed() && !self.adresse.is_empty() {
+                        if crate::kontext::feld(ui, egui::TextEdit::singleline(&mut self.adresse).hint_text("meinserver.de oder 1.2.3.4 (Port 4001)").desired_width(320.0)).changed() && !self.adresse.is_empty() {
                             self.ordner = fw::standard_ordner(&self.adresse).display().to_string();
                         }
                         ui.end_row();
                         ui.label("Zugangsschlüssel:");
-                        ui.add(egui::TextEdit::singleline(&mut self.schluessel).password(true).hint_text("XXXXX-XXXXX-…").desired_width(320.0));
+                        crate::kontext::feld(ui, egui::TextEdit::singleline(&mut self.schluessel).password(true).hint_text("XXXXX-XXXXX-…").desired_width(320.0));
                         ui.end_row();
                         ui.label("Arbeitskopie:");
-                        ui.add(egui::TextEdit::singleline(&mut self.ordner).desired_width(320.0));
+                        crate::kontext::feld(ui, egui::TextEdit::singleline(&mut self.ordner).desired_width(320.0));
                         ui.end_row();
                     });
                     ui.checkbox(&mut self.merken, "Schlüssel auf diesem PC merken");

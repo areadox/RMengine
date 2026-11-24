@@ -513,6 +513,8 @@ fn abdunkeln(c: Color32, f: f32) -> Color32 {
 impl eframe::App for App {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
+        // Aktionen aus dem Rechtsklick-Menü der Textfelder (Ausschneiden, Rückgängig ...)
+        crate::kontext::ereignisse_einspielen(&ctx);
 
         // Schließen mit ungespeicherten Änderungen
         if ctx.input(|i| i.viewport().close_requested()) && self.geaendert() && !self.darf_schliessen {
@@ -637,7 +639,7 @@ impl App {
         ui.add_space(8.0);
         ui.label("Datenordner (der Ordner mit welt.toml):");
         ui.horizontal(|ui| {
-            let r = ui.add(egui::TextEdit::singleline(&mut self.ordner_eingabe).desired_width(400.0));
+            let r = crate::kontext::feld(ui, egui::TextEdit::singleline(&mut self.ordner_eingabe).desired_width(400.0));
             if ui.button("Öffnen").clicked() || (r.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter))) {
                 self.laden();
             }
@@ -856,7 +858,7 @@ impl App {
         ui.separator();
 
         ui.strong("Räume");
-        ui.add(egui::TextEdit::singleline(&mut self.suche).hint_text("🔍 Suchen …"));
+        crate::kontext::feld(ui, egui::TextEdit::singleline(&mut self.suche).hint_text("🔍 Suchen …"));
         let suche = self.suche.to_lowercase();
         let mut springen = None;
         egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
@@ -874,11 +876,22 @@ impl App {
                         for (id, name) in raeume {
                             let gewaehlt = self.auswahl.as_deref() == Some(id.as_str());
                             let start = if self.welt().startraum == id { "★ " } else { "" };
-                            if ui
-                                .selectable_label(gewaehlt, format!("{start}{name}"))
-                                .on_hover_text(&id)
-                                .clicked()
-                            {
+                            let eintrag = ui.selectable_label(gewaehlt, format!("{start}{name}")).on_hover_text(&id);
+                            eintrag.context_menu(|ui| {
+                                if ui.button("Hinspringen").clicked() {
+                                    springen = Some(id.clone());
+                                    ui.close();
+                                }
+                                if ui.button("📋 ID kopieren").clicked() {
+                                    ui.ctx().copy_text(id.clone());
+                                    ui.close();
+                                }
+                                if ui.button("Name kopieren").clicked() {
+                                    ui.ctx().copy_text(name.clone());
+                                    ui.close();
+                                }
+                            });
+                            if eintrag.clicked() {
                                 springen = Some(id);
                             }
                         }
@@ -917,7 +930,7 @@ impl App {
         egui::Grid::new("felder").num_columns(2).spacing([8.0, 6.0]).show(ui, |ui| {
             ui.label("ID");
             ui.vertical(|ui| {
-                let rid = ui.add(egui::TextEdit::singleline(&mut self.id_eingabe).desired_width(200.0));
+                let rid = crate::kontext::feld(ui, egui::TextEdit::singleline(&mut self.id_eingabe).desired_width(200.0));
                 if rid.lost_focus() && self.id_eingabe != r.id {
                     let neu = self.id_eingabe.trim().to_string();
                     let alt = r.id.clone();
@@ -942,12 +955,12 @@ impl App {
             ui.end_row();
 
             ui.label("Name");
-            ui.add(egui::TextEdit::singleline(&mut r.name).desired_width(f32::INFINITY));
+            crate::kontext::feld(ui, egui::TextEdit::singleline(&mut r.name).desired_width(f32::INFINITY));
             ui.end_row();
 
             ui.label("Gebiet");
             ui.horizontal(|ui| {
-                ui.add(egui::TextEdit::singleline(&mut r.gebiet).desired_width(150.0));
+                crate::kontext::feld(ui, egui::TextEdit::singleline(&mut r.gebiet).desired_width(150.0));
                 let gebiete = self.welt().gebiete();
                 ui.menu_button("⏷", |ui| {
                     for g in gebiete {
@@ -1012,7 +1025,7 @@ impl App {
             ui.end_row();
 
             ui.label("Karte");
-            ui.add(egui::TextEdit::singleline(&mut r.karte).hint_text("(Hauptkarte)").desired_width(150.0))
+            crate::kontext::feld(ui, egui::TextEdit::singleline(&mut r.karte).hint_text("(Hauptkarte)").desired_width(150.0))
                 .on_hover_text("Eigene Karte, z.B. für das Innere eines Hauses. Leer = gemeinsame Karte.");
             ui.end_row();
 
@@ -1026,7 +1039,7 @@ impl App {
                 });
                 ui.menu_button("Neu…", |ui| {
                     ui.label("Neue Datei (relativ zum Datenordner):");
-                    ui.add(egui::TextEdit::singleline(&mut self.neue_datei).hint_text("raeume/burg.toml"));
+                    crate::kontext::feld(ui, egui::TextEdit::singleline(&mut self.neue_datei).hint_text("raeume/burg.toml"));
                     if ui.button("Raum dorthin verschieben").clicked() {
                         let mut d = self.neue_datei.trim().replace('\\', "/");
                         if !d.is_empty() {
@@ -1049,7 +1062,8 @@ impl App {
 
         ui.add_space(8.0);
         ui.strong("Beschreibung");
-        ui.add(
+        crate::kontext::feld(
+            ui,
             egui::TextEdit::multiline(&mut r.beschreibung)
                 .desired_rows(6)
                 .desired_width(f32::INFINITY)
@@ -1072,7 +1086,7 @@ impl App {
                 if !bekannt {
                     te = te.text_color(Color32::from_rgb(240, 110, 110));
                 }
-                let resp = ui.add_sized([170.0, 20.0], te);
+                let resp = crate::kontext::feld(ui, te.desired_width(162.0));
                 if resp.changed() {
                     if ziel.trim().is_empty() {
                         r.ausgaenge.remove(ri);
@@ -1100,7 +1114,7 @@ impl App {
         egui::Grid::new("sinne").num_columns(2).spacing([8.0, 4.0]).show(ui, |ui| {
             for (name, feld) in [("Geruch", &mut r.geruch), ("Geräusch", &mut r.geraeusch), ("Gefühl", &mut r.gefuehl)] {
                 ui.label(name);
-                ui.add(egui::TextEdit::multiline(feld).desired_rows(1).desired_width(f32::INFINITY));
+                crate::kontext::feld(ui, egui::TextEdit::multiline(feld).desired_rows(1).desired_width(f32::INFINITY));
                 ui.end_row();
             }
         });
@@ -1470,6 +1484,11 @@ impl App {
             match raum {
                 Some(id) => {
                     ui.label(egui::RichText::new(&id).strong());
+                    if ui.button("📋 ID kopieren").clicked() {
+                        ui.ctx().copy_text(id.clone());
+                        ui.close();
+                        return;
+                    }
                     if ui.button("★ Als Startraum festlegen").clicked() {
                         aktion = Some(Box::new(move |app: &mut App| {
                             app.merken();

@@ -80,7 +80,7 @@ das Update und veröffentlicht alles als Release.
 - **Rassen** (Wahl bei der Erschaffung), **Gilden** und **Berufe** als Grundlage zum Ausbauen
 - **Aufgaben und Quests** mit Schritten (töten, bringen, besuchen, sprechen) und Belohnungen
 - Karte, die durch eine **Fertigkeit** größer wird
-- Ausrüstungsplätze, benutzbare Tränke und Nahrung
+- Ausrüstungsplätze, benutzbare Tränke und Nahrung; **Behälter** (Taschen, Rucksäcke, Trankgürtel) mit Gewichtsreduktion und **Tragkraft**
 - **Ausführliche Beschreibungen:** Details mit beliebig tiefen Unterdetails, Gerüche, Geräusche und Gefühl (`riech`, `hoer`, `taste`)
 - **Bibliothek allgemeiner Beschreibungen** (Bäume, Himmel, Wasser, Möbel …), die Räume, Geländearten und Oberwelt-Felder mit `nutzt = [...]` verwenden
 - **NPCs in eigenen Dateien** mit Gesprächen: Standardfragen (Gruß, Beruf, Aufgabe, Neuigkeiten …) und eigene Themen
@@ -116,6 +116,7 @@ das Update und veröffentlicht alles als Release.
 | `handel.rs`  | Geld, Händler und Lehrmeister                                |
 | `gemeinschaft.rs` | Rassen, Gilden und Berufe                               |
 | `quests.rs`  | Aufgaben und Quests                                          |
+| `behaelter.rs` | Taschen und Rucksäcke, Tragkraft                           |
 | `fernwartung.rs` | Fernwartung: verschlüsselter Zugang für den Welteditor   |
 | `fernwartung_protokoll.rs` | Nachrichten der Fernwartung (auch vom Editor benutzt) |
 | `befehlsliste.rs` | alle eingebauten Befehle (auch vom Editor benutzt)      |

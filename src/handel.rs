@@ -187,6 +187,10 @@ pub fn kaufen(w: &mut Welt, sid: u64, rest: &str) {
         return;
     };
     let preis = verkaufspreis(&npc, g.wert) * anzahl as u64;
+    if !crate::behaelter::kann_tragen(w, sid, g.gewicht.max(0) * anzahl as i32) {
+        w.sende(sid, "Das könntest du nicht mehr tragen. ({gelb}stecke{/} Dinge in eine Tasche oder verkaufe etwas.)");
+        return;
+    }
     let s = w.spieler.get_mut(&sid).expect("Spieler");
     if s.sp.geld < preis {
         let hat = s.sp.geld;
@@ -224,6 +228,10 @@ pub fn verkaufen(w: &mut Welt, sid: u64, rest: &str) {
         return;
     };
     let gid = w.spieler[&sid].sp.inventar[i].clone();
+    if !crate::behaelter::darf_weg(&w.spieler[&sid].sp, &gid) {
+        w.sende(sid, "Da ist noch etwas drin. Nimm es erst heraus (nimm alles aus ...).");
+        return;
+    }
     let Some(g) = w.d.gegenstaende.get(&gid).cloned() else { return };
     let Some(npc) = haendler.iter().find(|d| {
         let h = d.haendler.as_ref().expect("Händler");

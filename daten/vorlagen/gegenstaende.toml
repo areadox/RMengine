@@ -47,3 +47,32 @@ name    = "etwas zu essen"
 typ     = "nahrung"
 gewicht = 1
 wert    = 2
+
+# ---------------------------------------------------------------------
+#  Behälter: Taschen, Beutel, Rucksäcke
+# ---------------------------------------------------------------------
+#  fassungsvermoegen  so viel Gewicht passt hinein (0 = kein Behälter)
+#  max_dinge          höchstens so viele Dinge (0 = beliebig viele)
+#  gewicht_reduktion  der Inhalt wiegt so viel Prozent weniger (z.B. 50)
+#  nur_typen          nur diese Typen passen hinein, z.B. ["trank"]
+#  platz              "ruecken" oder "guertel", wenn man ihn anlegen kann
+#  dativ              "einer bestickten Tasche" – nur nötig, wenn der Name Adjektive hat
+#  Im Spiel: stecke brot in rucksack / nimm brot aus rucksack / schau rucksack
+
+[[gegenstand]]
+id      = "vorlage_behaelter"
+vorlage = true
+name    = "ein Behälter"
+typ     = "behaelter"
+gewicht = 1
+fassungsvermoegen = 10
+
+[[gegenstand]]
+id      = "vorlage_rucksack"
+erbt    = "vorlage_behaelter"
+vorlage = true
+name    = "ein Rucksack"
+platz   = "ruecken"
+gewicht = 2
+fassungsvermoegen = 40
+gewicht_reduktion = 25

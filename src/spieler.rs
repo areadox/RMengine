@@ -95,6 +95,17 @@ pub struct SpielerDaten {
     pub quests: BTreeMap<String, QuestStand>,
     /// Erledigte Aufgaben und Quests: ID -> wie oft
     pub erledigt: BTreeMap<String, u32>,
+    /// Inhalt der Behälter (Taschen, Rucksäcke), die man bei sich hat
+    pub behaelter: Vec<Behaelter>,
+}
+
+/// Ein gefüllter Behälter. Leere Behälter haben keinen Eintrag.
+/// Hat man zwei gleiche Rucksäcke, gibt es bis zu zwei Einträge mit derselben ID.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Behaelter {
+    pub gegenstand: String,
+    pub inhalt: Vec<String>,
 }
 
 /// Wie weit man mit einer Aufgabe ist.
@@ -184,6 +195,7 @@ impl Default for SpielerDaten {
             berufe: Vec::new(),
             quests: BTreeMap::new(),
             erledigt: BTreeMap::new(),
+            behaelter: Vec::new(),
         }
     }
 }

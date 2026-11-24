@@ -73,6 +73,7 @@ pub const EINGEBAUT: &[Eingebaut] = &[
     b("nimm", &["nimm", "nehme", "take", "get"], "spieler", DINGE, "nimm <ding|alles>", "Etwas aufheben", false),
     b("lege", &["lege", "leg", "ablegen", "drop", "fallenlassen"], "spieler", DINGE, "lege <ding|alles>", "Etwas fallen lassen", false),
     b("inventar", &["inventar", "i", "inv"], "spieler", DINGE, "inventar", "Zeigen, was du bei dir hast", true),
+    b("stecke", &["stecke", "steck", "packe", "pack", "put"], "spieler", DINGE, "stecke <ding|alles> in <behälter>", "Etwas in eine Tasche oder einen Rucksack stecken (heraus: nimm ... aus ...)", false),
     b("anlegen", &["anlegen", "anziehen", "ausruesten", "zuecke", "wear", "wield"], "spieler", DINGE, "anlegen <ding>", "Waffe oder Rüstung anlegen", false),
     b("ausziehen", &["ausziehen", "abnehmen", "remove"], "spieler", DINGE, "ausziehen <ding>", "Ausrüstung wieder abnehmen", false),
     b("benutze", &["benutze", "benutzen", "trinke", "trink", "iss", "esse", "use", "drink", "eat"], "spieler", DINGE, "benutze <ding>", "Trank trinken, Essen essen ...", false),

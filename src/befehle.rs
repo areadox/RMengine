@@ -99,7 +99,7 @@ pub fn ausfuehren(w: &mut Welt, sid: u64, eingabe: &str) -> Folge {
         "schau" | "schaue" | "l" | "look" | "umsehen" | "betrachte" | "untersuche" | "unt" | "x" => {
             if rest.is_empty() {
                 raum_anzeigen(w, sid);
-            } else {
+            } else if !crate::behaelter::ansehen(w, sid, rest) {
                 untersuchen(w, sid, rest);
             }
         }
@@ -121,6 +121,7 @@ pub fn ausfuehren(w: &mut Welt, sid: u64, eingabe: &str) -> Folge {
         "nimm" | "nehme" | "take" | "get" => nehmen(w, sid, rest),
         "lege" | "leg" | "ablegen" | "drop" | "fallenlassen" => fallenlassen(w, sid, rest),
         "inventar" | "i" | "inv" => inventar(w, sid),
+        "stecke" => crate::behaelter::stecken(w, sid, rest),
         "anlegen" | "anziehen" | "ausruesten" | "zuecke" | "wear" | "wield" => anlegen(w, sid, rest),
         "ausziehen" | "abnehmen" | "remove" => ausziehen(w, sid, rest),
         "benutze" | "benutzen" | "trinke" | "trink" | "iss" | "esse" | "use" | "drink" | "eat" => {
@@ -882,27 +883,51 @@ fn nehmen(w: &mut Welt, sid: u64, such: &str) {
         w.sende(sid, "Was willst du nehmen?");
         return;
     }
+    // "nimm brot aus rucksack"
+    if crate::behaelter::herausnehmen(w, sid, such) {
+        return;
+    }
+    let tragbar_noch = |w: &Welt, ids: &[String], neu: &str| {
+        let extra: i32 = ids.iter().chain(std::iter::once(&neu.to_string())).filter_map(|g| w.d.gegenstaende.get(g)).map(|g| g.gewicht.max(0)).sum();
+        crate::behaelter::kann_tragen(w, sid, extra)
+    };
     let raum = w.spieler[&sid].sp.raum.clone();
     let name = w.spieler[&sid].sp.name.clone();
     let boden = w.boden.entry(raum.clone()).or_default();
 
-    let mut genommen = Vec::new();
+    let mut genommen: Vec<String> = Vec::new();
+    let mut zu_schwer = false;
+    let liegt: Vec<String> = boden.clone();
     if normalisieren(such) == "alles" {
-        let d = &w.d;
-        let (nehmbar, bleibt): (Vec<String>, Vec<String>) =
-            boden.drain(..).partition(|id| d.gegenstaende.get(id).is_some_and(|g| g.tragbar));
-        *boden = bleibt;
-        genommen = nehmbar;
-    } else if let Some(i) = finde_gegenstand(&w.d, boden, such) {
-        if w.d.gegenstaende.get(&boden[i]).is_some_and(|g| !g.tragbar) {
+        let mut bleibt = Vec::new();
+        for id in liegt {
+            let nehmbar = w.d.gegenstaende.get(&id).is_some_and(|g| g.tragbar);
+            if nehmbar && tragbar_noch(w, &genommen, &id) {
+                genommen.push(id);
+            } else {
+                zu_schwer |= nehmbar;
+                bleibt.push(id);
+            }
+        }
+        *w.boden.entry(raum.clone()).or_default() = bleibt;
+    } else if let Some(i) = finde_gegenstand(&w.d, &liegt, such) {
+        if w.d.gegenstaende.get(&liegt[i]).is_some_and(|g| !g.tragbar) {
             w.sende(sid, "Das kannst du nicht mitnehmen.");
             return;
         }
-        genommen.push(boden.remove(i));
+        if !tragbar_noch(w, &[], &liegt[i]) {
+            w.sende(sid, "Das ist dir zu schwer. ({gelb}stecke{/} Dinge in eine Tasche oder leg etwas ab.)");
+            return;
+        }
+        genommen.push(w.boden.entry(raum.clone()).or_default().remove(i));
     }
     if genommen.is_empty() {
-        w.sende(sid, "Hier gibt es nichts dergleichen zum Mitnehmen.");
+        let t = if zu_schwer { "Das ist dir alles zu schwer." } else { "Hier gibt es nichts dergleichen zum Mitnehmen." };
+        w.sende(sid, t);
         return;
+    }
+    if zu_schwer {
+        w.sende(sid, "{grau}Mehr kannst du nicht tragen.{/}");
     }
     for id in &genommen {
         let n = w.d.gegenstand_akk(id);
@@ -922,10 +947,24 @@ fn fallenlassen(w: &mut Welt, sid: u64, such: &str) {
     let Some(s) = w.spieler.get_mut(&sid) else { return };
     let raum = s.sp.raum.clone();
     let name = s.sp.name.clone();
+    // Gefüllte Behälter bleiben beim Spieler
     let weg: Vec<String> = if normalisieren(such) == "alles" {
-        s.sp.inventar.drain(..).collect()
+        let mut weg = Vec::new();
+        let mut i = 0;
+        while i < s.sp.inventar.len() {
+            if crate::behaelter::darf_weg(&s.sp, &s.sp.inventar[i].clone()) {
+                weg.push(s.sp.inventar.remove(i));
+            } else {
+                i += 1;
+            }
+        }
+        weg
     } else {
         match finde_gegenstand(&w.d, &s.sp.inventar, such) {
+            Some(i) if !crate::behaelter::darf_weg(&s.sp, &s.sp.inventar[i].clone()) => {
+                w.sende(sid, "Da ist noch etwas drin. Nimm es erst heraus (nimm alles aus ...).");
+                return;
+            }
             Some(i) => vec![s.sp.inventar.remove(i)],
             None => Vec::new(),
         }
@@ -964,7 +1003,9 @@ fn inventar(w: &Welt, sid: u64) {
             t.push_str(&format!("  {:<10} {}\n", format!("<{platz}>"), w.d.gegenstand_name(id)));
         }
     }
-    t.push_str(&format!("{{grau}}Gewicht: {gewicht}{{/}}   Geld: {{hellgelb}}{}{{/}}", crate::handel::betrag(w, sp.geld)));
+    let _ = gewicht;
+    t.push_str(&crate::behaelter::inventar_zeilen(w, sid));
+    t.push_str(&format!("{{grau}}{}{{/}}   Geld: {{hellgelb}}{}{{/}}", crate::behaelter::gewicht_text(w, sid), crate::handel::betrag(w, sp.geld)));
     w.sende(sid, &t);
 }
 
@@ -1940,13 +1981,13 @@ fn spielstand(w: &Welt, sid: u64) {
         if zauber.is_empty() { String::new() } else { format!("  {{grau}}({}){{/}}", zauber.join(", ")) }
     ));
 
-    let gewicht: i32 = sp.inventar.iter().filter_map(|g| w.d.gegenstaende.get(g)).map(|g| g.gewicht).sum();
+    let gewicht = crate::behaelter::gewicht_text(w, sid);
     let raeume = w.d.raeume.len().max(1);
     let besucht = sp.besucht.iter().filter(|r| w.d.raeume.contains_key(*r)).count();
     let ort = w.d.raum(&sp.raum).map(|r| r.name.clone()).unwrap_or_default();
     t.push_str("\n{gelb}Unterwegs{/}\n");
     t.push_str(&format!("  Aufenthalt    {ort}\n"));
-    t.push_str(&format!("  Gepäck        {} Gegenstände, Gewicht {gewicht}\n", sp.inventar.len()));
+    t.push_str(&format!("  Gepäck        {} Gegenstände, {gewicht}\n", sp.inventar.len()));
     t.push_str(&format!(
         "  Erkundet      {besucht} von {} Räumen ({}%)\n",
         w.d.raeume.len(),

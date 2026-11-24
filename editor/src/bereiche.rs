@@ -24,7 +24,7 @@ fn wortliste(ui: &mut egui::Ui, salt: impl std::hash::Hash + std::fmt::Debug, li
     if zerlegen(&puffer) != *liste {
         puffer = verbunden;
     }
-    let antwort = ui.add(egui::TextEdit::singleline(&mut puffer).hint_text(hinweis).desired_width(f32::INFINITY));
+    let antwort = crate::kontext::feld(ui, egui::TextEdit::singleline(&mut puffer).hint_text(hinweis).desired_width(f32::INFINITY));
     ui.data_mut(|d| d.insert_temp(id, puffer.clone()));
     if antwort.changed() {
         let neu = zerlegen(&puffer);
@@ -63,7 +63,7 @@ pub fn befehle_liste(ui: &mut egui::Ui, werk: &mut Befehlswerk, auswahl: &mut Op
         werk.gesten.push(g);
         *auswahl = Some(BefehlsAuswahl::Geste(werk.gesten.len() - 1));
     }
-    ui.add(egui::TextEdit::singleline(suche).hint_text("🔍 Suchen …"));
+    crate::kontext::feld(ui, egui::TextEdit::singleline(suche).hint_text("🔍 Suchen …"));
     ui.separator();
     let such = suche.to_lowercase();
     let passt = |woerter: &[String], extra: &str| {
@@ -140,10 +140,10 @@ pub fn befehl_formular(ui: &mut egui::Ui, werk: &mut Befehlswerk, auswahl: &mut 
                     ui.label(RichText::new(format!("Wer ihn benutzen darf (Standard: {})", st.rolle)).color(GRAU).small());
                 });
                 zeile(ui, "Aufruf", |ui| {
-                    ui.add(egui::TextEdit::singleline(&mut b.syntax).hint_text(st.syntax).desired_width(f32::INFINITY));
+                    crate::kontext::feld(ui, egui::TextEdit::singleline(&mut b.syntax).hint_text(st.syntax).desired_width(f32::INFINITY));
                 });
                 zeile(ui, "Hilfetext", |ui| {
-                    ui.add(egui::TextEdit::multiline(&mut b.hilfe).desired_rows(2).hint_text(st.hilfe).desired_width(f32::INFINITY));
+                    crate::kontext::feld(ui, egui::TextEdit::multiline(&mut b.hilfe).desired_rows(2).hint_text(st.hilfe).desired_width(f32::INFINITY));
                 });
                 ui.add_space(10.0);
                 if ui.add_enabled(!b.ist_standard(), egui::Button::new("↺ Auf Standard zurücksetzen")).clicked() {
@@ -178,7 +178,7 @@ pub fn befehl_formular(ui: &mut egui::Ui, werk: &mut Befehlswerk, auswahl: &mut 
                     wortliste(ui, ("geste_woerter", n), &mut g.woerter, "z.B. winke, winken");
                 });
                 zeile(ui, "Hilfetext", |ui| {
-                    ui.add(egui::TextEdit::singleline(&mut g.hilfe).desired_width(f32::INFINITY));
+                    crate::kontext::feld(ui, egui::TextEdit::singleline(&mut g.hilfe).desired_width(f32::INFINITY));
                 });
                 zeile(ui, "Rolle", |ui| {
                     egui::ComboBox::from_id_salt("geste_rolle").selected_text(&g.rolle).show_ui(ui, |ui| {
@@ -198,20 +198,20 @@ pub fn befehl_formular(ui: &mut egui::Ui, werk: &mut Befehlswerk, auswahl: &mut 
                 ui.label(RichText::new("{name} = wer die Geste macht · {ziel} = „den Wirt“ · {ziel_dativ} = „dem Wirt“").color(GRAU).small());
                 ui.label(RichText::new("Ohne Ziel (z.B. „winke“)").strong());
                 zeile(ui, "für dich", |ui| {
-                    ui.add(egui::TextEdit::singleline(&mut g.selbst).hint_text("Du winkst.").desired_width(f32::INFINITY));
+                    crate::kontext::feld(ui, egui::TextEdit::singleline(&mut g.selbst).hint_text("Du winkst.").desired_width(f32::INFINITY));
                 });
                 zeile(ui, "für die anderen", |ui| {
-                    ui.add(egui::TextEdit::singleline(&mut g.andere).hint_text("{name} winkt.").desired_width(f32::INFINITY));
+                    crate::kontext::feld(ui, egui::TextEdit::singleline(&mut g.andere).hint_text("{name} winkt.").desired_width(f32::INFINITY));
                 });
                 ui.label(RichText::new("Mit Ziel (z.B. „winke wirt“) – leer lassen, wenn es keins gibt").strong());
                 zeile(ui, "für dich", |ui| {
-                    ui.add(egui::TextEdit::singleline(&mut g.selbst_ziel).hint_text("Du winkst {ziel_dativ} zu.").desired_width(f32::INFINITY));
+                    crate::kontext::feld(ui, egui::TextEdit::singleline(&mut g.selbst_ziel).hint_text("Du winkst {ziel_dativ} zu.").desired_width(f32::INFINITY));
                 });
                 zeile(ui, "für das Ziel", |ui| {
-                    ui.add(egui::TextEdit::singleline(&mut g.ziel).hint_text("{name} winkt dir zu.").desired_width(f32::INFINITY));
+                    crate::kontext::feld(ui, egui::TextEdit::singleline(&mut g.ziel).hint_text("{name} winkt dir zu.").desired_width(f32::INFINITY));
                 });
                 zeile(ui, "für die anderen", |ui| {
-                    ui.add(egui::TextEdit::singleline(&mut g.andere_ziel).hint_text("{name} winkt {ziel_dativ} zu.").desired_width(f32::INFINITY));
+                    crate::kontext::feld(ui, egui::TextEdit::singleline(&mut g.andere_ziel).hint_text("{name} winkt {ziel_dativ} zu.").desired_width(f32::INFINITY));
                 });
 
                 // Vorschau

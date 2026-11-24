@@ -8,6 +8,7 @@
 //!   rmengine --fernwartung            Fernwartung für den Welteditor einrichten
 
 mod befehle;
+mod behaelter;
 mod befehlskonfig;
 mod befehlsliste;
 mod beschreibung;

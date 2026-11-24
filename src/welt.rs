@@ -185,6 +185,7 @@ impl Welt {
             }
             s.sp.inventar.retain(|g| d.gegenstaende.contains_key(g));
             s.sp.ausruestung.retain(|_, g| d.gegenstaende.contains_key(g));
+            crate::behaelter::nach_neuladen(d, &mut s.sp);
             s.sp.fertigkeiten.retain(|f, _| d.fertigkeiten.contains_key(f));
             s.sp.zauber.retain(|z| d.zauber.contains_key(z));
             s.rolle = rolle_berechnen(d, &s.sp);
