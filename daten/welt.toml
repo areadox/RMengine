@@ -21,6 +21,11 @@ baumeister = []
 karte_beim_umsehen  = true        # Bei jedem "schau" die kleine Karte zeigen
 karten_radius       = 1           # Räume in jede Richtung (1 = 3x3 Räume; "karte" zeigt mehr)
 karte_daneben       = true        # Raumbeschreibung rechts neben der Karte (false = darunter)
+karten_fertigkeit        = "orientierung"  # Diese Fertigkeit macht die Karte größer ("" = aus)
+karten_fertigkeit_stufen = 10              # ... alle 10 Stufen um ein Feld
+karten_fertigkeit_max    = 3               # ... höchstens um 3 Felder
+waehrung   = "Gold"           # So heißt das Geld
+max_berufe = 2                # So viele Berufe darf man gleichzeitig haben
 stadtkarte_stil     = "kasten"    # "kasten" = ( ) und [ ] im Rahmen, "linien" = ein Zeichen pro Raum
 karten_hintergrund  = "*"         # Füllzeichen für leere Stellen
 nur_besuchte_raeume_auf_karte = false   # true = "Nebel des Krieges"
@@ -40,6 +45,7 @@ lebenspunkte = 100
 mana         = 50
 gegenstaende = ["brot", "fackel", "landkarte"]
 zauber       = ["kleine_heilung", "heimkehr", "feuerpfeil"]
+geld         = 20             # Startgeld
 
 [start.fertigkeiten]       # Fertigkeit = Stufe
 magie        = 1

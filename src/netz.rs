@@ -157,7 +157,42 @@ async fn verbindung(sock: TcpStream, welt: GeteilteWelt) -> io::Result<()> {
             } else if pw1 != pw2 {
                 sende("Die Passwörter stimmen nicht überein.\n");
             } else {
-                let sp = sperren(&welt).neuer_spieler(&name, &pw1);
+                let mut sp = sperren(&welt).neuer_spieler(&name, &pw1);
+                // Rasse wählen, wenn die Welt welche hat
+                let auswahl = {
+                    let w = sperren(&welt);
+                    (!crate::gemeinschaft::waehlbare_rassen(&w.d).is_empty()).then(|| crate::gemeinschaft::rassen_auswahl(&w.d))
+                };
+                if let Some(auswahl) = auswahl {
+                    sende(&auswahl);
+                    loop {
+                        let Some(zeile) = leser.zeile().await? else { return Ok(()) };
+                        let w = sperren(&welt);
+                        let (info, name) = match zeile.trim().split_once(char::is_whitespace) {
+                            Some((a, b)) if crate::text::normalisieren(a) == "info" => (true, b.trim().to_string()),
+                            _ => (false, zeile.trim().to_string()),
+                        };
+                        match crate::gemeinschaft::rasse_finden(&w.d, &name) {
+                            Some(r) if info => {
+                                let t = crate::gemeinschaft::info(&w.d, r);
+                                drop(w);
+                                sende(&format!("{t}\nDeine Wahl: "));
+                            }
+                            Some(r) => {
+                                let id = r.id.clone();
+                                let rname = r.name.clone();
+                                crate::gemeinschaft::rasse_anwenden(&w.d, &mut sp, &id);
+                                drop(w);
+                                sende(&format!("Deine Rasse: {rname}.\n"));
+                                break;
+                            }
+                            None => {
+                                drop(w);
+                                sende("Diese Rasse gibt es nicht. Deine Wahl: ");
+                            }
+                        }
+                    }
+                }
                 break sp;
             }
         }

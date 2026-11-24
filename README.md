@@ -74,7 +74,12 @@ das Update und veröffentlicht alles als Release.
 - Spieler werden gespeichert: Inventar, Ausrüstung, Fertigkeiten, Zauber, besuchte Räume, Spielzeit
 - **Spielstand** (`sp`) mit Balken, Ausrüstungsboni und Fortschritt; **Spielerbuch** für persönliche Einstellungen (Karte, Kurzmodus, Zeilenbreite, Titel, Passwort …)
 - Monster wandern in ihrem Gebiet umher und sprechen
-- Zauber mit Heilung, Mana und Teleport, Abklingzeiten und Fertigkeitssteigerung
+- Zauber mit Heilung, Mana und Teleport, Abklingzeiten und Fertigkeitssteigerung; **Schilde und Stärkungen**, die eine Zeit lang wirken (Schild, Rüstung, Werte, Kraft, Tempo, Heilung über Zeit, Gift)
+- **Kampftechniken** (`spezial`) mit Waffenschlag, Mana- und Ausdauerkosten, Betäuben
+- **Geld**, **Händler** (`waren`, `kaufe`, `verkaufe`) und **Lehrmeister** (`lerne`)
+- **Rassen** (Wahl bei der Erschaffung), **Gilden** und **Berufe** als Grundlage zum Ausbauen
+- **Aufgaben und Quests** mit Schritten (töten, bringen, besuchen, sprechen) und Belohnungen
+- Karte, die durch eine **Fertigkeit** größer wird
 - Ausrüstungsplätze, benutzbare Tränke und Nahrung
 - **Ausführliche Beschreibungen:** Details mit beliebig tiefen Unterdetails, Gerüche, Geräusche und Gefühl (`riech`, `hoer`, `taste`)
 - **Bibliothek allgemeiner Beschreibungen** (Bäume, Himmel, Wasser, Möbel …), die Räume, Geländearten und Oberwelt-Felder mit `nutzt = [...]` verwenden
@@ -86,7 +91,7 @@ das Update und veröffentlicht alles als Release.
 - **Befehle anpassen:** Wörter, Rollen, Hilfetexte und Abschalten über `daten/befehle/`, dazu eigene **Gesten** (`winke`, `verbeuge` …)
 - **Vorlagen und Vererbung** (`erbt = "..."`, `vorlage = true`) für Gegenstände, Monster, NPCs, Zauber, Fertigkeiten und Beschreibungen
 - **Fernwartung:** Server unter Linux, Welteditor am PC – Welt holen, bearbeiten und hochladen, verschlüsselt und mit Prüfung vor dem Übernehmen
-- **Grafischer Welteditor** (`rmeditor`): Räume auf einer Karte anlegen, verschieben, verbinden und beschreiben; Zauber und Befehle/Gesten bearbeiten. Kommentare in den TOML-Dateien bleiben beim Speichern erhalten.
+- **Grafischer Welteditor** (`rmeditor`): Räume auf einer Karte anlegen, verschieben, verbinden und beschreiben; alle Inhalte (Gegenstände, Monster, NPCs mit Händler/Lehrer, Zauber, Quests, Rassen, Gilden, Berufe, Welteinstellungen) und Befehle/Gesten bearbeiten. Kommentare in den TOML-Dateien bleiben beim Speichern erhalten.
 
 ## Code-Überblick (`src/`)
 
@@ -107,6 +112,10 @@ das Update und veröffentlicht alles als Release.
 | `beschreibung.rs` | Details, Sinne und Bibliothek                          |
 | `gespraech.rs` | NPC-Gespräche                                              |
 | `kampf.rs`   | Kampf, Stufen, Tod und Wiederbelebung                        |
+| `wirkung.rs` | Wirkungen mit Dauer: Schilde, Stärkungen, Gift               |
+| `handel.rs`  | Geld, Händler und Lehrmeister                                |
+| `gemeinschaft.rs` | Rassen, Gilden und Berufe                               |
+| `quests.rs`  | Aufgaben und Quests                                          |
 | `fernwartung.rs` | Fernwartung: verschlüsselter Zugang für den Welteditor   |
 | `fernwartung_protokoll.rs` | Nachrichten der Fernwartung (auch vom Editor benutzt) |
 | `befehlsliste.rs` | alle eingebauten Befehle (auch vom Editor benutzt)      |
@@ -119,8 +128,9 @@ Der Welteditor (`editor/src/`):
 | `main.rs` | Programmstart, Suche nach dem Datenordner                             |
 | `welt.rs` | Räume laden, prüfen und kommentarerhaltend speichern (`toml_edit`)    |
 | `app.rs`  | Oberfläche: Karte, Raumliste, Eigenschaften, Rückgängig (`egui`)      |
-| `zauber.rs` | Zauber laden, mit Vererbung anzeigen, prüfen und speichern          |
+| `inhalte.rs` | Bereich Inhalte: Formulare für alle Arten, direkt auf den TOML-Dateien |
+| `schema.rs` | Welche Felder jede Art hat (daraus entstehen die Formulare)           |
 | `befehle.rs` | Befehle und Gesten laden, prüfen und speichern                     |
-| `bereiche.rs` | Oberfläche der Bereiche Zauber und Befehle                        |
+| `bereiche.rs` | Oberfläche des Bereichs Befehle                                   |
 | `fernwartung.rs` | Verbindung zum Server, Arbeitskopie holen und hochladen       |
 | `fenster.rs` | Fenster „Server“ und „Updates“                                      |

@@ -187,6 +187,16 @@ pub struct WeltConfig {
     pub stadtkarte_stil: String,
     /// Füllzeichen für leere Stellen der Stadtkarte
     pub karten_hintergrund: String,
+    /// Name des Geldes, z.B. "Gold" oder "Taler"
+    pub waehrung: String,
+    /// Fertigkeit, mit der die Karte größer wird (leer = aus), z.B. "orientierung"
+    pub karten_fertigkeit: String,
+    /// Alle wie viele Stufen der Fertigkeit die Karte ein Feld größer wird
+    pub karten_fertigkeit_stufen: u32,
+    /// So groß kann die Karte durch die Fertigkeit höchstens werden (zusätzliche Felder)
+    pub karten_fertigkeit_max: i32,
+    /// Wie viele Berufe man gleichzeitig haben darf
+    pub max_berufe: u32,
 }
 
 impl Default for WeltConfig {
@@ -211,6 +221,11 @@ impl Default for WeltConfig {
             spieler_verzeichnis: "spieler".into(),
             stadtkarte_stil: "kasten".into(),
             karten_hintergrund: "*".into(),
+            waehrung: "Gold".into(),
+            karten_fertigkeit: String::new(),
+            karten_fertigkeit_stufen: 20,
+            karten_fertigkeit_max: 3,
+            max_berufe: 2,
         }
     }
 }
@@ -225,6 +240,7 @@ pub struct StartWerte {
     pub fertigkeiten: BTreeMap<String, u32>,
     pub zauber: Vec<String>,
     pub werte: BTreeMap<String, i32>,
+    pub geld: u64,
 }
 
 impl Default for StartWerte {
@@ -236,6 +252,7 @@ impl Default for StartWerte {
             fertigkeiten: BTreeMap::new(),
             zauber: Vec::new(),
             werte: BTreeMap::new(),
+            geld: 0,
         }
     }
 }
@@ -552,6 +569,21 @@ pub struct MonsterDef {
     /// Eigene Gesprächsthemen
     #[serde(default)]
     pub thema: Vec<crate::gespraech::ThemaDef>,
+    /// Geld, das man beim Sieg bekommt: eine Zahl oder [von, bis]
+    #[serde(default)]
+    pub geld: GeldDef,
+    /// Der NPC verkauft und kauft Gegenstände
+    #[serde(default)]
+    pub haendler: Option<HaendlerDef>,
+    /// Der NPC lehrt Fertigkeiten und Zauber gegen Geld
+    #[serde(default)]
+    pub lehrt: Vec<LehrDef>,
+    /// Der NPC nimmt in diese Gilde auf (Befehl: beitreten)
+    #[serde(default)]
+    pub gilde: String,
+    /// Der NPC nimmt in diesen Beruf / diese Zunft auf (Befehl: beitreten)
+    #[serde(default)]
+    pub beruf: String,
     /// Steht in einer eigenen NPC-Datei ([npc])
     #[serde(skip)]
     pub ist_npc: bool,
@@ -602,6 +634,15 @@ pub struct WirkungDef {
     pub wert: i32,
     #[serde(default)]
     pub raum: String,
+    /// Sekunden, die die Wirkung anhält (0 = sofort und einmalig)
+    #[serde(default)]
+    pub dauer: f64,
+    /// Bei heilen/mana/ausdauer/schaden mit Dauer: alle wie viele Sekunden (Standard 3)
+    #[serde(default)]
+    pub intervall: Option<f64>,
+    /// Bei "bonus": welcher Wert, z.B. "staerke"
+    #[serde(default)]
+    pub attribut: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -631,9 +672,228 @@ pub struct ZauberDef {
     pub text_ziel: String,
     #[serde(default)]
     pub text_raum: String,
+    /// Wenn eine Wirkung mit Dauer endet, z.B. "Dein Schild verblasst."
+    #[serde(default)]
+    pub text_ende: String,
+    /// "zauber" oder "technik" (Kampftechnik, Befehl: spezial)
+    #[serde(default = "standard_zaubertyp")]
+    pub typ: String,
+    #[serde(default)]
+    pub ausdauer_kosten: i32,
+    /// Technik: Schaden der Waffe mal diesen Faktor (z.B. 1.5); 0 = kein Waffenschlag
+    #[serde(default)]
+    pub waffen_faktor: f64,
+    /// Nur für Mitglieder dieser Gilde (leer = für alle)
+    #[serde(default)]
+    pub gilde: String,
 
     #[serde(skip)]
     pub quelle: String,
+}
+
+impl ZauberDef {
+    pub fn ist_technik(&self) -> bool {
+        self.typ == "technik"
+    }
+}
+
+fn standard_zaubertyp() -> String {
+    "zauber".into()
+}
+
+/// Geld als feste Zahl (geld = 5) oder Bereich (geld = [2, 8]).
+#[derive(Debug, Clone, Deserialize, Default)]
+#[serde(untagged)]
+pub enum GeldDef {
+    #[default]
+    Keins,
+    Fest(u64),
+    Bereich(Vec<u64>),
+}
+
+impl GeldDef {
+    pub fn wuerfeln(&self) -> u64 {
+        use rand::Rng;
+        match self {
+            GeldDef::Keins => 0,
+            GeldDef::Fest(n) => *n,
+            GeldDef::Bereich(v) => match v.as_slice() {
+                [] => 0,
+                [n] => *n,
+                [a, b, ..] => rand::thread_rng().gen_range((*a).min(*b)..=(*a).max(*b)),
+            },
+        }
+    }
+}
+
+/// [npc.haendler]
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct HaendlerDef {
+    /// Was der Händler verkauft (Gegenstand-IDs, unbegrenzter Vorrat)
+    #[serde(default)]
+    pub waren: Vec<String>,
+    /// Kauft er Gegenstände an?
+    #[serde(default = "wahr")]
+    pub ankauf: bool,
+    /// Nur diese Typen ankaufen, z.B. ["waffe", "ruestung"] (leer = alles)
+    #[serde(default)]
+    pub ankauf_typen: Vec<String>,
+    /// Verkaufspreis in Prozent vom Wert (100 = genau der Wert)
+    #[serde(default = "hundert")]
+    pub verkauf_prozent: u32,
+    /// Ankaufspreis in Prozent vom Wert
+    #[serde(default = "fuenfzig")]
+    pub ankauf_prozent: u32,
+}
+
+/// [[npc.lehrt]]: eine Fertigkeit oder ein Zauber, den der NPC lehrt.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LehrDef {
+    /// ID einer Fertigkeit oder eines Zaubers
+    pub id: String,
+    /// Preis pro Lektion (Fertigkeit: +1 Stufe) bzw. für den Zauber
+    #[serde(default)]
+    pub preis: u64,
+    /// Fertigkeiten: bis zu dieser Stufe kann man hier lernen
+    #[serde(default)]
+    pub bis: Option<u32>,
+    /// Ab dieser Spielerstufe
+    #[serde(default)]
+    pub stufe: u32,
+    /// Nur für Mitglieder dieser Gilde (leer = für alle)
+    #[serde(default)]
+    pub gilde: String,
+}
+
+/// Rasse, Gilde oder Beruf ([[rasse]], [[gilde]], [[beruf]]).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GemeinschaftDef {
+    pub id: String,
+    pub name: String,
+    #[serde(default)]
+    pub beschreibung: String,
+    /// Zuschläge auf die Werte, z.B. { staerke = 2, intelligenz = -1 }
+    #[serde(default)]
+    pub werte: BTreeMap<String, i32>,
+    #[serde(default)]
+    pub lebenspunkte: i32,
+    #[serde(default)]
+    pub mana: i32,
+    #[serde(default)]
+    pub ausdauer: i32,
+    /// Fertigkeiten, die man bekommt: { schwertkampf = 5 }
+    #[serde(default)]
+    pub fertigkeiten: BTreeMap<String, u32>,
+    #[serde(default)]
+    pub zauber: Vec<String>,
+    /// Gilde/Beruf: ab dieser Spielerstufe
+    #[serde(default)]
+    pub aufnahme_stufe: u32,
+    /// Gilde/Beruf: nur für diese Rassen (leer = alle)
+    #[serde(default)]
+    pub rassen: Vec<String>,
+    /// Gilde/Beruf: Aufnahmegebühr
+    #[serde(default)]
+    pub preis: u64,
+    /// Gilde: Titel für Mitglieder, z.B. "der Krieger"
+    #[serde(default)]
+    pub titel: String,
+    /// Text bei der Aufnahme
+    #[serde(default)]
+    pub aufnahme_text: String,
+    /// Rasse: bei der Erschaffung wählbar?
+    #[serde(default = "wahr")]
+    pub waehlbar: bool,
+
+    #[serde(skip)]
+    pub quelle: String,
+}
+
+/// [[quest]]: eine Aufgabe (klein) oder ein Quest (groß).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct QuestDef {
+    pub id: String,
+    pub name: String,
+    /// "aufgabe" (klein) oder "quest"
+    #[serde(default = "standard_questart")]
+    pub art: String,
+    #[serde(default)]
+    pub beschreibung: String,
+    /// NPC, der die Aufgabe vergibt und bei dem man sie abgibt
+    pub geber: String,
+    #[serde(default)]
+    pub mindest_stufe: u32,
+    /// Diese Quests muss man vorher erledigt haben
+    #[serde(default)]
+    pub voraussetzungen: Vec<String>,
+    /// Nur für Mitglieder dieser Gilde
+    #[serde(default)]
+    pub gilde: String,
+    #[serde(default)]
+    pub wiederholbar: bool,
+    /// Was der NPC sagt, wenn er die Aufgabe anbietet
+    #[serde(default)]
+    pub angebot: String,
+    /// ... wenn man sie annimmt
+    #[serde(default)]
+    pub annahme: String,
+    /// ... wenn man sie abgibt
+    #[serde(default)]
+    pub abschluss: String,
+    /// Muss man zum Geber zurück? (false = fertig, sobald alle Schritte erledigt sind)
+    #[serde(default = "wahr")]
+    pub abgabe: bool,
+    #[serde(default)]
+    pub schritte: Vec<SchrittDef>,
+    #[serde(default)]
+    pub belohnung: BelohnungDef,
+
+    #[serde(skip)]
+    pub quelle: String,
+}
+
+fn standard_questart() -> String {
+    "quest".into()
+}
+
+pub const QUEST_ARTEN: &[&str] = &["aufgabe", "quest"];
+pub const SCHRITT_ARTEN: &[&str] = &["toeten", "bringen", "besuchen", "sprechen"];
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SchrittDef {
+    /// toeten, bringen, besuchen, sprechen
+    pub art: String,
+    /// Monster-, Gegenstand-, Raum- oder NPC-ID
+    pub ziel: String,
+    #[serde(default = "eins_u")]
+    pub anzahl: u32,
+    /// bringen: an welchen NPC (leer = der Geber)
+    #[serde(default)]
+    pub an: String,
+    /// Was im Aufgabenbuch steht, z.B. "Töte 3 Ratten im Keller"
+    #[serde(default)]
+    pub text: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+#[serde(deny_unknown_fields, default)]
+pub struct BelohnungDef {
+    pub erfahrung: u64,
+    pub geld: u64,
+    pub gegenstaende: Vec<String>,
+    /// Fertigkeiten steigen um so viele Stufen: { kraeuterkunde = 2 }
+    pub fertigkeiten: BTreeMap<String, u32>,
+    pub zauber: Vec<String>,
+    pub titel: String,
+}
+
+fn fuenfzig() -> u32 {
+    50
 }
 
 fn standard_monster_erholung() -> f64 {
@@ -693,7 +953,12 @@ pub const GEGENSTAND_TYPEN: &[&str] =
 pub const PLAETZE: &[&str] =
     &["waffe", "schild", "kopf", "koerper", "haende", "beine", "fuesse", "hals", "ring", "umhang", "licht"];
 pub const ZAUBER_ZIELE: &[&str] = &["selbst", "spieler", "gegner", "raum"];
-pub const WIRKUNGEN: &[&str] = &["heilen", "mana", "schaden", "teleport"];
+pub const WIRKUNGEN: &[&str] = &[
+    "heilen", "mana", "ausdauer", "schaden", "teleport", "schild", "ruestung", "bonus", "kraft", "tempo", "betaeuben",
+];
+/// Wirkungen, die nur mit einer Dauer Sinn ergeben
+pub const WIRKUNGEN_MIT_DAUER: &[&str] = &["schild", "ruestung", "bonus", "kraft", "tempo"];
+pub const ZAUBER_TYPEN: &[&str] = &["zauber", "technik"];
 
 #[derive(Debug, Clone)]
 pub struct Daten {
@@ -705,6 +970,10 @@ pub struct Daten {
     pub monster: BTreeMap<String, MonsterDef>,
     pub fertigkeiten: BTreeMap<String, FertigkeitDef>,
     pub zauber: BTreeMap<String, ZauberDef>,
+    pub rassen: BTreeMap<String, GemeinschaftDef>,
+    pub gilden: BTreeMap<String, GemeinschaftDef>,
+    pub berufe: BTreeMap<String, GemeinschaftDef>,
+    pub quests: BTreeMap<String, QuestDef>,
     /// Welcher Raum liegt an welcher Koordinate?
     /// (karte, x, y, z) -> Raum
     pub koordinaten: HashMap<(String, i32, i32, i32), String>,
@@ -884,6 +1153,10 @@ pub fn laden(ordner: &Path) -> Result<Daten, Vec<String>> {
         monster: BTreeMap::new(),
         fertigkeiten: BTreeMap::new(),
         zauber: BTreeMap::new(),
+        rassen: BTreeMap::new(),
+        gilden: BTreeMap::new(),
+        berufe: BTreeMap::new(),
+        quests: BTreeMap::new(),
         koordinaten: HashMap::new(),
         deko_farben: wd.deko,
         namen: wd.namen,
@@ -937,6 +1210,10 @@ pub fn laden(ordner: &Path) -> Result<Daten, Vec<String>> {
     let mut fertigkeiten: Vec<(String, FertigkeitDef)> = Vec::new();
     let mut zauber: Vec<(String, ZauberDef)> = Vec::new();
     let mut bibliothek: Vec<(String, BeschreibungDef)> = Vec::new();
+    let mut rassen: Vec<(String, GemeinschaftDef)> = Vec::new();
+    let mut gilden: Vec<(String, GemeinschaftDef)> = Vec::new();
+    let mut berufe: Vec<(String, GemeinschaftDef)> = Vec::new();
+    let mut quests: Vec<(String, QuestDef)> = Vec::new();
     for (i, t) in fertig {
         let r = &roh[i];
         let id = t.get("id").and_then(|v| v.as_str()).unwrap_or("?").to_string();
@@ -957,6 +1234,10 @@ pub fn laden(ordner: &Path) -> Result<Daten, Vec<String>> {
             "npc" => umwandeln!(npcs),
             "fertigkeit" => umwandeln!(fertigkeiten),
             "zauber" => umwandeln!(zauber),
+            "rasse" => umwandeln!(rassen),
+            "gilde" => umwandeln!(gilden),
+            "beruf" => umwandeln!(berufe),
+            "quest" => umwandeln!(quests),
             _ => umwandeln!(bibliothek),
         }
     }
@@ -987,6 +1268,10 @@ pub fn laden(ordner: &Path) -> Result<Daten, Vec<String>> {
     einsortieren!(fertigkeiten, d.fertigkeiten, "Fertigkeit");
     einsortieren!(zauber, d.zauber, "Zauber");
     einsortieren!(bibliothek, d.bibliothek, "Beschreibung");
+    einsortieren!(rassen, d.rassen, "Rasse");
+    einsortieren!(gilden, d.gilden, "Gilde");
+    einsortieren!(berufe, d.berufe, "Beruf");
+    einsortieren!(quests, d.quests, "Quest");
 
     d.oberwelt = oberwelt::laden(ordner, &mut fehler);
     d.befehle = crate::befehlskonfig::laden(ordner, &mut fehler, &mut warnungen);
@@ -1054,7 +1339,8 @@ struct Roh {
     t: toml::Table,
 }
 
-const ARTEN: &[&str] = &["raum", "gegenstand", "monster", "npc", "fertigkeit", "zauber", "beschreibung"];
+const ARTEN: &[&str] =
+    &["raum", "gegenstand", "monster", "npc", "fertigkeit", "zauber", "beschreibung", "rasse", "gilde", "beruf", "quest"];
 
 fn art_anzeige(art: &str) -> &'static str {
     match art {
@@ -1064,6 +1350,10 @@ fn art_anzeige(art: &str) -> &'static str {
         "npc" => "NPC",
         "fertigkeit" => "Fertigkeit",
         "zauber" => "Zauber",
+        "rasse" => "Rasse",
+        "gilde" => "Gilde",
+        "beruf" => "Beruf",
+        "quest" => "Quest",
         _ => "Beschreibung",
     }
 }
@@ -1575,16 +1865,164 @@ fn pruefen(d: &mut Daten, fehler: &mut Vec<String>, warn: &mut Vec<String>) {
         if !z.fertigkeit.is_empty() {
             verweis(&d.fertigkeiten, &z.fertigkeit, &wo, "Fertigkeit", fehler);
         }
-        if z.wirkungen.is_empty() {
+        if z.wirkungen.is_empty() && z.waffen_faktor <= 0.0 {
             warn.push(format!("{wo}: hat keine Wirkungen."));
+        }
+        if !ZAUBER_TYPEN.contains(&z.typ.as_str()) {
+            fehler.push(format!("{wo}: Typ '{}' gibt es nicht. Erlaubt: zauber, technik", z.typ));
+        }
+        if !z.gilde.is_empty() {
+            verweis(&d.gilden, &z.gilde, &wo, "Gilde", fehler);
+        }
+        if z.waffen_faktor < 0.0 || z.ausdauer_kosten < 0 || z.mana_kosten < 0 {
+            fehler.push(format!("{wo}: Kosten und Faktoren dürfen nicht negativ sein."));
+        }
+        if z.ist_technik() && z.ziel != "gegner" && z.waffen_faktor > 0.0 {
+            warn.push(format!("{wo}: Eine Technik mit Waffenschlag braucht ziel = \"gegner\"."));
         }
         for w in &z.wirkungen {
             if !WIRKUNGEN.contains(&w.art.as_str()) {
-                fehler.push(format!("{wo}: Wirkung '{}' gibt es nicht. Erlaubt: {}", w.art, WIRKUNGEN.join(", ")));
+                let tipp = text::vorschlag(&w.art, WIRKUNGEN.iter().map(|s| s.to_string()).collect::<Vec<_>>().iter())
+                    .map(|v| format!(" Meintest du '{v}'?"))
+                    .unwrap_or_default();
+                fehler.push(format!("{wo}: Wirkung '{}' gibt es nicht.{tipp} Erlaubt: {}", w.art, WIRKUNGEN.join(", ")));
             }
             if w.art == "teleport" {
                 raum_verweis(d, &w.raum, &format!("{wo}, Wirkung teleport"), fehler);
             }
+            if WIRKUNGEN_MIT_DAUER.contains(&w.art.as_str()) && w.dauer <= 0.0 {
+                fehler.push(format!("{wo}: Die Wirkung '{}' braucht eine 'dauer' in Sekunden.", w.art));
+            }
+            if w.dauer < 0.0 || w.intervall.is_some_and(|i| i <= 0.0) {
+                fehler.push(format!("{wo}: 'dauer' und 'intervall' müssen größer als 0 sein."));
+            }
+            if w.art == "bonus" {
+                if w.attribut.is_empty() {
+                    fehler.push(format!("{wo}: Die Wirkung 'bonus' braucht ein 'attribut', z.B. \"staerke\"."));
+                } else if !d.start.werte.contains_key(&w.attribut) {
+                    warn.push(format!("{wo}: Attribut '{}' gibt es in [start.werte] nicht.", w.attribut));
+                }
+            }
+        }
+    }
+
+    // --- Geld, Händler und Lehrer ---
+    for m in d.monster.values() {
+        let wo = format!("[{}] {} '{}'", m.quelle, if m.ist_npc { "NPC" } else { "Monster" }, m.id);
+        if let Some(h) = &m.haendler {
+            for g in &h.waren {
+                verweis(&d.gegenstaende, g, &format!("{wo}, haendler.waren"), "Gegenstand", fehler);
+            }
+            for t in &h.ankauf_typen {
+                if !GEGENSTAND_TYPEN.contains(&t.as_str()) {
+                    warn.push(format!("{wo}: unbekannter Typ '{t}' in haendler.ankauf_typen."));
+                }
+            }
+            for g in &h.waren {
+                if d.gegenstaende.get(g).is_some_and(|g| g.wert <= 0) {
+                    warn.push(format!("{wo}: Die Ware '{g}' hat keinen 'wert' und kostet darum nur 1."));
+                }
+            }
+        }
+        for l in &m.lehrt {
+            if !d.fertigkeiten.contains_key(&l.id) && !d.zauber.contains_key(&l.id) {
+                let alle: Vec<String> = d.fertigkeiten.keys().chain(d.zauber.keys()).cloned().collect();
+                let tipp = text::vorschlag(&l.id, alle.iter()).map(|v| format!(" Meintest du '{v}'?")).unwrap_or_default();
+                fehler.push(format!("{wo}, lehrt: Eine Fertigkeit oder einen Zauber '{}' gibt es nicht.{tipp}", l.id));
+            }
+            if !l.gilde.is_empty() {
+                verweis(&d.gilden, &l.gilde, &format!("{wo}, lehrt"), "Gilde", fehler);
+            }
+        }
+        if !m.gilde.is_empty() {
+            verweis(&d.gilden, &m.gilde, &wo, "Gilde", fehler);
+        }
+        if !m.beruf.is_empty() {
+            verweis(&d.berufe, &m.beruf, &wo, "Beruf", fehler);
+        }
+        if let GeldDef::Bereich(v) = &m.geld {
+            if v.len() > 2 {
+                fehler.push(format!("{wo}: 'geld' ist eine Zahl oder [von, bis]."));
+            }
+        }
+    }
+
+    // --- Rassen, Gilden, Berufe ---
+    for (art, liste) in [("Rasse", &d.rassen), ("Gilde", &d.gilden), ("Beruf", &d.berufe)] {
+        for g in liste.values() {
+            let wo = format!("[{}] {art} '{}'", g.quelle, g.id);
+            for f in g.fertigkeiten.keys() {
+                verweis(&d.fertigkeiten, f, &wo, "Fertigkeit", fehler);
+            }
+            for z in &g.zauber {
+                verweis(&d.zauber, z, &wo, "Zauber", fehler);
+            }
+            for r in &g.rassen {
+                verweis(&d.rassen, r, &wo, "Rasse", fehler);
+            }
+            for w in g.werte.keys() {
+                if !d.start.werte.contains_key(w) {
+                    warn.push(format!("{wo}: Wert '{w}' gibt es in [start.werte] nicht."));
+                }
+            }
+        }
+    }
+
+    // --- Quests ---
+    for q in d.quests.values() {
+        let wo = format!("[{}] Quest '{}'", q.quelle, q.id);
+        if !QUEST_ARTEN.contains(&q.art.as_str()) {
+            fehler.push(format!("{wo}: Art '{}' gibt es nicht. Erlaubt: aufgabe, quest", q.art));
+        }
+        match d.monster.get(&q.geber) {
+            Some(m) if !m.ist_npc => warn.push(format!("{wo}: Der Geber '{}' ist ein Monster, kein NPC.", q.geber)),
+            Some(_) => {}
+            None => verweis(&d.monster, &q.geber, &format!("{wo}, geber"), "NPC", fehler),
+        }
+        for v in &q.voraussetzungen {
+            verweis(&d.quests, v, &format!("{wo}, voraussetzungen"), "Quest", fehler);
+        }
+        if !q.gilde.is_empty() {
+            verweis(&d.gilden, &q.gilde, &wo, "Gilde", fehler);
+        }
+        if q.schritte.is_empty() {
+            warn.push(format!("{wo}: hat keine Schritte und ist sofort erledigt."));
+        }
+        for (i, sch) in q.schritte.iter().enumerate() {
+            let wo = format!("{wo}, Schritt {}", i + 1);
+            match sch.art.as_str() {
+                "toeten" => verweis(&d.monster, &sch.ziel, &wo, "Monster", fehler),
+                "bringen" => {
+                    verweis(&d.gegenstaende, &sch.ziel, &wo, "Gegenstand", fehler);
+                    if !sch.an.is_empty() {
+                        verweis(&d.monster, &sch.an, &format!("{wo}, an"), "NPC", fehler);
+                    }
+                }
+                "besuchen" => raum_verweis(d, &sch.ziel, &wo, fehler),
+                "sprechen" => verweis(&d.monster, &sch.ziel, &wo, "NPC", fehler),
+                a => fehler.push(format!("{wo}: Art '{a}' gibt es nicht. Erlaubt: {}", SCHRITT_ARTEN.join(", "))),
+            }
+            if sch.anzahl == 0 {
+                fehler.push(format!("{wo}: 'anzahl' muss mindestens 1 sein."));
+            }
+        }
+        let b = &q.belohnung;
+        for g in &b.gegenstaende {
+            verweis(&d.gegenstaende, g, &format!("{wo}, Belohnung"), "Gegenstand", fehler);
+        }
+        for f in b.fertigkeiten.keys() {
+            verweis(&d.fertigkeiten, f, &format!("{wo}, Belohnung"), "Fertigkeit", fehler);
+        }
+        for z in &b.zauber {
+            verweis(&d.zauber, z, &format!("{wo}, Belohnung"), "Zauber", fehler);
+        }
+    }
+
+    // --- welt.toml: Karte und Start ---
+    if !d.welt.karten_fertigkeit.is_empty() {
+        verweis(&d.fertigkeiten, &d.welt.karten_fertigkeit, "welt.toml (karten_fertigkeit)", "Fertigkeit", fehler);
+        if d.welt.karten_fertigkeit_stufen == 0 {
+            fehler.push("welt.toml: 'karten_fertigkeit_stufen' muss mindestens 1 sein.".into());
         }
     }
 }
@@ -1614,5 +2052,21 @@ mod tests {
         assert!(d.monster["ratte"].aggressiv);
         let segen = &d.zauber["segen"];
         assert_eq!((segen.ziel.as_str(), segen.fertigkeit.as_str()), ("raum", "heilkunde"));
+    }
+
+    #[test]
+    fn neue_arten_aus_der_beispielwelt() {
+        let d = beispiel();
+        assert!(d.rassen.contains_key("zwerg") && d.gilden.contains_key("lichtorden") && d.berufe.contains_key("schmied"));
+        let q = &d.quests["rattenplage"];
+        assert_eq!((q.geber.as_str(), q.schritte.len(), q.belohnung.geld), ("wirt", 2, 25));
+        let schmied = &d.monster["schmied"];
+        assert_eq!(schmied.beruf, "schmied");
+        assert!(schmied.haendler.as_ref().is_some_and(|h| h.waren.contains(&"dolch".to_string())));
+        assert!(schmied.lehrt.iter().any(|l| l.id == "wuchtschlag" && l.stufe == 2));
+        assert!(d.zauber["wuchtschlag"].ist_technik());
+        assert_eq!(d.zauber["schutzschild"].wirkungen[0].dauer, 90.0);
+        assert!(matches!(d.monster["ratte"].geld, GeldDef::Bereich(_)));
+        assert_eq!(d.start.geld, 20);
     }
 }

@@ -87,6 +87,24 @@ pub struct SpielerDaten {
     pub siege: u32,
     /// Liegt gerade tot am Boden und wartet auf Wiederbelebung
     pub ist_tot: bool,
+    pub geld: u64,
+    pub rasse: String,
+    pub gilde: String,
+    pub berufe: Vec<String>,
+    /// Laufende Aufgaben und Quests: ID -> Fortschritt
+    pub quests: BTreeMap<String, QuestStand>,
+    /// Erledigte Aufgaben und Quests: ID -> wie oft
+    pub erledigt: BTreeMap<String, u32>,
+}
+
+/// Wie weit man mit einer Aufgabe ist.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct QuestStand {
+    /// Der aktuelle Schritt (0 = erster)
+    pub schritt: usize,
+    /// Wie oft das Ziel des Schritts schon erreicht wurde (z.B. 2 von 3 Ratten)
+    pub zaehler: u32,
 }
 
 /// Alles, was man im Spielerbuch einstellen kann.
@@ -160,6 +178,12 @@ impl Default for SpielerDaten {
             tode: 0,
             siege: 0,
             ist_tot: false,
+            geld: 0,
+            rasse: String::new(),
+            gilde: String::new(),
+            berufe: Vec::new(),
+            quests: BTreeMap::new(),
+            erledigt: BTreeMap::new(),
         }
     }
 }

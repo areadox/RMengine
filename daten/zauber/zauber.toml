@@ -1,9 +1,25 @@
 # =====================================================================
 #  Zaubersprüche
 # =====================================================================
+#  typ:        zauber (Standard, Befehl: zaubere) | technik (Kampftechnik, Befehl: spezial)
 #  ziel:       selbst | spieler | gegner | raum
-#  wirkungen:  heilen (wert), mana (wert), schaden (wert), teleport (raum)
+#  kosten:     mana_kosten, ausdauer_kosten
 #  abklingzeit: Sekunden, bis man den Zauber wieder sprechen kann
+#  waffen_faktor: nur Techniken – Schlag mit der Waffe, Schaden mal Faktor
+#
+#  wirkungen = [ { art = "...", wert = ..., dauer = ... }, ... ]
+#    sofort:     heilen, mana, ausdauer, schaden (wert), teleport (raum),
+#                betaeuben (wert = Sekunden, nur gegen Gegner)
+#    mit dauer (Sekunden):
+#                schild   (fängt `wert` Schaden ab)
+#                ruestung (+wert Rüstung)
+#                bonus    (+wert auf `attribut`, z.B. attribut = "staerke")
+#                kraft    (+wert Prozent Schaden)
+#                tempo    (+wert Prozent schnellere Angriffe)
+#                heilen / mana / ausdauer mit dauer: alle `intervall` Sekunden (Standard 3)
+#                schaden mit dauer gegen Gegner: Gift, alle `intervall` Sekunden
+#  text_ende: was man liest, wenn eine Wirkung mit Dauer endet
+#  gilde:     nur für Mitglieder dieser Gilde
 #  Texte dürfen {name} (wer zaubert), {ziel} und {zauber} enthalten.
 
 [[zauber]]
@@ -52,3 +68,107 @@ abklingzeit = 60
 wirkungen = [ { art = "teleport", raum = "dorfplatz" } ]
 text_selbst = "Du schließt die Augen und denkst an zu Hause ..."
 text_raum   = "{name} schließt die Augen und löst sich in Licht auf."
+
+# ---------------------------------------------------------------------
+#  Schutz und Stärkung (wirken eine Zeit lang)
+# ---------------------------------------------------------------------
+
+[[zauber]]
+id   = "schutzschild"
+name = "Schutzschild"
+schluesselwoerter = ["schild"]
+beschreibung = "Ein schimmernder Schild, der 30 Schaden abfängt."
+fertigkeit  = "magie"
+mana_kosten = 15
+abklingzeit = 20
+wirkungen = [ { art = "schild", wert = 30, dauer = 90 } ]
+text_selbst = "Ein {hellblau}schimmernder Schild{/} legt sich um dich."
+text_raum   = "Ein schimmernder Schild legt sich um {name}."
+text_ende   = "Der schimmernde Schild um dich verblasst."
+
+[[zauber]]
+id   = "baerenkraft"
+name = "Bärenkraft"
+schluesselwoerter = ["kraft", "staerke"]
+beschreibung = "Stärke +3 und 20 % mehr Schaden für zwei Minuten."
+fertigkeit  = "magie"
+mindest_stufe = 3
+mana_kosten = 20
+ziel = "spieler"
+wirkungen = [
+  { art = "bonus", attribut = "staerke", wert = 3, dauer = 120 },
+  { art = "kraft", wert = 20, dauer = 120 },
+]
+text_selbst = "Du rufst die Kraft des Bären herbei."
+text_ziel   = "{name} legt dir die Hand auf die Schulter. Du fühlst dich stark wie ein Bär!"
+text_ende   = "Die Bärenkraft verlässt dich."
+
+[[zauber]]
+id   = "lebensquell"
+erbt = "vorlage_heilzauber"
+name = "Lebensquell"
+beschreibung = "Heilt 30 Sekunden lang alle 3 Sekunden 5 LP."
+mana_kosten = 18
+wirkungen = [ { art = "heilen", wert = 5, dauer = 30, intervall = 3 } ]
+text_selbst = "Ein sanfter Quell des Lebens umfließt {ziel}."
+
+# ---------------------------------------------------------------------
+#  Kampftechniken (Befehl: spezial <name> [ziel])
+# ---------------------------------------------------------------------
+
+[[zauber]]
+id   = "wuchtschlag"
+typ  = "technik"
+name = "Wuchtschlag"
+schluesselwoerter = ["wucht"]
+beschreibung = "Ein gewaltiger Schlag mit 80 % mehr Schaden."
+ziel = "gegner"
+fertigkeit = "schwertkampf"
+mindest_stufe = 2
+ausdauer_kosten = 15
+abklingzeit = 8
+waffen_faktor = 1.8
+text_selbst = "Du holst weit aus und lässt deine Waffe auf {ziel} niedersausen!"
+text_raum   = "{name} holt weit aus und schlägt mit voller Wucht auf {ziel} ein!"
+
+[[zauber]]
+id   = "giftklinge"
+typ  = "technik"
+name = "Giftklinge"
+schluesselwoerter = ["gift"]
+beschreibung = "Ein Schnitt mit vergifteter Klinge: 4 Schaden alle 2 Sekunden."
+ziel = "gegner"
+fertigkeit = "schwertkampf"
+mana_kosten = 5
+ausdauer_kosten = 5
+abklingzeit = 15
+waffen_faktor = 1.0
+wirkungen = [ { art = "schaden", wert = 4, dauer = 12, intervall = 2 } ]
+text_selbst = "Du ritzt {ziel} mit deiner {gruen}vergifteten Klinge{/}!"
+
+[[zauber]]
+id   = "schildstoss"
+typ  = "technik"
+name = "Schildstoß"
+beschreibung = "Stößt den Gegner mit dem Schild – er ist 3 Sekunden benommen."
+ziel = "gegner"
+fertigkeit = "schildblock"
+ausdauer_kosten = 10
+abklingzeit = 12
+wirkungen = [ { art = "betaeuben", wert = 3 } ]
+text_selbst = "Du rammst {ziel} deinen Schild entgegen!"
+text_raum   = "{name} rammt {ziel} mit dem Schild."
+
+[[zauber]]
+id   = "kampfschrei"
+typ  = "technik"
+name = "Kampfschrei"
+beschreibung = "Ein Schrei, der dich anstachelt: 25 % schnellere Angriffe für 30 Sekunden."
+ziel = "selbst"
+ausdauer_kosten = 20
+abklingzeit = 60
+gilde = "kriegerbund"
+wirkungen = [ { art = "tempo", wert = 25, dauer = 30 } ]
+text_selbst = "Du stößt einen markerschütternden Kampfschrei aus!"
+text_raum   = "{name} stößt einen markerschütternden Kampfschrei aus!"
+text_ende   = "Dein Kampfrausch legt sich."

@@ -22,8 +22,21 @@ pub struct Zelle {
     pub farbe: String,
 }
 
+/// Wie viele Felder die Karte durch die Karten-Fertigkeit größer ist
+/// (welt.toml: karten_fertigkeit, karten_fertigkeit_stufen, karten_fertigkeit_max).
+pub fn fertigkeits_bonus(w: &Welt, sp: &SpielerDaten) -> i32 {
+    let k = &w.d.welt;
+    if k.karten_fertigkeit.is_empty() || k.karten_fertigkeit_stufen == 0 {
+        return 0;
+    }
+    let stufe = sp.fertigkeiten.get(&k.karten_fertigkeit).copied().unwrap_or(0);
+    ((stufe / k.karten_fertigkeit_stufen) as i32).clamp(0, k.karten_fertigkeit_max.max(0))
+}
+
 pub fn zeichnen(w: &Welt, sp: &SpielerDaten, radius: i32, mit_legende: bool) -> String {
     let d = &w.d;
+    let bonus = fertigkeits_bonus(w, sp);
+    let radius = radius + bonus;
     // Auf der Oberwelt gibt es eine eigene Darstellung.
     if let (Some((x, y)), Some(ow)) = (crate::oberwelt::aus_id(&sp.raum), &d.oberwelt) {
         let andere: Vec<(i32, i32)> = w
@@ -32,7 +45,7 @@ pub fn zeichnen(w: &Welt, sp: &SpielerDaten, radius: i32, mit_legende: bool) -> 
             .filter(|s| s.sp.name != sp.name)
             .filter_map(|s| crate::oberwelt::aus_id(&s.sp.raum))
             .collect();
-        return ow.karte_zeichnen(x, y, &andere, mit_legende, sp.einstellungen.kartengroesse);
+        return ow.karte_zeichnen(x, y, &andere, mit_legende, sp.einstellungen.kartengroesse, bonus);
     }
     if d.welt.stadtkarte_stil == "kasten" {
         return zeichnen_kasten(w, sp, radius, mit_legende);

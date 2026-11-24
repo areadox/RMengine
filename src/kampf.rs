@@ -81,7 +81,9 @@ pub fn wert(w: &Welt, sid: u64, name: &str) -> i32 {
         .filter_map(|g| w.d.gegenstaende.get(g))
         .filter_map(|g| g.eigenschaften.get(name))
         .sum();
-    grund + bonus
+    // Rasse, Stärkungen durch Zauber
+    let rasse = w.d.rassen.get(&s.sp.rasse).and_then(|r| r.werte.get(name)).copied().unwrap_or(0);
+    grund + bonus + rasse + crate::wirkung::summe(w, sid, "bonus", name)
 }
 
 fn ruestung_spieler(w: &Welt, sid: u64) -> i32 {
@@ -92,9 +94,10 @@ fn ruestung_spieler(w: &Welt, sid: u64) -> i32 {
                 .values()
                 .filter_map(|g| w.d.gegenstaende.get(g))
                 .filter_map(|g| g.eigenschaften.get("ruestung"))
-                .sum()
+                .sum::<i32>()
         })
         .unwrap_or(0)
+        + crate::wirkung::summe(w, sid, "ruestung", "")
 }
 
 /// (Schaden, Erholung in Sekunden, Fertigkeit) der angelegten Waffe.
@@ -131,7 +134,7 @@ pub fn kampf_beenden(w: &mut Welt, sid: u64) {
 }
 
 /// Spieler und Monster verwickeln sich in einen Kampf.
-fn verwickeln(w: &mut Welt, sid: u64, mid: u64) {
+pub(crate) fn verwickeln(w: &mut Welt, sid: u64, mid: u64) {
     if let Some(m) = w.monster.get_mut(&mid) {
         if !m.ziele.contains(&sid) {
             if m.ziele.is_empty() {
@@ -334,9 +337,32 @@ pub fn aufgeben(w: &mut Welt, sid: u64) {
 
 /// Der Spieler greift sein Ziel an. Gibt false zurück, wenn es kein gültiges Ziel gibt.
 pub fn spieler_schlaegt(w: &mut Welt, sid: u64) -> bool {
+    let Some(mid) = w.spieler.get(&sid).and_then(|s| s.kampf_ziel) else { return false };
+    schlag(w, sid, mid, None)
+}
+
+/// Eine Kampftechnik: ein Waffenschlag mit Faktor und Zusatzschaden.
+pub struct Technik<'a> {
+    pub name: &'a str,
+    pub faktor: f64,
+    pub zusatz: i32,
+    pub text_selbst: &'a str,
+    pub text_raum: &'a str,
+}
+
+/// Kampftechnik gegen ein Monster (Kosten sind schon bezahlt).
+pub fn technik(w: &mut Welt, sid: u64, mid: u64, t: &Technik) -> bool {
+    if let Some(s) = w.spieler.get_mut(&sid) {
+        s.kampf_ziel = Some(mid);
+    }
+    verwickeln(w, sid, mid);
+    schlag(w, sid, mid, Some(t))
+}
+
+/// Ein Schlag mit der Waffe – normal oder als Technik.
+fn schlag(w: &mut Welt, sid: u64, mid: u64, technik: Option<&Technik>) -> bool {
     let jetzt = Instant::now();
     let Some(s) = w.spieler.get(&sid) else { return false };
-    let Some(mid) = s.kampf_ziel else { return false };
     let Some(m) = w.monster.get(&mid) else { return false };
     if m.raum != s.sp.raum || s.tot_bis.is_some() {
         return false;
@@ -354,6 +380,8 @@ pub fn spieler_schlaegt(w: &mut Welt, sid: u64) -> bool {
     let mut rng = rand::thread_rng();
     let chance = (75 + (geschick - 10) * 2 + fert / 4 - (def.stufe as i32 - spieler_stufe) * 5).clamp(10, 95);
     let getroffen = rng.gen_range(0..100) < chance;
+    let kraft = crate::wirkung::summe(w, sid, "kraft", "");
+    let tempo_bonus = crate::wirkung::summe(w, sid, "tempo", "");
 
     // Ausdauer und Erholung
     let kosten = w.d.kampf.ausdauer_pro_angriff;
@@ -363,13 +391,20 @@ pub fn spieler_schlaegt(w: &mut Welt, sid: u64) -> bool {
         erschoepft = s.sp.ausdauer < kosten;
         s.sp.ausdauer = (s.sp.ausdauer - kosten).max(0);
         let tempo = (1.0 - (geschick - 10) as f64 * 0.02).clamp(0.6, 1.4);
-        let mut sekunden = (erholung * tempo).max(0.6);
+        let mut sekunden = (erholung * tempo / (1.0 + tempo_bonus as f64 / 100.0).max(0.2)).max(0.6);
         if erschoepft {
             sekunden *= 1.5;
         }
         s.bereit_ab = jetzt + Duration::from_secs_f64(sekunden);
     }
 
+    let ersetzen = |t: &str| t.replace("{name}", &name).replace("{ziel}", &akk);
+    if let Some(t) = technik {
+        let selbst = if t.text_selbst.is_empty() { format!("Du setzt {} ein!", t.name) } else { ersetzen(t.text_selbst) };
+        let andere = if t.text_raum.is_empty() { format!("{name} setzt {} ein!", t.name) } else { ersetzen(t.text_raum) };
+        w.sende(sid, &format!("{{hellmagenta}}{selbst}{{/}}"));
+        w.sende_raum(&raum, &format!("{{hellmagenta}}{andere}{{/}}"), &[sid]);
+    }
     if !getroffen {
         w.sende(sid, &format!("Du verfehlst {akk}."));
         w.sende_raum(&raum, &format!("{name} verfehlt {akk}."), &[sid]);
@@ -377,6 +412,10 @@ pub fn spieler_schlaegt(w: &mut Welt, sid: u64) -> bool {
     }
 
     let mut schaden = (waffen_schaden + staerke / 4 + fert / 10) as f64;
+    if let Some(t) = technik {
+        schaden = schaden * t.faktor + t.zusatz as f64;
+    }
+    schaden *= 1.0 + kraft as f64 / 100.0;
     schaden *= rng.gen_range(0.75..1.25) * haltung.faktoren().0;
     if erschoepft {
         schaden *= 0.5;
@@ -513,12 +552,24 @@ fn monster_schlaegt(w: &mut Welt, mid: u64) {
         schaden -= ruestung_spieler(w, sid) as f64;
     }
     let schaden = (schaden.round() as i32).max(1);
+    // Schilde fangen zuerst ab
+    let (schaden, abgefangen) = crate::wirkung::schild_abfangen(w, sid, schaden);
+    if schaden == 0 {
+        let zahl = if zahlen { format!(" {{grau}}({abgefangen} abgefangen){{/}}") } else { String::new() };
+        w.sende(sid, &format!("{monster_name} {verb_dich}, aber dein Schild fängt alles ab.{zahl}"));
+        w.sende_raum(&raum, &format!("{monster_name} {verb_andere}, prallt aber an einem Schild ab."), &[sid]);
+        return;
+    }
     let (lp, max, tot) = {
         let Some(s) = w.spieler.get_mut(&sid) else { return };
         s.sp.lebenspunkte -= schaden;
         (s.sp.lebenspunkte, s.sp.max_lebenspunkte, s.sp.lebenspunkte <= 0)
     };
-    let zahl = if zahlen { format!(" {{grau}}({schaden}){{/}}") } else { String::new() };
+    let zahl = match (zahlen, abgefangen) {
+        (false, _) => String::new(),
+        (true, 0) => format!(" {{grau}}({schaden}){{/}}"),
+        (true, a) => format!(" {{grau}}({schaden}, Schild fängt {a} ab){{/}}"),
+    };
     w.sende(sid, &format!("{{hellrot}}{monster_name} {verb_dich}!{{/}}{zahl}"));
     w.sende_raum(&raum, &format!("{monster_name} {verb_andere}."), &[sid]);
     if tot {
@@ -532,7 +583,7 @@ fn monster_schlaegt(w: &mut Welt, mid: u64) {
 // Sieg, Tod und Stufen
 // ---------------------------------------------------------------------------
 
-fn monster_stirbt(w: &mut Welt, mid: u64) {
+pub(crate) fn monster_stirbt(w: &mut Welt, mid: u64) {
     let Some(m) = w.monster.remove(&mid) else { return };
     let Some(def) = w.d.monster.get(&m.def).cloned() else { return };
     let name = gross(&def.name);
@@ -553,8 +604,34 @@ fn monster_stirbt(w: &mut Welt, mid: u64) {
         }
     }
 
-    // Erfahrung für alle, die mitgekämpft haben und noch da sind
+    // Erfahrung (und Geld) für alle, die mitgekämpft haben und noch da sind
     let ep = def.kampf_erfahrung();
+    let sieger: Vec<u64> = m
+        .ziele
+        .iter()
+        .copied()
+        .filter(|sid| w.spieler.get(sid).is_some_and(|s| s.sp.raum == m.raum && s.tot_bis.is_none()))
+        .collect();
+    let geld = def.geld.wuerfeln();
+    if geld > 0 && !sieger.is_empty() {
+        let anteil = geld / sieger.len() as u64;
+        let rest = geld % sieger.len() as u64;
+        let waehrung = w.d.welt.waehrung.clone();
+        for (i, sid) in sieger.iter().enumerate() {
+            let betrag = anteil + if i == 0 { rest } else { 0 };
+            if betrag == 0 {
+                continue;
+            }
+            if let Some(s) = w.spieler.get_mut(sid) {
+                s.sp.geld += betrag;
+            }
+            let bei = if def.dativ.is_empty() { String::new() } else { format!(" bei {}", def.dativ) };
+            w.sende(*sid, &format!("{{hellgelb}}Du findest {betrag} {waehrung}{bei}.{{/}}"));
+        }
+    }
+    for sid in &sieger {
+        crate::quests::fortschritt(w, *sid, "toeten", &def.id, 1);
+    }
     for sid in m.ziele {
         let Some(s) = w.spieler.get_mut(&sid) else { continue };
         if s.kampf_ziel == Some(mid) {
@@ -687,6 +764,9 @@ fn erwecken(w: &mut Welt, sid: u64, im_tempel: bool) {
 pub fn takt(w: &mut Welt) {
     let jetzt = Instant::now();
     let mut beteiligt: BTreeSet<u64> = BTreeSet::new();
+
+    // 0. Wirkungen mit Dauer (Schilde, Gift, Heilung über Zeit ...)
+    beteiligt.extend(crate::wirkung::takt(w));
 
     // 1. Aufräumen: Wer nicht mehr im selben Raum ist oder tot ist, kämpft nicht mehr.
     let orte: std::collections::HashMap<u64, (String, bool)> =

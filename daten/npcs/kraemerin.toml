@@ -26,8 +26,21 @@ unbekannt   = "Hm? Davon hab ich keine Ahnung, Schätzchen."
 
 [[npc.thema]]
 woerter = ["kaufen", "verkaufen", "preis", "preise", "waren", "handel"]
-antwort = "Handeln kann ich mit dir erst, wenn es Geld in dieser Welt gibt. Bald, bald!"
+antwort = "Schau dir meine Waren an (waren). Ich kaufe auch, was du loswerden willst."
 
 [[npc.thema]]
 woerter = ["pilz", "pilze"]
 antwort = "Die blauen Pilze vom Waldweg geben einem Kraft für Zauberei, sagt man. Ich ess sie lieber nicht."
+
+# Greta handelt: "waren" zeigt das Angebot, "kaufe brot", "verkaufe pelz"
+[npc.haendler]
+waren           = ["brot", "apfel", "heiltrank", "manatrank", "fackel", "landkarte"]
+ankauf          = true      # kauft Gegenstände an
+ankauf_prozent  = 50        # zahlt die Hälfte des Werts
+verkauf_prozent = 100       # verkauft zum vollen Wert
+
+# Und sie bringt einem bei, sich zurechtzufinden (größere Karte)
+[[npc.lehrt]]
+id    = "orientierung"
+preis = 8
+bis   = 30

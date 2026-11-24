@@ -25,7 +25,11 @@ mod spieler;
 mod telnet;
 mod text;
 mod update;
+mod gemeinschaft;
+mod handel;
+mod quests;
 mod welt;
+mod wirkung;
 
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};

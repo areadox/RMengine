@@ -1,0 +1,20 @@
+# =====================================================================
+#  Berufe und Zünfte – man kann mehrere haben (welt.toml: max_berufe)
+# =====================================================================
+#  Felder wie bei Gilden. Man tritt bei einem NPC mit  beruf = "<id>"  bei.
+#  Das Handwerk selbst (Herstellen von Dingen) kommt später – die Berufe
+#  geben schon jetzt ihre Fertigkeiten, und Lehrmeister können sie vertiefen.
+
+[[beruf]]
+id   = "schmied"
+name = "Zunft der Schmiede"
+beschreibung = "Schmiede bearbeiten Eisen und Stahl."
+preis = 5
+fertigkeiten = { schmieden = 5 }
+aufnahme_text = "Willkommen in der Zunft. Hau ordentlich drauf, aber nicht auf die Finger!"
+
+[[beruf]]
+id   = "kraeutersammler"
+name = "Kräutersammler"
+beschreibung = "Wer die Pflanzen kennt, findet Heilung am Wegesrand."
+fertigkeiten = { kraeuterkunde = 5 }

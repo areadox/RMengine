@@ -1,0 +1,35 @@
+# =====================================================================
+#  Gilden – man kann in genau einer Gilde sein
+# =====================================================================
+#  Man tritt bei einem NPC bei, der  gilde = "<id>"  hat (Befehl: beitreten).
+#  aufnahme_stufe: ab welcher Stufe   preis: Aufnahmegebühr
+#  rassen:  nur diese Rassen (leer = alle)
+#  titel:   wird bei der Aufnahme als Titel gesetzt
+#  werte, lebenspunkte, mana, ausdauer, fertigkeiten, zauber: was man bekommt
+#
+#  Ausbauen lässt sich eine Gilde mit:
+#    - Lehrmeistern, die nur Mitglieder unterrichten ([[npc.lehrt]] mit gilde = "...")
+#    - Zaubern/Techniken nur für Mitglieder (gilde = "..." beim Zauber)
+#    - Aufgaben nur für Mitglieder (gilde = "..." beim Quest)
+
+[[gilde]]
+id   = "lichtorden"
+name = "Orden des Lichts"
+beschreibung = "Heiler und Hüter, die dem Licht dienen. Sie lernen Schutz- und Heilzauber."
+aufnahme_stufe = 2
+preis = 10
+titel = "vom Orden des Lichts"
+mana  = 15
+fertigkeiten = { heilkunde = 5 }
+zauber = ["lebensquell"]
+aufnahme_text = "Möge das Licht dich leiten. Willkommen im Orden!"
+
+[[gilde]]
+id   = "kriegerbund"
+name = "Bund der Krieger"
+beschreibung = "Wer kämpft, gehört hierher. (Noch ohne Gildenmeister – eine Vorbereitung.)"
+aufnahme_stufe = 3
+titel = "der Krieger"
+lebenspunkte = 20
+fertigkeiten = { schwertkampf = 5 }
+zauber = ["kampfschrei"]

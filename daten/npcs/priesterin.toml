@@ -1,0 +1,46 @@
+# =====================================================================
+#  NPC: Schwester Alwine, Priesterin im Tempel
+# =====================================================================
+#  Sie lehrt Zauber und nimmt in den Orden des Lichts auf.
+
+[npc]
+id        = "priesterin"
+erbt      = "vorlage_dorfbewohner"
+name      = "Schwester Alwine"
+akkusativ = "Schwester Alwine"
+dativ     = "Schwester Alwine"
+schluesselwoerter = ["alwine", "schwester", "priesterin"]
+raumtext  = "Schwester Alwine kniet betend vor dem Altar."
+beschreibung = """
+Eine ältere Frau in einem schlichten weißen Gewand. Ihre Augen sind
+freundlich, aber wach – ihr entgeht nichts."""
+stufe        = 10
+lebenspunkte = 120
+gilde        = "lichtorden"   # nimmt in den Orden des Lichts auf (beitreten)
+
+[npc.gespraech]
+begruessung = "Das Licht sei mit dir, {spieler}."
+beruf       = "Ich hüte diesen Tempel und lehre die Kunst des Schutzes und der Heilung. Frag nach meinen Lehren (waren)."
+aufgabe     = "Wer dem Orden des Lichts beitreten will, sage es mir (beitreten)."
+name        = "Man nennt mich Schwester Alwine."
+abschied    = "Geh mit dem Licht."
+unbekannt   = "*lächelt nur still."
+
+[[npc.lehrt]]
+id    = "schutzschild"
+preis = 25
+
+[[npc.lehrt]]
+id    = "baerenkraft"
+preis = 50
+stufe = 3
+
+[[npc.lehrt]]
+id    = "heilkunde"
+preis = 6
+bis   = 25
+
+[[npc.lehrt]]
+id    = "magie"
+preis = 6
+bis   = 25

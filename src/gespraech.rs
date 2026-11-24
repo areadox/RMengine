@@ -142,6 +142,12 @@ pub fn satz_vorbereiten(t: &str) -> String {
         .join(" ")
 }
 
+/// Fragt der Satz nach einer Aufgabe ("hast du eine Aufgabe für mich")?
+pub fn fragt_nach_aufgabe(frage: &str) -> bool {
+    let satz = satz_vorbereiten(frage);
+    STANDARD.iter().filter(|(art, _)| *art == "aufgabe").any(|(_, woerter)| woerter.iter().any(|w| kommt_vor(&satz, w)))
+}
+
 /// Was antwortet der NPC? `None` = er versteht die Frage nicht.
 pub fn antwort(g: &GespraechDef, themen: &[ThemaDef], frage: &str) -> Option<String> {
     let satz = satz_vorbereiten(frage);

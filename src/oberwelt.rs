@@ -569,11 +569,12 @@ impl Oberwelt {
     /// Stil "kompakt": ein Zeichen pro Feld im Rahmen, X = du.
     /// Stil "weit": ein Zeichen und ein Leerzeichen pro Feld, ohne Rahmen.
     /// `zoom`: -1 kleiner, 0 normal, +1 größer (Einstellung im Spielerbuch)
-    pub fn karte_zeichnen(&self, x: i32, y: i32, andere: &[(i32, i32)], mit_legende: bool, zoom: i32) -> String {
-        let rx = (self.cfg.anzeige_breite + zoom * 4).max(2);
-        let ry = (self.cfg.anzeige_hoehe + zoom * 2).max(1);
+    /// `extra`: zusätzliche Felder durch die Karten-Fertigkeit (größerer Ausschnitt und weitere Sicht)
+    pub fn karte_zeichnen(&self, x: i32, y: i32, andere: &[(i32, i32)], mit_legende: bool, zoom: i32, extra: i32) -> String {
+        let rx = (self.cfg.anzeige_breite + zoom * 4 + extra * 2).max(2);
+        let ry = (self.cfg.anzeige_hoehe + zoom * 2 + extra).max(1);
         let kompakt = self.cfg.stil != "weit";
-        let weite = self.sichtweite(x, y);
+        let weite = self.sichtweite(x, y) + extra;
         let mut gesehen: BTreeSet<char> = BTreeSet::new();
         let mut orte_gesehen: Vec<(char, String, String)> = Vec::new();
         let ich = if kompakt { 'X' } else { '@' };

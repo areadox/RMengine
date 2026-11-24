@@ -1,0 +1,308 @@
+//! Geld, Händler und Lehrmeister.
+//!
+//! Händler: NPCs mit `[npc.haendler]` verkaufen ihre `waren` und kaufen
+//! Gegenstände an. Preise richten sich nach dem `wert` des Gegenstands.
+//! Lehrmeister: NPCs mit `[[npc.lehrt]]` bringen Fertigkeiten (Stufe für Stufe)
+//! und Zauber gegen Geld bei.
+
+use crate::befehle::{finde_gegenstand, gruppieren, passt};
+use crate::daten::{LehrDef, MonsterDef};
+use crate::text::{auffuellen, gross, normalisieren};
+use crate::welt::Welt;
+
+/// "12 Gold"
+pub fn betrag(w: &Welt, n: u64) -> String {
+    format!("{n} {}", w.d.welt.waehrung)
+}
+
+/// NPCs im Raum des Spielers, auf die `pruefen` zutrifft.
+fn npcs_im_raum<'a>(w: &'a Welt, sid: u64, pruefen: impl Fn(&MonsterDef) -> bool) -> Vec<(u64, &'a MonsterDef)> {
+    let raum = &w.spieler[&sid].sp.raum;
+    w.monster_im_raum(raum)
+        .into_iter()
+        .filter_map(|mid| w.monster.get(&mid).and_then(|m| w.d.monster.get(&m.def)).map(|d| (mid, d)))
+        .filter(|(_, d)| pruefen(d))
+        .collect()
+}
+
+fn verkaufspreis(d: &MonsterDef, wert: i32) -> u64 {
+    let p = d.haendler.as_ref().map(|h| h.verkauf_prozent).unwrap_or(100) as u64;
+    (wert.max(0) as u64 * p / 100).max(1)
+}
+
+fn ankaufspreis(d: &MonsterDef, wert: i32) -> u64 {
+    let p = d.haendler.as_ref().map(|h| h.ankauf_prozent).unwrap_or(50) as u64;
+    wert.max(0) as u64 * p / 100
+}
+
+fn npc_sagt(w: &Welt, sid: u64, npc: &MonsterDef, text: &str) {
+    let raum = w.spieler[&sid].sp.raum.clone();
+    w.sende_raum(&raum, &format!("{{hellcyan}}{} sagt: „{text}“{{/}}", gross(&npc.name)), &[]);
+}
+
+/// Befehl "waren": was die Händler und Lehrmeister hier anbieten.
+pub fn waren(w: &Welt, sid: u64, rest: &str) {
+    let liste = npcs_im_raum(w, sid, |d| d.haendler.is_some() || !d.lehrt.is_empty());
+    let liste: Vec<_> = if rest.is_empty() {
+        liste
+    } else {
+        liste.into_iter().filter(|(_, d)| passt(rest, &d.name, &d.id, &d.schluesselwoerter)).collect()
+    };
+    if liste.is_empty() {
+        w.sende(sid, "Hier verkauft und lehrt niemand etwas.");
+        return;
+    }
+    let sp = &w.spieler[&sid].sp;
+    let mut t = String::new();
+    for (_, d) in liste {
+        if let Some(h) = &d.haendler {
+            t.push_str(&format!("{{fett}}{} verkauft:{{/}}\n", gross(&d.name)));
+            if h.waren.is_empty() {
+                t.push_str("  (nichts – kauft aber an)\n");
+            }
+            for id in &h.waren {
+                let Some(g) = w.d.gegenstaende.get(id) else { continue };
+                t.push_str(&format!(
+                    "  {} {{hellgelb}}{}{{/}}\n",
+                    auffuellen(&gross(&g.name), 32),
+                    betrag(w, verkaufspreis(d, g.wert))
+                ));
+            }
+            if h.ankauf {
+                let was = if h.ankauf_typen.is_empty() { "alles".to_string() } else { h.ankauf_typen.join(", ") };
+                t.push_str(&format!("  {{grau}}Kauft an: {was} (für {} % des Werts){{/}}\n", h.ankauf_prozent));
+            }
+        }
+        if !d.lehrt.is_empty() {
+            t.push_str(&format!("{{fett}}{} lehrt:{{/}}\n", gross(&d.name)));
+            for l in &d.lehrt {
+                if let Some(f) = w.d.fertigkeiten.get(&l.id) {
+                    let bis = l.bis.unwrap_or(f.max_stufe);
+                    let hat = sp.fertigkeiten.get(&f.id).copied().unwrap_or(0);
+                    t.push_str(&format!(
+                        "  {} {{hellgelb}}{}{{/}} je Lektion {{grau}}(bis Stufe {bis}, du: {hat}){}{{/}}\n",
+                        auffuellen(&f.name, 24),
+                        betrag(w, l.preis),
+                        bedingung(w, l)
+                    ));
+                } else if let Some(z) = w.d.zauber.get(&l.id) {
+                    let art = if z.ist_technik() { "Technik" } else { "Zauber" };
+                    let kann = if sp.zauber.contains(&z.id) { ", kannst du schon" } else { "" };
+                    t.push_str(&format!(
+                        "  {} {{hellgelb}}{}{{/}} {{grau}}({art}{kann}){}{{/}}\n",
+                        auffuellen(&z.name, 24),
+                        betrag(w, l.preis),
+                        bedingung(w, l)
+                    ));
+                }
+            }
+        }
+    }
+    t.push_str(&format!(
+        "\nDu hast {{hellgelb}}{}{{/}}. Befehle: {{gelb}}kaufe <ware>{{/}}, {{gelb}}verkaufe <ding>{{/}}, {{gelb}}lerne <was>{{/}}",
+        betrag(w, sp.geld)
+    ));
+    w.sende(sid, &t);
+}
+
+fn bedingung(w: &Welt, l: &LehrDef) -> String {
+    let mut v = Vec::new();
+    if l.stufe > 1 {
+        v.push(format!("ab Stufe {}", l.stufe));
+    }
+    if let Some(g) = w.d.gilden.get(&l.gilde) {
+        v.push(format!("nur {}", g.name));
+    }
+    if v.is_empty() {
+        String::new()
+    } else {
+        format!(", {}", v.join(", "))
+    }
+}
+
+/// "kaufe 3 brot" -> (3, "brot")
+fn anzahl_und_name(rest: &str) -> (u32, &str) {
+    match rest.split_once(char::is_whitespace) {
+        Some((zahl, name)) if zahl.parse::<u32>().is_ok() => (zahl.parse::<u32>().unwrap_or(1).clamp(1, 50), name.trim()),
+        _ => (1, rest),
+    }
+}
+
+/// Befehl "kaufe <ware>"
+pub fn kaufen(w: &mut Welt, sid: u64, rest: &str) {
+    if rest.is_empty() {
+        w.sende(sid, "Was willst du kaufen? ({gelb}waren{/} zeigt das Angebot)");
+        return;
+    }
+    let (anzahl, such) = anzahl_und_name(rest);
+    let treffer = npcs_im_raum(w, sid, |d| d.haendler.is_some()).into_iter().find_map(|(_, d)| {
+        let h = d.haendler.as_ref()?;
+        let i = finde_gegenstand(&w.d, &h.waren, such)?;
+        let g = w.d.gegenstaende.get(&h.waren[i])?;
+        Some((d.clone(), g.clone()))
+    });
+    let Some((npc, g)) = treffer else {
+        if npcs_im_raum(w, sid, |d| d.haendler.is_some()).is_empty() {
+            w.sende(sid, "Hier gibt es keinen Händler.");
+        } else {
+            w.sende(sid, "Das wird hier nicht verkauft. ({gelb}waren{/} zeigt das Angebot)");
+        }
+        return;
+    };
+    let preis = verkaufspreis(&npc, g.wert) * anzahl as u64;
+    let s = w.spieler.get_mut(&sid).expect("Spieler");
+    if s.sp.geld < preis {
+        let hat = s.sp.geld;
+        w.sende(sid, &format!("Das kostet {}, du hast aber nur {}.", betrag(w, preis), betrag(w, hat)));
+        return;
+    }
+    s.sp.geld -= preis;
+    for _ in 0..anzahl {
+        s.sp.inventar.push(g.id.clone());
+    }
+    let (name, raum) = (s.sp.name.clone(), s.sp.raum.clone());
+    let akk = if g.akkusativ.is_empty() { g.name.clone() } else { g.akkusativ.clone() };
+    let was = if anzahl > 1 { format!("{anzahl}x {}", g.name) } else { akk };
+    w.sende(sid, &format!("Du kaufst {was} für {{hellgelb}}{}{{/}}.", betrag(w, preis)));
+    w.sende_raum(&raum, &format!("{name} kauft etwas bei {}.", if npc.dativ.is_empty() { &npc.name } else { &npc.dativ }), &[sid]);
+}
+
+/// Befehl "verkaufe <ding>"
+pub fn verkaufen(w: &mut Welt, sid: u64, rest: &str) {
+    if rest.is_empty() {
+        w.sende(sid, "Was willst du verkaufen?");
+        return;
+    }
+    let haendler: Vec<MonsterDef> = npcs_im_raum(w, sid, |d| d.haendler.as_ref().is_some_and(|h| h.ankauf))
+        .into_iter()
+        .map(|(_, d)| d.clone())
+        .collect();
+    if haendler.is_empty() {
+        w.sende(sid, "Hier gibt es niemanden, der etwas ankauft.");
+        return;
+    }
+    let (anzahl, such) = anzahl_und_name(rest);
+    let Some(i) = finde_gegenstand(&w.d, &w.spieler[&sid].sp.inventar, such) else {
+        w.sende(sid, "So etwas hast du nicht dabei. (Angelegte Ausrüstung musst du erst ausziehen.)");
+        return;
+    };
+    let gid = w.spieler[&sid].sp.inventar[i].clone();
+    let Some(g) = w.d.gegenstaende.get(&gid).cloned() else { return };
+    let Some(npc) = haendler.iter().find(|d| {
+        let h = d.haendler.as_ref().expect("Händler");
+        h.ankauf_typen.is_empty() || h.ankauf_typen.contains(&g.typ)
+    }) else {
+        npc_sagt(w, sid, &haendler[0], "So etwas kaufe ich nicht.");
+        return;
+    };
+    let stueck = ankaufspreis(npc, g.wert);
+    if stueck == 0 {
+        npc_sagt(w, sid, npc, "Das ist nichts wert, tut mir leid.");
+        return;
+    }
+    let s = w.spieler.get_mut(&sid).expect("Spieler");
+    let mut verkauft = 0;
+    while verkauft < anzahl {
+        let Some(pos) = s.sp.inventar.iter().position(|x| *x == gid) else { break };
+        s.sp.inventar.remove(pos);
+        verkauft += 1;
+    }
+    let preis = stueck * verkauft as u64;
+    s.sp.geld += preis;
+    let (name, raum) = (s.sp.name.clone(), s.sp.raum.clone());
+    let akk = if g.akkusativ.is_empty() { g.name.clone() } else { g.akkusativ.clone() };
+    let was = if verkauft > 1 { format!("{verkauft}x {}", g.name) } else { akk };
+    w.sende(sid, &format!("Du verkaufst {was} für {{hellgelb}}{}{{/}}.", betrag(w, preis)));
+    w.sende_raum(&raum, &format!("{name} verkauft etwas."), &[sid]);
+}
+
+/// Befehl "lerne <fertigkeit|zauber>"
+pub fn lernen(w: &mut Welt, sid: u64, rest: &str) {
+    let lehrer = npcs_im_raum(w, sid, |d| !d.lehrt.is_empty());
+    if lehrer.is_empty() {
+        w.sende(sid, "Hier ist niemand, der dir etwas beibringen kann.");
+        return;
+    }
+    if rest.is_empty() {
+        waren(w, sid, "");
+        return;
+    }
+    let such = normalisieren(rest);
+    let gefunden = lehrer.iter().find_map(|(_, d)| {
+        d.lehrt.iter().find(|l| {
+            let (name, woerter) = match (w.d.fertigkeiten.get(&l.id), w.d.zauber.get(&l.id)) {
+                (Some(f), _) => (f.name.clone(), Vec::new()),
+                (_, Some(z)) => (z.name.clone(), z.schluesselwoerter.clone()),
+                _ => return false,
+            };
+            passt(&such, &name, &l.id, &woerter) || normalisieren(&name) == such
+        })
+        .map(|l| ((*d).clone(), l.clone()))
+    });
+    let Some((npc, l)) = gefunden else {
+        w.sende(sid, "Das kann dir hier niemand beibringen. ({gelb}waren{/} zeigt, was gelehrt wird)");
+        return;
+    };
+    let sp = &w.spieler[&sid].sp;
+    if sp.stufe < l.stufe {
+        npc_sagt(w, sid, &npc, &format!("Komm wieder, wenn du Stufe {} erreicht hast.", l.stufe));
+        return;
+    }
+    if !l.gilde.is_empty() && sp.gilde != l.gilde {
+        let g = w.d.gilden.get(&l.gilde).map(|g| g.name.clone()).unwrap_or_default();
+        npc_sagt(w, sid, &npc, &format!("Das lehre ich nur Mitgliedern der {g}."));
+        return;
+    }
+    if sp.geld < l.preis {
+        npc_sagt(w, sid, &npc, &format!("Das kostet {}. Du hast nicht genug.", betrag(w, l.preis)));
+        return;
+    }
+    let meldung = if let Some(f) = w.d.fertigkeiten.get(&l.id).cloned() {
+        let hat = sp.fertigkeiten.get(&f.id).copied().unwrap_or(0);
+        let bis = l.bis.unwrap_or(f.max_stufe).min(f.max_stufe);
+        if hat >= bis {
+            npc_sagt(w, sid, &npc, &format!("Mehr kann ich dir in {} nicht beibringen.", f.name));
+            return;
+        }
+        if let Some(fehlt) = f.voraussetzungen.iter().find(|v| sp.fertigkeiten.get(*v).copied().unwrap_or(0) == 0) {
+            let n = w.d.fertigkeiten.get(fehlt).map(|f| f.name.clone()).unwrap_or_else(|| fehlt.clone());
+            npc_sagt(w, sid, &npc, &format!("Dafür musst du zuerst {n} lernen."));
+            return;
+        }
+        let s = w.spieler.get_mut(&sid).expect("Spieler");
+        s.sp.fertigkeiten.insert(f.id.clone(), hat + 1);
+        format!("{} bringt dir {} bei. {{hellgruen}}{} steigt auf {}.{{/}}", gross(&npc.name), f.name, f.name, hat + 1)
+    } else if let Some(z) = w.d.zauber.get(&l.id).cloned() {
+        if sp.zauber.contains(&z.id) {
+            npc_sagt(w, sid, &npc, &format!("{} beherrschst du doch schon.", z.name));
+            return;
+        }
+        let s = w.spieler.get_mut(&sid).expect("Spieler");
+        s.sp.zauber.push(z.id.clone());
+        let befehl = if z.ist_technik() { "spezial" } else { "zaubere" };
+        format!(
+            "{} lehrt dich {}. {{hellgruen}}Du beherrschst jetzt {}!{{/}} {{grau}}({befehl} {}){{/}}",
+            gross(&npc.name),
+            z.name,
+            z.name,
+            normalisieren(&z.name)
+        )
+    } else {
+        return;
+    };
+    let s = w.spieler.get_mut(&sid).expect("Spieler");
+    s.sp.geld -= l.preis;
+    let sp = s.sp.clone();
+    w.speichern(&sp);
+    w.sende(sid, &format!("{meldung} {{grau}}(-{}){{/}}", betrag(w, l.preis)));
+}
+
+/// Befehl "geld"
+pub fn geld(w: &Welt, sid: u64) {
+    w.sende(sid, &format!("Du hast {{hellgelb}}{}{{/}}.", betrag(w, w.spieler[&sid].sp.geld)));
+}
+
+/// Wie viele Gegenstände man zum Bringen dabei hat.
+pub fn im_inventar(w: &Welt, sid: u64, gid: &str) -> u32 {
+    gruppieren(&w.spieler[&sid].sp.inventar).into_iter().find(|(id, _)| id == gid).map(|(_, n)| n as u32).unwrap_or(0)
+}

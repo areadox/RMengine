@@ -14,6 +14,8 @@ mod bereiche;
 mod befehlsliste;
 mod fenster;
 mod fernwartung;
+mod inhalte;
+mod schema;
 #[allow(dead_code)]
 #[path = "../../src/fernwartung_protokoll.rs"]
 mod fernwartung_protokoll;
@@ -21,7 +23,6 @@ mod fernwartung_protokoll;
 #[path = "../../src/update.rs"]
 mod update;
 mod welt;
-mod zauber;
 
 fn main() -> eframe::Result {
     update::aufraeumen();

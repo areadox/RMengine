@@ -1,0 +1,83 @@
+# =====================================================================
+#  Aufgaben und Quests
+# =====================================================================
+#  art:        "aufgabe" (klein) oder "quest" (groß)
+#  geber:      der NPC, der sie anbietet (und bei dem man sie abgibt)
+#  mindest_stufe, voraussetzungen (andere Quests), gilde: wer sie bekommt
+#  wiederholbar: true = kann immer wieder erledigt werden
+#  angebot / annahme / abschluss: was der NPC sagt
+#  abgabe:     false = fertig, sobald alle Schritte erledigt sind
+#
+#  [[quest.schritte]]  der Reihe nach:
+#    art = "toeten"    ziel = Monster-ID,    anzahl
+#    art = "bringen"   ziel = Gegenstand-ID, anzahl, an = NPC (leer = Geber)
+#    art = "besuchen"  ziel = Raum-ID
+#    art = "sprechen"  ziel = NPC-ID
+#    text = "..."      was im Aufgabenbuch steht (sonst automatisch)
+#
+#  [quest.belohnung]  erfahrung, geld, gegenstaende, fertigkeiten, zauber, titel
+#
+#  So spielt man es: sage hast du eine aufgabe? → annehmen → aufgaben → abgeben
+
+[[quest]]
+id     = "rattenplage"
+name   = "Die Rattenplage"
+art    = "quest"
+geber  = "wirt"
+beschreibung = "Im Keller der Taverne treiben sich Ratten herum."
+angebot   = "Im Keller wimmelt es von Ratten! Wenn du mir drei davon vom Hals schaffst, lohnt es sich für dich."
+annahme   = "Wunderbar! Die Falltür ist hinter der Theke – nach unten."
+abschluss = "Endlich Ruhe im Keller! Hier, das hast du dir verdient."
+
+[[quest.schritte]]
+art    = "besuchen"
+ziel   = "keller"
+text   = "Steig in den Weinkeller hinab"
+
+[[quest.schritte]]
+art    = "toeten"
+ziel   = "ratte"
+anzahl = 3
+text   = "Besiege 3 Ratten"
+
+[quest.belohnung]
+erfahrung    = 60
+geld         = 25
+gegenstaende = ["heiltrank"]
+
+[[quest]]
+id     = "pilze_fuer_greta"
+name   = "Blaue Pilze"
+art    = "aufgabe"
+geber  = "kraemerin"
+wiederholbar = true
+angebot   = "Bring mir zwei blaue Pilze aus dem Wald, dann zahle ich gut."
+annahme   = "Die wachsen am Waldweg. Aber iss sie nicht!"
+abschluss = "Prächtig! Die verkaufe ich teuer weiter."
+
+[[quest.schritte]]
+art    = "bringen"
+ziel   = "pilz"
+anzahl = 2
+
+[quest.belohnung]
+erfahrung = 15
+geld      = 12
+
+[[quest]]
+id     = "bote_zum_schmied"
+name   = "Ein Gruß an Harald"
+art    = "aufgabe"
+geber  = "wirt"
+voraussetzungen = ["rattenplage"]
+abgabe = false
+angebot = "Kannst du Harald, dem Schmied, ausrichten, dass sein Bier bereitsteht?"
+
+[[quest.schritte]]
+art  = "sprechen"
+ziel = "schmied"
+text = "Sprich mit Harald, dem Schmied"
+
+[quest.belohnung]
+erfahrung = 20
+fertigkeiten = { orientierung = 2 }

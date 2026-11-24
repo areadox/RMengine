@@ -28,6 +28,8 @@ pub struct Sitzung {
     pub ausweichen_bis: Option<Instant>,
     /// Tot: bis dahin können andere helfen, danach Wiederbelebung im Tempel
     pub tot_bis: Option<Instant>,
+    /// Schilde, Stärkungen und andere Wirkungen mit Dauer
+    pub effekte: Vec<crate::wirkung::Effekt>,
 }
 
 impl Sitzung {
@@ -72,6 +74,8 @@ pub struct Monster {
     pub ziele: Vec<u64>,
     /// Ab wann es wieder angreifen kann
     pub bereit_ab: Instant,
+    /// Gift und andere Wirkungen mit Dauer
+    pub effekte: Vec<crate::wirkung::Effekt>,
 }
 
 /// Gespeicherte Rolle – aber wer in welt.toml unter admins/baumeister steht,
@@ -145,6 +149,7 @@ impl Welt {
             mana: m.mana,
             ziele: Vec::new(),
             bereit_ab: Instant::now(),
+            effekte: Vec::new(),
         };
         let id = self.neue_id();
         self.monster.insert(id, monster);
@@ -275,6 +280,7 @@ impl Welt {
             fertigkeiten: st.fertigkeiten.clone(),
             zauber: st.zauber.clone(),
             werte: st.werte.clone(),
+            geld: st.geld,
             ausdauer: self.d.kampf.ausdauer,
             max_ausdauer: self.d.kampf.ausdauer,
             erstellt: std::time::SystemTime::now()
@@ -318,6 +324,7 @@ impl Welt {
                 haltung: crate::kampf::Haltung::Ausgewogen,
                 ausweichen_bis: None,
                 tot_bis: None,
+                effekte: Vec::new(),
             });
         self.sende_raum(&raum, &format!("{name} erscheint."), &[id]);
         self.sende_ankuendigung(&format!("{{grau}}[{name} hat die Welt betreten.]{{/}}"), &[id]);

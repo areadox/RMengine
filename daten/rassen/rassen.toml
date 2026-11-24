@@ -1,0 +1,41 @@
+# =====================================================================
+#  Rassen – werden bei der Erschaffung einer Figur gewählt
+# =====================================================================
+#  werte:        Zuschläge auf die Grundwerte aus [start.werte]
+#  lebenspunkte, mana, ausdauer: Zuschläge auf die Höchstwerte
+#  fertigkeiten: Fertigkeiten, die man von Anfang an kann (= Stufe)
+#  zauber:       Zauber oder Techniken, die man von Anfang an kann
+#  waehlbar:     false = nicht bei der Erschaffung wählbar (z.B. für NPC-Völker)
+#  Gibt es keine Rasse, wird bei der Erschaffung nicht gefragt.
+
+[[rasse]]
+id   = "mensch"
+name = "Menschen"
+beschreibung = "Anpassungsfähig und ausdauernd. Menschen können alles ein bisschen."
+ausdauer = 10
+werte = { ausdauer = 1 }
+
+[[rasse]]
+id   = "elf"
+name = "Elfen"
+beschreibung = "Schlank, flink und mit einem Gespür für Magie. Im Nahkampf eher zart."
+mana  = 20
+lebenspunkte = -10
+werte = { geschick = 2, intelligenz = 1, staerke = -1 }
+fertigkeiten = { magie = 3, orientierung = 5 }
+
+[[rasse]]
+id   = "zwerg"
+name = "Zwerge"
+beschreibung = "Klein, zäh und stur. Zwerge halten viel aus und schwingen ihre Äxte mit Kraft."
+lebenspunkte = 20
+mana = -10
+werte = { staerke = 2, ausdauer = 1, geschick = -1 }
+fertigkeiten = { schwertkampf = 3, schmieden = 2 }
+
+[[rasse]]
+id   = "halbling"
+name = "Halblinge"
+beschreibung = "Klein, leise und neugierig. Halblinge kommen überall unbemerkt hin."
+werte = { geschick = 3, staerke = -2 }
+fertigkeiten = { schleichen = 5 }

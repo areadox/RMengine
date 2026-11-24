@@ -454,6 +454,18 @@ stadtkarte_stil    = "kasten"   # oder "linien": ein Zeichen pro Raum, ohne Rahm
 karten_hintergrund = "*"        # Füllzeichen, z.B. "*" oder " "
 ```
 
+**Größere Karte durch eine Fertigkeit:** Mit `karten_fertigkeit` wird die Karte
+größer, je besser man eine Fertigkeit beherrscht:
+
+```toml
+karten_fertigkeit        = "orientierung"  # "" = aus
+karten_fertigkeit_stufen = 10              # alle 10 Stufen ein Feld mehr
+karten_fertigkeit_max    = 3               # höchstens 3 Felder mehr
+```
+
+Das gilt für die Stadtkarte und die Oberwelt (dort sieht man auch weiter).
+Die Fertigkeit lernt man zum Beispiel bei einem Lehrmeister.
+
 Mit `karte_daneben = true` steht die Raumbeschreibung rechts neben der Karte
 und läuft darunter in voller Breite weiter:
 
@@ -589,12 +601,22 @@ automatisch mit aktualisiert.
 Oben schaltest du zwischen drei Bereichen um:
 
 - **🗺 Räume:** die Karte, wie oben beschrieben.
-- **✨ Zauber:** alle Zauber und Zauber-Vorlagen. Du kannst Name, Kosten, Ziel,
-  Fertigkeit, Abklingzeit, Wirkungen und Texte bearbeiten, Zauber anlegen,
-  kopieren und löschen. Ist ein Zauber von einer Vorlage abgeleitet, sind die
-  geerbten Werte grau. Wer selbst etwas einträgt, überschreibt die Vorlage.
-  Benennst du einen Zauber um, passt der Editor die Startzauber, die Monster und
-  die Vorlagen-Verweise an.
+- **📚 Inhalte:** alles außer Räumen und Befehlen. Oben links wählst du die Art:
+  Gegenstände, Monster, NPCs (mit Gespräch, Händler, Lehrmeister, Gilde und
+  Beruf), Fertigkeiten, Zauber und Techniken, Aufgaben und Quests, Rassen,
+  Gilden, Berufe, allgemeine Beschreibungen, dazu die Welteinstellungen, der
+  Start neuer Figuren und die Kampfregeln.
+  - Darunter stehen die Einträge, nach Dateien sortiert. **+ Neu**, **Kopieren**
+    und **Löschen** legen Einträge an oder entfernen sie. Ein neuer NPC bekommt
+    automatisch seine eigene Datei.
+  - In der Mitte steht das Formular. Felder mit * braucht die Engine unbedingt.
+  - Verweise wählst du aus Listen aus: Gegenstände, Monster, Räume, Fertigkeiten
+    und so weiter. Ein Verweis ins Leere wird rot angezeigt.
+  - Erbt ein Eintrag von einer Vorlage, stehen die geerbten Werte grau im Feld.
+    Leere Felder werden nicht gespeichert, dann gilt der Standardwert oder die
+    Vorlage.
+  - Benennst du eine ID um, passe die Verweise darauf selbst an. Die Prüfung
+    oben zeigt dir, wo etwas fehlt.
 - **⌨ Befehle:** alle eingebauten Befehle (gelb = angepasst, durchgestrichen =
   abgeschaltet) und alle Gesten. Bei Befehlen änderst du Wörter, Rolle,
   Hilfetext und Aufruf; *Auf Standard zurücksetzen* nimmt alles zurück. Bei
@@ -602,7 +624,8 @@ Oben schaltest du zwischen drei Bereichen um:
   Gespeichert wird in `daten/befehle/`, und zwar nur, was vom Standard abweicht.
 
 Die Prüfung oben zählt Fehler in allen drei Bereichen, zum Beispiel ein Wort,
-das zwei Befehlen gehört, oder einen Zauber mit unbekannter Fertigkeit.
+das zwei Befehlen gehört, einen Zauber mit unbekannter Fertigkeit oder eine
+Aufgabe ohne Geber.
 
 Beim Speichern ändert der Editor nur, was du wirklich geändert hast. Kommentare,
 Leerzeilen, `details` und alles andere, was der Editor nicht kennt, bleiben in den
@@ -1105,28 +1128,92 @@ beschreibung = "Wunden heilen."
 
 ---
 
-## 14. Zauber
+## 14. Zauber und Kampftechniken
+
+Zauber spricht man mit `zaubere <name> [ziel]`. **Kampftechniken** (`typ = "technik"`)
+setzt man mit `spezial <name> [ziel]` ein. Beide stehen in `daten/zauber/` und
+funktionieren gleich. Der Unterschied: Eine Technik kann einen Schlag mit der
+Waffe enthalten (`waffen_faktor`), und sie kostet meist Ausdauer statt Mana.
+`zauber` zeigt beides an. Ohne Ziel trifft ein Angriff den aktuellen Gegner.
 
 ```toml
 [[zauber]]
 id   = "kleine_heilung"
 name = "Kleine Heilung"            # Spieler tippen: zaubere kleine heilung
 schluesselwoerter = ["heilung"]    # oder: zaubere heilung
+typ           = "zauber"           # zauber | technik
 mana_kosten   = 10
+ausdauer_kosten = 0
 ziel          = "spieler"          # selbst | spieler | gegner | raum
-fertigkeit    = "heilkunde"        # nötige Fertigkeit (optional)
+fertigkeit    = "heilkunde"        # nötige Fertigkeit (optional, wird geübt)
 mindest_stufe = 1
 abklingzeit   = 0                  # Sekunden bis zum nächsten Mal
+gilde         = ""                 # nur für Mitglieder dieser Gilde (optional)
 wirkungen = [ { art = "heilen", wert = 20 } ]
 text_selbst = "Du heilst {ziel}."
 text_ziel   = "{name} heilt dich."
 text_raum   = "{name} spricht eine Heilformel."
+text_ende   = ""                   # wenn eine Wirkung mit Dauer endet
 ```
 
-**Wirkungen:**
+**Wirkungen, die sofort wirken:**
 
-| art        | bedeutet                       | Angabe            |
-|------------|--------------------------------|-------------------|
+| art         | bedeutet                                  | Angabe                 |
+|-------------|-------------------------------------------|------------------------|
+| `heilen`    | gibt Lebenspunkte                         | `wert`                 |
+| `mana`      | gibt Mana                                 | `wert`                 |
+| `ausdauer`  | gibt Ausdauer                             | `wert`                 |
+| `schaden`   | trifft einen Gegner                       | `wert`                 |
+| `betaeuben` | der Gegner kann so lange nicht angreifen  | `wert` = Sekunden      |
+| `teleport`  | bringt das Ziel in einen Raum             | `raum = "id"`          |
+
+**Wirkungen mit Dauer** (Schilde und Stärkungen, `dauer` in Sekunden):
+
+| art        | bedeutet                                         |
+|------------|--------------------------------------------------|
+| `schild`   | fängt `wert` Schaden ab, dann zerbricht er       |
+| `ruestung` | `wert` zusätzliche Rüstung                       |
+| `bonus`    | `wert` mehr auf `attribut`, z.B. `attribut = "staerke"` |
+| `kraft`    | `wert` Prozent mehr Schaden                      |
+| `tempo`    | `wert` Prozent schnellere Angriffe               |
+| `heilen`, `mana`, `ausdauer` mit `dauer` | wirken alle `intervall` Sekunden (Standard 3) |
+| `schaden` mit `dauer` (gegen Gegner) | Gift: alle `intervall` Sekunden Schaden |
+
+```toml
+[[zauber]]
+id   = "schutzschild"
+name = "Schutzschild"
+mana_kosten = 15
+wirkungen = [ { art = "schild", wert = 30, dauer = 90 } ]
+text_ende = "Der schimmernde Schild um dich verblasst."
+
+[[zauber]]
+id   = "wuchtschlag"
+typ  = "technik"                   # spezial wuchtschlag
+name = "Wuchtschlag"
+ziel = "gegner"
+ausdauer_kosten = 15
+abklingzeit     = 8
+waffen_faktor   = 1.8              # Waffenschaden mal 1,8
+```
+
+Wer einen Zauber noch einmal spricht, frischt die Wirkung auf. Zwei gleiche
+Wirkungen addieren sich nicht. Mit `wirkungen` sieht man im Spiel, was gerade
+wirkt und wie lange noch.
+
+Bei Zaubern auf einen Gegner wirken `schaden` und `betaeuben` auf den Gegner,
+alle anderen Wirkungen auf den Zaubernden selbst. So geht zum Beispiel
+„Lebensraub“: Schaden am Gegner und Heilung für sich.
+
+Ein Zauber darf mehrere Wirkungen haben. In Texten setzt der Treiber für
+`{name}` den Zaubernden ein, für `{ziel}` das Ziel und für `{zauber}` den Namen
+des Zaubers. Mit dem Zaubern übt man die zugehörige Fertigkeit.
+
+Spieler lernen Zauber und Techniken bei Lehrmeistern (Kapitel 18), durch
+Belohnungen für Quests (Kapitel 20), über ihre Rasse oder Gilde (Kapitel 19)
+oder von Anfang an (`zauber` in `[start]`).
+
+------------|--------------------------------|-------------------|
 | `heilen`   | gibt Lebenspunkte              | `wert`            |
 | `mana`     | gibt Mana                      | `wert`            |
 | `teleport` | bringt das Ziel in einen Raum  | `raum = "id"`     |
@@ -1192,6 +1279,7 @@ technische Werte sowie Unterdetails und Sinne eines Details.
 | `verkuende <text>`                | Nachricht an alle                       |
 | `lehre <spieler> <id> [stufe]`    | Fertigkeit oder Zauber beibringen       |
 | `erfahrung <spieler> <menge>`     | Erfahrung geben (zum Testen)            |
+| `gebegeld <spieler> <menge>`      | Geld geben (zum Testen)                 |
 | `speichernalle`                   | alle Spieler sofort speichern           |
 
 ---
@@ -1240,7 +1328,7 @@ sich die Zeilenbreite dem Fenster an, mit `spielerbuch breite 80` ist sie fest.
 |---------------------|----------------------------|-----------------------------------------------------------|
 | `Char.Name`         | beim Einloggen             | `name`, `fullname`                                        |
 | `Char.Vitals`       | bei Änderung, vor dem Prompt | `hp`, `maxhp`, `mp`, `maxmp`, `ep`, `maxep` (LP, MP, AP) |
-| `Char.Status`       | bei Änderung, vor dem Prompt | `name`, `level`, `xp`, `xp_next`, `free_points`, `role`, `dead`, `enemy`, `enemy_health` (Prozent) |
+| `Char.Status`       | bei Änderung, vor dem Prompt | `name`, `level`, `xp`, `xp_next`, `free_points`, `gold`, `race`, `guild`, `role`, `dead`, `enemy`, `enemy_health` (Prozent) |
 | `Room.Info`         | bei jedem Raum             | `num`, `id`, `name`, `area`, `environment`, `x`, `y`, `z`, `coords`, `map`, `exits` (`{"n": 12345, ...}`) |
 | `Comm.Channel.Text` | bei `sage` und `rufe`      | `channel` (`say`/`shout`), `talker`, `text`               |
 | `Core.Ping`         | auf Anfrage                | Antwort auf den Ping des Programms                        |
@@ -1253,7 +1341,7 @@ Richtungen in `exits`: `n ne e se s sw w nw u d in out`.
 ### MSDP-Variablen
 
 `CHARACTER_NAME`, `SERVER_ID`, `SERVER_TIME`, `HEALTH`, `HEALTH_MAX`, `MANA`,
-`MANA_MAX`, `MOVEMENT`, `MOVEMENT_MAX`, `LEVEL`, `EXPERIENCE`, `EXPERIENCE_MAX`,
+`MANA_MAX`, `MOVEMENT`, `MOVEMENT_MAX`, `LEVEL`, `MONEY`, `EXPERIENCE`, `EXPERIENCE_MAX`,
 `EXPERIENCE_TNL`, `OPPONENT_NAME`, `OPPONENT_HEALTH`, `OPPONENT_HEALTH_MAX`,
 `ROOM`, `ROOM_NAME`, `ROOM_VNUM`, `ROOM_AREA`, `ROOM_TERRAIN` und `ROOM_EXITS`.
 Die Befehle `LIST`, `REPORT`, `UNREPORT`, `SEND` und `RESET` werden verstanden.
@@ -1273,4 +1361,190 @@ STATUS   = "Alpha"
 HOSTNAME = "mud.example.de"
 WEBSITE  = "https://..."
 ```
+
+---
+
+## 18. Geld, Händler und Lehrmeister
+
+Jede Figur hat Geld. Wie es heißt, steht in `welt.toml` (`waehrung = "Gold"`),
+das Startgeld in `[start]` (`geld = 20`). Geld gibt es:
+
+- von Monstern: `geld = 5` oder `geld = [2, 8]` (zufällig von 2 bis 8). Haben
+  mehrere zusammen gekämpft, wird geteilt.
+- als Belohnung für Aufgaben (Kapitel 20)
+- beim Verkaufen an Händler
+
+`geld` und `sp` zeigen, wie viel man hat.
+
+### Händler
+
+Ein NPC wird zum Händler mit `[npc.haendler]`. Die Preise richten sich nach dem
+`wert` der Gegenstände.
+
+```toml
+[npc.haendler]
+waren           = ["brot", "heiltrank", "fackel"]   # verkauft er (unbegrenzt)
+ankauf          = true          # kauft er an? (Standard: ja)
+ankauf_typen    = ["waffe"]     # nur diese Typen (leer = alles)
+verkauf_prozent = 100           # Verkaufspreis in % vom Wert
+ankauf_prozent  = 50            # er zahlt die Hälfte des Werts
+```
+
+Spieler: `waren` (Angebot zeigen), `kaufe brot`, `kaufe 3 brot`,
+`verkaufe pelz`.
+
+### Lehrmeister
+
+Ein NPC lehrt Fertigkeiten und Zauber mit `[[npc.lehrt]]`:
+
+```toml
+[[npc.lehrt]]
+id    = "schwertkampf"   # Fertigkeit: jede Lektion +1 Stufe
+preis = 5                # pro Lektion
+bis   = 20               # höchstens bis Stufe 20
+
+[[npc.lehrt]]
+id    = "wuchtschlag"    # Zauber oder Technik: einmal lernen
+preis = 40
+stufe = 2                # ab Spielerstufe 2
+gilde = ""               # nur für Mitglieder dieser Gilde (optional)
+```
+
+Spieler: `waren` zeigt auch, was gelehrt wird. Gelernt wird mit
+`lerne schwertkampf`. Voraussetzungen von Fertigkeiten werden geprüft.
+
+**Achtung TOML:** Felder des NPCs (wie `gilde = "..."`) müssen **vor** dem
+ersten `[[npc.lehrt]]` oder `[npc.haendler]` stehen. Sonst gehören sie zur
+Lehre bzw. zum Händler. Der Welteditor achtet von selbst darauf.
+
+---
+
+## 19. Rassen, Gilden und Berufe
+
+### Rassen (`daten/rassen/`)
+
+Gibt es Rassen, wählt jede neue Figur bei der Erschaffung eine aus
+(`info elf` zeigt Einzelheiten). Ältere Figuren können mit `rasse <name>` einmal
+nachwählen.
+
+```toml
+[[rasse]]
+id   = "zwerg"
+name = "Zwerge"
+beschreibung = "Klein, zäh und stur."
+werte        = { staerke = 2, geschick = -1 }  # Zuschläge auf die Grundwerte
+lebenspunkte = 20                              # mehr (oder weniger) LP, MP, AP
+mana         = -10
+ausdauer     = 0
+fertigkeiten = { schwertkampf = 3 }            # von Anfang an
+zauber       = []
+waehlbar     = true                            # false = nicht wählbar
+```
+
+### Gilden (`daten/gilden/`) und Berufe (`daten/berufe/`)
+
+Man ist in höchstens **einer Gilde**, kann aber mehrere **Berufe** haben
+(`max_berufe` in `welt.toml`). Beigetreten wird bei einem NPC, der dafür
+zuständig ist:
+
+```toml
+[npc]
+id    = "priesterin"
+gilde = "lichtorden"     # nimmt in diese Gilde auf
+beruf = ""               # oder in einen Beruf
+```
+
+```toml
+[[gilde]]
+id    = "lichtorden"
+name  = "Orden des Lichts"
+beschreibung   = "Heiler und Hüter."
+aufnahme_stufe = 2               # ab Stufe
+preis          = 10              # Aufnahmegebühr
+rassen         = []              # nur diese Rassen (leer = alle)
+titel          = "vom Orden des Lichts"   # wird als Titel gesetzt
+mana           = 15              # Zuschläge wie bei Rassen
+fertigkeiten   = { heilkunde = 5 }
+zauber         = ["lebensquell"]
+aufnahme_text  = "Möge das Licht dich leiten."
+```
+
+Berufe haben dieselben Felder (`[[beruf]]`).
+
+Spieler: `beitreten` (beim NPC), `austreten gilde` oder `austreten <beruf>`,
+`gilde` (eigene Gilde und wer von ihr gerade spielt), `beruf`, `rasse`.
+
+Das ist die **Grundlage**, die du ausbauen kannst:
+
+- Lehrmeister nur für Mitglieder: `gilde = "..."` bei `[[npc.lehrt]]`
+- Zauber und Techniken nur für Mitglieder: `gilde = "..."` beim Zauber
+- Aufgaben nur für Mitglieder: `gilde = "..."` bei der Quest
+
+Das Herstellen von Dingen in Berufen (Handwerk) ist noch nicht eingebaut.
+Die Berufe geben aber schon ihre Fertigkeiten.
+
+---
+
+## 20. Aufgaben und Quests
+
+Aufgaben (klein, oft wiederholbar) und Quests (größere Geschichten) stehen in
+`daten/quests/`. Ein NPC bietet sie an:
+
+```
+> sage hast du eine aufgabe für mich?
+Der Wirt sagt: „Im Keller wimmelt es von Ratten! ...“
+(Quest: Die Rattenplage – annehmen mit annehmen die rattenplage)
+> annehmen
+> aufgaben                 (zeigt alle Aufgaben und den Fortschritt)
+...
+> rede mit wirt            (oder: abgeben)
+*** Quest erledigt: Die Rattenplage ***
+```
+
+```toml
+[[quest]]
+id     = "rattenplage"
+name   = "Die Rattenplage"
+art    = "quest"             # "aufgabe" oder "quest"
+geber  = "wirt"              # NPC, der sie anbietet und annimmt
+beschreibung = "Im Keller treiben sich Ratten herum."
+angebot   = "Wenn du mir drei Ratten vom Hals schaffst, lohnt es sich."
+annahme   = "Wunderbar! Die Falltür ist hinter der Theke."
+abschluss = "Endlich Ruhe im Keller!"
+mindest_stufe   = 1
+voraussetzungen = []         # andere Quests, die vorher erledigt sein müssen
+gilde           = ""         # nur für Mitglieder
+wiederholbar    = false
+abgabe          = true       # false = fertig, sobald alle Schritte erledigt sind
+
+[[quest.schritte]]           # werden der Reihe nach erledigt
+art    = "besuchen"
+ziel   = "keller"
+
+[[quest.schritte]]
+art    = "toeten"
+ziel   = "ratte"
+anzahl = 3
+text   = "Besiege 3 Ratten"  # steht im Aufgabenbuch (sonst automatisch)
+
+[quest.belohnung]
+erfahrung    = 60
+geld         = 25
+gegenstaende = ["heiltrank"]
+fertigkeiten = { orientierung = 2 }   # steigen um so viele Stufen
+zauber       = []
+titel        = ""
+```
+
+**Arten von Schritten:**
+
+| art        | erledigt, wenn ...                                           |
+|------------|--------------------------------------------------------------|
+| `toeten`   | man `anzahl` Monster mit der ID `ziel` besiegt hat            |
+| `bringen`  | man `anzahl` Gegenstände `ziel` beim NPC `an` abgibt (leer = Geber) |
+| `besuchen` | man den Raum `ziel` betritt                                   |
+| `sprechen` | man mit dem NPC `ziel` redet                                  |
+
+Spieler: `aufgaben`, `aufgaben erledigt`, `annehmen [name]`, `abgeben`,
+`abbrechen <name>`. Zum Abgeben reicht es auch, mit dem Geber zu reden.
 

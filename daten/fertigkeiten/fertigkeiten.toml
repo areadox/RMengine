@@ -43,3 +43,25 @@ kategorie = "zauberei"
 attribut  = "weisheit"
 lernchance = 20
 beschreibung = "Wunden heilen, mit Kräutern und Magie."
+
+[[fertigkeit]]
+id   = "orientierung"
+name = "Orientierung"
+kategorie = "allgemein"
+attribut  = "weisheit"
+lernchance = 0
+beschreibung = "Sich zurechtfinden. Alle 10 Stufen zeigt die Karte ein Feld mehr (welt.toml: karten_fertigkeit)."
+
+[[fertigkeit]]
+id   = "schmieden"
+name = "Schmieden"
+kategorie = "handwerk"
+attribut  = "staerke"
+beschreibung = "Metall bearbeiten. (Vorbereitung: wird später für Handwerk gebraucht.)"
+
+[[fertigkeit]]
+id   = "kraeuterkunde"
+name = "Kräuterkunde"
+kategorie = "handwerk"
+attribut  = "weisheit"
+beschreibung = "Kräuter erkennen und sammeln. (Vorbereitung für Handwerk)"

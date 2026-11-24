@@ -175,6 +175,7 @@ beschreibung = """
 Ein stiller Raum aus weißem Stein. Durch ein buntes Glasfenster fällt
 farbiges Licht auf einen schlichten Altar."""
 gegenstaende = ["manatrank"]
+npcs         = ["priesterin"]
 deko_richtung = { sued = "~", suedost = "~", suedwest = "~" }   # der Dorfbach
 
 [raum.details]

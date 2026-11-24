@@ -163,9 +163,29 @@ pub fn ausfuehren(w: &mut Welt, sid: u64, eingabe: &str) -> Folge {
         }
         "wiederbeleben" | "wiederbelebe" | "belebe" | "rette" | "revive" => kampf::wiederbeleben(w, sid, rest),
         "aufgeben" => kampf::aufgeben(w, sid),
-        "sage" | "sag" | "say" => sagen(w, sid, rest),
-        "frage" | "frag" | "ask" => fragen(w, sid, rest),
-        "rede" | "red" | "sprich" | "sprech" | "talk" => reden(w, sid, rest),
+        "sage" | "sag" | "say" => {
+            sagen(w, sid, rest);
+            if let Some(mid) = npc_fuer_satz(w, sid, rest) {
+                crate::quests::angesprochen(w, sid, mid, gespraech::fragt_nach_aufgabe(rest));
+            }
+        }
+        "frage" | "frag" | "ask" => {
+            fragen(w, sid, rest);
+            let (wer, thema) = rest.split_once(char::is_whitespace).unwrap_or((rest, ""));
+            if let Some(mid) = finde_monster(w, &w.spieler[&sid].sp.raum, wer).filter(|m| kann_reden(w, *m)) {
+                crate::quests::angesprochen(w, sid, mid, gespraech::fragt_nach_aufgabe(thema));
+            }
+        }
+        "rede" | "red" | "sprich" | "sprech" | "talk" => {
+            reden(w, sid, rest);
+            let wer = rest.strip_prefix("mit ").unwrap_or(rest).trim();
+            let raum = w.spieler[&sid].sp.raum.clone();
+            let npcs: Vec<u64> = w.monster_im_raum(&raum).into_iter().filter(|m| kann_reden(w, *m)).collect();
+            let mid = if wer.is_empty() { (npcs.len() == 1).then(|| npcs[0]) } else { finde_monster(w, &raum, wer) };
+            if let Some(mid) = mid.filter(|m| kann_reden(w, *m)) {
+                crate::quests::angesprochen(w, sid, mid, true);
+            }
+        }
         "emote" | "me" | "/me" => emote(w, sid, rest),
         "rufe" | "ruf" | "shout" => rufen(w, sid, rest),
         "wer" | "who" => wer(w, sid),
@@ -177,7 +197,23 @@ pub fn ausfuehren(w: &mut Welt, sid: u64, eingabe: &str) -> Folge {
         },
         "fertigkeiten" | "fert" | "skills" => fertigkeiten(w, sid),
         "zauber" | "spells" | "zaubersprueche" => zauber_liste(w, sid),
-        "zaubere" | "zauber_sprechen" | "cast" | "z" => zaubern(w, sid, rest),
+        "zaubere" | "zauber_sprechen" | "cast" | "z" => zaubern(w, sid, rest, false),
+        "spezial" => zaubern(w, sid, rest, true),
+        "wirkungen" => crate::wirkung::anzeigen(w, sid),
+        "waren" => crate::handel::waren(w, sid, rest),
+        "kaufe" => crate::handel::kaufen(w, sid, rest),
+        "verkaufe" => crate::handel::verkaufen(w, sid, rest),
+        "lerne" => crate::handel::lernen(w, sid, rest),
+        "geld" => crate::handel::geld(w, sid),
+        "aufgaben" => crate::quests::anzeigen(w, sid, rest),
+        "annehmen" => crate::quests::annehmen(w, sid, rest),
+        "abgeben" => crate::quests::abgeben(w, sid),
+        "abbrechen" => crate::quests::abbrechen(w, sid, rest),
+        "rasse" => crate::gemeinschaft::rasse(w, sid, rest),
+        "gilde" => crate::gemeinschaft::gilde(w, sid),
+        "beruf" => crate::gemeinschaft::berufe(w, sid),
+        "beitreten" => crate::gemeinschaft::beitreten(w, sid, rest),
+        "austreten" => crate::gemeinschaft::austreten(w, sid, rest),
         "farbe" | "farben" | "color" => {
             let an = !matches!(normalisieren(rest).as_str(), "aus" | "off" | "nein");
             if let Some(s) = w.spieler.get_mut(&sid) {
@@ -197,8 +233,27 @@ pub fn ausfuehren(w: &mut Welt, sid: u64, eingabe: &str) -> Folge {
             }
         }
     }
+    // Aufgaben: Ist man in einem Raum, den man besuchen sollte?
+    if w.spieler.contains_key(&sid) {
+        crate::quests::raum_pruefen(w, sid);
+    }
     prompt(w, sid);
     Folge::Weiter
+}
+
+/// Welcher NPC ist mit einem gesagten Satz gemeint? (mit Namen angesprochen oder der einzige im Raum)
+fn npc_fuer_satz(w: &Welt, sid: u64, t: &str) -> Option<u64> {
+    let raum = &w.spieler.get(&sid)?.sp.raum;
+    let npcs: Vec<u64> = w.monster_im_raum(raum).into_iter().filter(|m| kann_reden(w, *m)).collect();
+    let satz = gespraech::satz_vorbereiten(t);
+    npcs.iter()
+        .copied()
+        .find(|mid| {
+            w.monster.get(mid).and_then(|m| w.d.monster.get(&m.def)).is_some_and(|d| {
+                satz.split_whitespace().any(|wort| passt(wort, &d.name, &d.id, &d.schluesselwoerter))
+            })
+        })
+        .or_else(|| (npcs.len() == 1).then(|| npcs[0]))
 }
 
 /// Eine Geste aus befehle.toml ausführen, z.B. "winke" oder "winke bert".
@@ -391,7 +446,7 @@ fn hilfe(w: &Welt, sid: u64, rolle: Rolle, rest: &str) {
 // ---------------------------------------------------------------------------
 
 /// Passt ein getipptes Wort zu einem Ding?
-fn passt(such: &str, name: &str, id: &str, schluessel: &[String]) -> bool {
+pub(crate) fn passt(such: &str, name: &str, id: &str, schluessel: &[String]) -> bool {
     let s = normalisieren(such);
     if s.is_empty() {
         return false;
@@ -403,13 +458,13 @@ fn passt(such: &str, name: &str, id: &str, schluessel: &[String]) -> bool {
         || n.split(|c: char| !c.is_alphanumeric()).any(|wort| wort == s)
 }
 
-fn finde_gegenstand(d: &Daten, liste: &[String], such: &str) -> Option<usize> {
+pub(crate) fn finde_gegenstand(d: &Daten, liste: &[String], such: &str) -> Option<usize> {
     liste.iter().position(|id| {
         d.gegenstaende.get(id).is_some_and(|g| passt(such, &g.name, &g.id, &g.schluesselwoerter))
     })
 }
 
-fn finde_monster(w: &Welt, raum: &str, such: &str) -> Option<u64> {
+pub(crate) fn finde_monster(w: &Welt, raum: &str, such: &str) -> Option<u64> {
     w.monster_im_raum(raum).into_iter().find(|id| {
         w.monster
             .get(id)
@@ -426,7 +481,7 @@ fn finde_spieler_im_raum(w: &Welt, raum: &str, such: &str) -> Option<u64> {
 }
 
 /// Fasst gleiche Gegenstände zusammen: [(id, anzahl)]
-fn gruppieren(ids: &[String]) -> Vec<(String, usize)> {
+pub(crate) fn gruppieren(ids: &[String]) -> Vec<(String, usize)> {
     let mut aus: Vec<(String, usize)> = Vec::new();
     for id in ids {
         match aus.iter_mut().find(|(i, _)| i == id) {
@@ -909,7 +964,7 @@ fn inventar(w: &Welt, sid: u64) {
             t.push_str(&format!("  {:<10} {}\n", format!("<{platz}>"), w.d.gegenstand_name(id)));
         }
     }
-    t.push_str(&format!("{{grau}}Gewicht: {gewicht}{{/}}"));
+    t.push_str(&format!("{{grau}}Gewicht: {gewicht}{{/}}   Geld: {{hellgelb}}{}{{/}}", crate::handel::betrag(w, sp.geld)));
     w.sende(sid, &t);
 }
 
@@ -1032,7 +1087,7 @@ fn sagen(w: &Welt, sid: u64, t: &str) {
 // Gespräche mit NPCs
 // ---------------------------------------------------------------------------
 
-fn kann_reden(w: &Welt, mid: u64) -> bool {
+pub(crate) fn kann_reden(w: &Welt, mid: u64) -> bool {
     w.monster.get(&mid).and_then(|m| w.d.monster.get(&m.def)).is_some_and(|d| {
         let g = &d.gespraech;
         !d.thema.is_empty()
@@ -1043,7 +1098,7 @@ fn kann_reden(w: &Welt, mid: u64) -> bool {
 }
 
 /// Der NPC antwortet für alle hörbar. `notfalls`: auch antworten, wenn er die Frage nicht versteht.
-fn npc_antwortet(w: &Welt, raum: &str, mid: u64, spieler: &str, frage: &str, notfalls: bool) -> bool {
+pub(crate) fn npc_antwortet(w: &Welt, raum: &str, mid: u64, spieler: &str, frage: &str, notfalls: bool) -> bool {
     let Some(def) = w.monster.get(&mid).and_then(|m| w.d.monster.get(&m.def)) else { return false };
     let text = match gespraech::antwort(&def.gespraech, &def.thema, frage) {
         Some(t) => t,
@@ -1210,21 +1265,38 @@ fn fertigkeiten(w: &Welt, sid: u64) {
 fn zauber_liste(w: &Welt, sid: u64) {
     let sp = &w.spieler[&sid].sp;
     if sp.zauber.is_empty() {
-        w.sende(sid, "Du kennst noch keine Zaubersprüche.");
+        w.sende(sid, "Du kennst noch keine Zaubersprüche und Kampftechniken.");
         return;
     }
-    let mut t = String::from("{fett}Deine Zaubersprüche{/}\n");
-    for id in &sp.zauber {
-        let Some(z) = w.d.zauber.get(id) else { continue };
-        t.push_str(&format!("  {{magenta}}{:<18}{{/}} {:>3} MP  {{grau}}{}{{/}}\n", z.name, z.mana_kosten, z.beschreibung));
+    let kosten = |z: &crate::daten::ZauberDef| {
+        let mut k = Vec::new();
+        if z.mana_kosten > 0 {
+            k.push(format!("{} MP", z.mana_kosten));
+        }
+        if z.ausdauer_kosten > 0 {
+            k.push(format!("{} AP", z.ausdauer_kosten));
+        }
+        text::auffuellen(&k.join(" "), 12)
+    };
+    let mut t = String::new();
+    for (technik, titel, befehl) in [(false, "Deine Zaubersprüche", "zaubere <name> [ziel]"), (true, "Deine Kampftechniken", "spezial <name> [ziel]")] {
+        let liste: Vec<_> = sp.zauber.iter().filter_map(|id| w.d.zauber.get(id)).filter(|z| z.ist_technik() == technik).collect();
+        if liste.is_empty() {
+            continue;
+        }
+        t.push_str(&format!("{{fett}}{titel}{{/}}  {{grau}}({befehl}){{/}}\n"));
+        for z in liste {
+            t.push_str(&format!("  {{magenta}}{:<18}{{/}} {} {{grau}}{}{{/}}\n", z.name, kosten(z), z.beschreibung));
+        }
     }
-    t.push_str("Benutzung: zaubere <name> [ziel]");
-    w.sende(sid, &t);
+    w.sende(sid, t.trim_end());
 }
 
-fn zaubern(w: &mut Welt, sid: u64, rest: &str) {
+/// "zaubere ..." oder (mit `technik`) "spezial ...".
+fn zaubern(w: &mut Welt, sid: u64, rest: &str, technik: bool) {
+    let was = if technik { "Welche Technik willst du einsetzen?" } else { "Was willst du zaubern?" };
     if rest.is_empty() {
-        w.sende(sid, "Was willst du zaubern? ({gelb}zauber{/} zeigt deine Sprüche)");
+        w.sende(sid, &format!("{was} ({{gelb}}zauber{{/}} zeigt, was du kannst)"));
         return;
     }
     // Welcher Zauber ist gemeint? Der längste passende Name gewinnt.
@@ -1242,7 +1314,8 @@ fn zaubern(w: &mut Welt, sid: u64, rest: &str) {
         }
     }
     let Some((zid, laenge)) = bester else {
-        w.sende(sid, "Einen solchen Zauber kennst du nicht.");
+        let t = if technik { "Eine solche Technik beherrschst du nicht." } else { "Einen solchen Zauber kennst du nicht." };
+        w.sende(sid, t);
         return;
     };
     let zielwort = such[laenge..].trim().to_string();
@@ -1260,6 +1333,11 @@ fn zaubern(w: &mut Welt, sid: u64, rest: &str) {
                 return;
             }
         }
+        if !z.gilde.is_empty() && s.sp.gilde != z.gilde {
+            let g = w.d.gilden.get(&z.gilde).map(|g| g.name.clone()).unwrap_or_default();
+            w.sende(sid, &format!("Das können nur Mitglieder der {g}."));
+            return;
+        }
         if let Some(bis) = s.abklingzeiten.get(&zid) {
             if *bis > jetzt {
                 let sek = (*bis - jetzt).as_secs() + 1;
@@ -1269,6 +1347,16 @@ fn zaubern(w: &mut Welt, sid: u64, rest: &str) {
         }
         if s.sp.mana < z.mana_kosten {
             w.sende(sid, "Dein Mana reicht dafür nicht aus.");
+            return;
+        }
+        if s.sp.ausdauer < z.ausdauer_kosten {
+            w.sende(sid, "Dafür bist du zu erschöpft.");
+            return;
+        }
+        // Ein Waffenschlag braucht, dass man bereit ist
+        if z.waffen_faktor > 0.0 && s.bereit_ab > jetzt {
+            let rest = (s.bereit_ab - jetzt).as_secs_f64();
+            w.sende(sid, &format!("Du bist noch nicht bereit ({rest:.1} s)."));
             return;
         }
     }
@@ -1289,16 +1377,25 @@ fn zaubern(w: &mut Welt, sid: u64, rest: &str) {
         },
         "raum" => ziel_spieler = w.spieler_im_raum(&raum),
         "gegner" => {
-            if zielwort.is_empty() {
-                w.sende(sid, "Auf wen willst du den Zauber sprechen?");
-                return;
-            }
-            match finde_monster(w, &raum, &zielwort) {
+            // Ohne Ziel: der aktuelle Gegner
+            let aktuell = w.spieler[&sid].kampf_ziel.filter(|m| w.monster.get(m).is_some_and(|m| m.raum == raum));
+            let gefunden = if zielwort.is_empty() { aktuell } else { finde_monster(w, &raum, &zielwort) };
+            match gefunden {
                 Some(m) => ziel_monster = Some(m),
+                None if zielwort.is_empty() => {
+                    w.sende(sid, "Auf wen? (Gib ein Ziel an, z.B. ratte)");
+                    return;
+                }
                 None => {
                     w.sende(sid, "Das ist nicht hier.");
                     return;
                 }
+            }
+            let angreifbar =
+                ziel_monster.and_then(|m| w.monster.get(&m)).and_then(|m| w.d.monster.get(&m.def)).is_some_and(|d| d.ist_angreifbar());
+            if !angreifbar {
+                w.sende(sid, "Hier wird nicht gekämpft.");
+                return;
             }
         }
         _ => ziel_spieler.push(sid),
@@ -1314,35 +1411,82 @@ fn zaubern(w: &mut Welt, sid: u64, rest: &str) {
     // Bezahlen
     if let Some(s) = w.spieler.get_mut(&sid) {
         s.sp.mana -= z.mana_kosten;
+        s.sp.ausdauer -= z.ausdauer_kosten;
         if z.abklingzeit > 0 {
             s.abklingzeiten.insert(zid.clone(), jetzt + Duration::from_secs(z.abklingzeit));
         }
     }
 
-    // Texte
-    let selbst = if z.text_selbst.is_empty() { "Du sprichst {zauber}." } else { &z.text_selbst };
-    let im_raum = if z.text_raum.is_empty() { "{name} spricht {zauber}." } else { &z.text_raum };
-    let am_ziel = if z.text_ziel.is_empty() { "{name} spricht {zauber} auf dich." } else { &z.text_ziel };
-    w.sende(sid, &format!("{{magenta}}{}{{/}}", ersetzen(selbst)));
-    let mut ausser = vec![sid];
-    for p in &ziel_spieler {
-        if *p != sid {
-            w.sende(*p, &format!("{{magenta}}{}{{/}}", ersetzen(am_ziel)));
-            ausser.push(*p);
+    // Texte (eine Technik mit Waffenschlag meldet sich beim Schlag selbst)
+    let waffenschlag = z.waffen_faktor > 0.0 && ziel_monster.is_some();
+    if !waffenschlag {
+        let (st_selbst, st_raum, st_ziel) = if z.ist_technik() {
+            ("Du setzt {zauber} ein.", "{name} setzt {zauber} ein.", "{name} setzt {zauber} bei dir ein.")
+        } else {
+            ("Du sprichst {zauber}.", "{name} spricht {zauber}.", "{name} spricht {zauber} auf dich.")
+        };
+        let selbst = if z.text_selbst.is_empty() { st_selbst } else { &z.text_selbst };
+        let im_raum = if z.text_raum.is_empty() { st_raum } else { &z.text_raum };
+        let am_ziel = if z.text_ziel.is_empty() { st_ziel } else { &z.text_ziel };
+        w.sende(sid, &format!("{{magenta}}{}{{/}}", ersetzen(selbst)));
+        let mut ausser = vec![sid];
+        for p in &ziel_spieler {
+            if *p != sid {
+                w.sende(*p, &format!("{{magenta}}{}{{/}}", ersetzen(am_ziel)));
+                ausser.push(*p);
+            }
         }
+        w.sende_raum(&raum, &format!("{{magenta}}{}{{/}}", ersetzen(im_raum)), &ausser);
     }
-    w.sende_raum(&raum, &format!("{{magenta}}{}{{/}}", ersetzen(im_raum)), &ausser);
 
     // Wirkungen
     if let Some(mid) = ziel_monster {
-        let schaden: i32 = z.wirkungen.iter().filter(|w| w.art == "schaden").map(|w| w.wert).sum();
-        if schaden > 0 {
-            kampf::zauber_trifft(w, sid, mid, schaden, &z.fertigkeit);
+        // Auf den Gegner: Schaden, Gift (Schaden mit Dauer), Betäuben.
+        // Alles andere (z.B. Heilen) wirkt auf den Zaubernden selbst.
+        let sofort: i32 = z.wirkungen.iter().filter(|w| w.art == "schaden" && w.dauer <= 0.0).map(|w| w.wert).sum();
+        if waffenschlag {
+            let t = kampf::Technik {
+                name: &z.name,
+                faktor: z.waffen_faktor,
+                zusatz: sofort,
+                text_selbst: &z.text_selbst,
+                text_raum: &z.text_raum,
+            };
+            kampf::technik(w, sid, mid, &t);
+        } else if sofort > 0 {
+            kampf::zauber_trifft(w, sid, mid, sofort, &z.fertigkeit);
+        }
+        for wi in &z.wirkungen {
+            let lebt = w.monster.contains_key(&mid);
+            match wi.art.as_str() {
+                "schaden" if wi.dauer > 0.0 && lebt => {
+                    crate::wirkung::auf_monster(w, mid, &z, wi, sid);
+                    w.sende(sid, &format!("{} wirkt nun {} Sekunden lang.", z.name, wi.dauer.round()));
+                }
+                "betaeuben" if lebt => {
+                    if let Some(m) = w.monster.get_mut(&mid) {
+                        m.bereit_ab = m.bereit_ab.max(Instant::now()) + Duration::from_secs_f64(wi.wert.max(1) as f64);
+                    }
+                    let n = gross(&w.monster_name(mid));
+                    w.sende(sid, &format!("{{hellgelb}}{n} ist benommen!{{/}}"));
+                }
+                "schaden" | "betaeuben" => {}
+                _ if wi.dauer > 0.0 => crate::wirkung::auf_spieler(w, sid, &z, wi, sid),
+                art => wirkung_anwenden(w, sid, art, wi.wert, &wi.raum),
+            }
+        }
+        // Wer einen Gegner verzaubert, ist mit ihm im Kampf
+        if w.monster.contains_key(&mid) {
+            kampf::verwickeln(w, sid, mid);
         }
     } else {
         for p in ziel_spieler {
-            for wirkung in &z.wirkungen {
-                wirkung_anwenden(w, p, &wirkung.art, wirkung.wert, &wirkung.raum);
+            for wi in &z.wirkungen {
+                if wi.dauer > 0.0 {
+                    crate::wirkung::auf_spieler(w, p, &z, wi, sid);
+                } else {
+                    wirkung_anwenden(w, p, &wi.art, wi.wert, &wi.raum);
+                }
             }
         }
     }
@@ -1361,7 +1505,7 @@ fn zaubern(w: &mut Welt, sid: u64, rest: &str) {
     }
 }
 
-fn wirkung_anwenden(w: &mut Welt, sid: u64, art: &str, wert: i32, raum: &str) {
+pub(crate) fn wirkung_anwenden(w: &mut Welt, sid: u64, art: &str, wert: i32, raum: &str) {
     let Some(s) = w.spieler.get_mut(&sid) else { return };
     match art {
         "heilen" => {
@@ -1383,6 +1527,12 @@ fn wirkung_anwenden(w: &mut Welt, sid: u64, art: &str, wert: i32, raum: &str) {
             } else {
                 s.sende("{cyan}Dein Mana ist bereits voll.{/}");
             }
+        }
+        "ausdauer" => {
+            let vorher = s.sp.ausdauer;
+            s.sp.ausdauer = (vorher + wert).min(s.sp.max_ausdauer);
+            let plus = s.sp.ausdauer - vorher;
+            s.sende(&format!("{{gelb}}Neue Kraft durchströmt dich. (+{plus} AP){{/}}"));
         }
         "teleport" => {
             let alt = std::mem::replace(&mut s.sp.raum, raum.to_string());
@@ -1431,6 +1581,24 @@ fn admin_befehl(w: &mut Welt, sid: u64, befehl: &str, rest: &str) -> bool {
             } else {
                 let von = w.spieler[&sid].sp.name.clone();
                 w.sende_alle(&format!("\n{{hellgelb}}*** Verkündung von {von}: {rest} ***{{/}}\n"), &[]);
+            }
+        }
+        "gebegeld" | "geldgeben" => {
+            let teile: Vec<&str> = rest.split_whitespace().collect();
+            let (Some(name), Some(Ok(n))) = (teile.first(), teile.get(1).map(|z| z.parse::<u64>())) else {
+                w.sende(sid, "Benutzung: gebegeld <spieler> <menge>");
+                return true;
+            };
+            let Some(pid) = w.spieler.iter().find(|(_, s)| s.sp.name.eq_ignore_ascii_case(name)).map(|(id, _)| *id) else {
+                w.sende(sid, "Dieser Spieler ist nicht online.");
+                return true;
+            };
+            if let Some(s) = w.spieler.get_mut(&pid) {
+                s.sp.geld += n;
+            }
+            w.sende(pid, &format!("{{hellgelb}}Du erhältst {}.{{/}}", crate::handel::betrag(w, n)));
+            if pid != sid {
+                w.sende(sid, "Erledigt.");
             }
         }
         "erfahrung" => {
@@ -1677,6 +1845,25 @@ fn spielstand(w: &Welt, sid: u64) {
         ));
     }
     t.push_str(&format!("  {{grau}}Siege: {}   Tode: {}{{/}}\n", sp.siege, sp.tode));
+    t.push_str(&format!("  Geld: {{hellgelb}}{}{{/}}\n", crate::handel::betrag(w, sp.geld)));
+    let mut herkunft = Vec::new();
+    if let Some(r) = w.d.rassen.get(&sp.rasse) {
+        herkunft.push(format!("Rasse: {}", r.name));
+    }
+    if let Some(g) = w.d.gilden.get(&sp.gilde) {
+        herkunft.push(format!("Gilde: {}", g.name));
+    }
+    let berufe: Vec<String> = sp.berufe.iter().filter_map(|b| w.d.berufe.get(b).map(|b| b.name.clone())).collect();
+    if !berufe.is_empty() {
+        herkunft.push(format!("Beruf: {}", berufe.join(", ")));
+    }
+    if !herkunft.is_empty() {
+        t.push_str(&format!("  {}\n", herkunft.join("   ")));
+    }
+    let effekte: Vec<String> = w.spieler[&sid].effekte.iter().map(|e| e.name.clone()).collect();
+    if !effekte.is_empty() {
+        t.push_str(&format!("  {{hellcyan}}Es wirkt: {}{{/}} {{grau}}(wirkungen){{/}}\n", effekte.join(", ")));
+    }
 
     // Boni durch angelegte Ausrüstung
     let mut boni: std::collections::BTreeMap<String, i32> = Default::default();
@@ -1690,7 +1877,9 @@ fn spielstand(w: &Welt, sid: u64) {
     if !sp.werte.is_empty() {
         t.push_str("\n{gelb}Werte{/}\n");
         for (k, v) in &sp.werte {
-            let bonus = boni.remove(k).unwrap_or(0);
+            boni.remove(k);
+            // Ausrüstung, Rasse und Zauber zusammen
+            let bonus = kampf::wert(w, sid, k) - v;
             let extra = match bonus {
                 0 => String::new(),
                 b if b > 0 => format!(" {{hellgruen}}(+{b}){{/}}"),

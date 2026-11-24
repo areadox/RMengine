@@ -64,6 +64,7 @@ name = "eine Fackel"
 schluesselwoerter = ["fackel"]
 typ  = "werkzeug"
 platz = "licht"
+wert  = 2
 beschreibung = "Ein Holzstab, mit Pech getränkt."
 
 [[gegenstand]]
@@ -101,3 +102,4 @@ akkusativ = "eine Landkarte"
 schluesselwoerter = ["karte", "landkarte"]
 beschreibung = "Eine abgegriffene Karte des Landes. Mit 'weltkarte' kannst du sie ansehen."
 eigenschaften = { landkarte = 1 }
+wert = 15
