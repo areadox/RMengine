@@ -12,6 +12,9 @@ const HILFE: &str = "Befehle der Server-Konsole:
   verkuende <text>       Nachricht an alle Spieler
   rolle <name> <rolle>   Rolle vergeben: spieler, baumeister oder admin
   speichern              Alle Spieler sofort speichern
+  fernwartung [ein|neu|aus]
+                         Fernwartung für den Welteditor: Zustand anzeigen,
+                         einschalten, neuer Zugangsschlüssel, abschalten
   version                Version anzeigen
   ende                   Alle speichern und den Server beenden";
 
@@ -98,6 +101,11 @@ pub async fn starten(welt: GeteilteWelt) {
                 }
             }
             "rolle" => rolle(&mut w, rest),
+            "fernwartung" => {
+                let ordner = w.daten_ordner.clone();
+                drop(w);
+                crate::fernwartung::konsole(&welt, &ordner, rest);
+            }
             "speichern" | "speichernalle" => {
                 w.alle_speichern();
                 println!("{} Spieler gespeichert.", w.spieler.len());

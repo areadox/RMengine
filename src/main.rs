@@ -91,14 +91,10 @@ async fn main() {
         }
     }
     if hat(&["--fernwartung-aus"]) {
-        let pfad = ordner.parent().unwrap_or(std::path::Path::new(".")).join("fernwartung.toml");
-        match std::fs::read_to_string(&pfad) {
-            Ok(t) => {
-                let neu = t.replace("aktiv = true", "aktiv = false");
-                let _ = std::fs::write(&pfad, neu);
-                println!("Fernwartung abgeschaltet (wirkt nach dem nächsten Start).");
-            }
-            Err(_) => println!("Die Fernwartung war nicht eingerichtet."),
+        match fernwartung::abschalten(&ordner) {
+            Ok(true) => println!("Fernwartung abgeschaltet (wirkt nach dem nächsten Start)."),
+            Ok(false) => println!("Die Fernwartung war nicht eingerichtet."),
+            Err(e) => eprintln!("Fernwartung: {e}"),
         }
         warten_und_beenden(0);
     }

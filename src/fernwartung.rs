@@ -72,8 +72,27 @@ pub fn fingerabdruck(daten_ordner: &Path) -> Option<String> {
     Some(p::fingerabdruck(&der))
 }
 
-/// `rmengine --fernwartung`: einschalten und einen neuen Zugangsschlüssel erzeugen.
-pub fn einrichten(daten_ordner: &Path) -> Result<(), String> {
+/// Schreibt fernwartung.toml (nur für den Besitzer lesbar).
+fn konfig_schreiben(daten_ordner: &Path, konfig: &Konfig) -> Result<(), String> {
+    let text = format!(
+        "# Fernwartung für den Welteditor\n\
+         # Einschalten/neuer Schlüssel: in der Server-Konsole 'fernwartung ein' bzw. 'fernwartung neu'\n\
+         # (oder 'rmengine --fernwartung'). Abschalten: aktiv = false\n{}",
+        toml::to_string(konfig).map_err(|e| e.to_string())?
+    );
+    let pfad = konfig_pfad(daten_ordner);
+    fs::write(&pfad, text).map_err(|e| format!("{}: {e}", pfad.display()))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = fs::set_permissions(&pfad, fs::Permissions::from_mode(0o600));
+    }
+    Ok(())
+}
+
+/// Einschalten mit einem neuen Zugangsschlüssel (erzeugt beim ersten Mal auch das Zertifikat).
+/// Gibt den Schlüssel zurück – er wird nirgends gespeichert, nur sein Hash.
+fn neuer_schluessel(daten_ordner: &Path) -> Result<(Konfig, String), String> {
     let (crt, key) = zertifikat_pfade(daten_ordner);
     if !crt.exists() || !key.exists() {
         let neu = rcgen::generate_simple_self_signed(vec![p::SERVERNAME.to_string()]).map_err(|e| e.to_string())?;
@@ -95,32 +114,115 @@ pub fn einrichten(daten_ordner: &Path) -> Result<(), String> {
     let alt = konfig_laden(daten_ordner).unwrap_or_default();
     let salz = spieler::neues_salz();
     let konfig = Konfig { aktiv: true, port: alt.port, schluessel_hash: spieler::passwort_hash(&schluessel, &salz), salz };
-    let text = format!(
-        "# Fernwartung für den Welteditor (eingerichtet mit 'rmengine --fernwartung')\n\
-         # Neuer Zugangsschlüssel: noch einmal 'rmengine --fernwartung' ausführen.\n\
-         # Abschalten: aktiv = false\n{}",
-        toml::to_string(&konfig).map_err(|e| e.to_string())?
-    );
-    let pfad = konfig_pfad(daten_ordner);
-    fs::write(&pfad, text).map_err(|e| format!("{}: {e}", pfad.display()))?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let _ = fs::set_permissions(&pfad, fs::Permissions::from_mode(0o600));
-    }
-    println!("\nFernwartung eingerichtet.\n");
+    konfig_schreiben(daten_ordner, &konfig)?;
+    Ok((konfig, schluessel))
+}
+
+fn schluessel_anzeigen(daten_ordner: &Path, konfig: &Konfig, schluessel: &str) {
+    println!("\nFernwartung eingeschaltet.\n");
     println!("  Port:              {}   (in der Firewall freigeben)", konfig.port);
     println!("  Zugangsschlüssel:  {schluessel}");
     println!("                     (wird nur jetzt angezeigt – gut aufheben!)");
     println!("  Fingerabdruck:     {}", fingerabdruck(daten_ordner).unwrap_or_default());
     println!("\nIm Welteditor: 🌐 Server → Adresse dieses Rechners, Port {} und den Schlüssel eingeben.", konfig.port);
     println!("Der Editor zeigt beim ersten Verbinden den Fingerabdruck – er muss mit dem oben übereinstimmen.");
+}
+
+/// `rmengine --fernwartung`: einschalten und einen neuen Zugangsschlüssel erzeugen.
+pub fn einrichten(daten_ordner: &Path) -> Result<(), String> {
+    let (konfig, schluessel) = neuer_schluessel(daten_ordner)?;
+    schluessel_anzeigen(daten_ordner, &konfig, &schluessel);
     println!("Starte den Server (neu), damit die Fernwartung aktiv wird.");
     Ok(())
 }
 
+/// Abschalten (der Schlüssel bleibt gespeichert). false = war nicht eingerichtet.
+pub fn abschalten(daten_ordner: &Path) -> Result<bool, String> {
+    let Some(mut k) = konfig_laden(daten_ordner) else { return Ok(false) };
+    k.aktiv = false;
+    konfig_schreiben(daten_ordner, &k)?;
+    Ok(true)
+}
+
+/// Läuft die Fernwartung gerade?
+static LAEUFT: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static STOPP: tokio::sync::Notify = tokio::sync::Notify::const_new();
+
+/// Der Befehl `fernwartung [ein|neu|aus]` in der Server-Konsole – wirkt sofort, ohne Neustart.
+pub fn konsole(welt: &GeteilteWelt, daten_ordner: &Path, was: &str) {
+    use std::sync::atomic::Ordering;
+    let ergebnis: Result<(), String> = (|| {
+        match crate::text::normalisieren(was).as_str() {
+            "ein" | "an" | "on" => {
+                match konfig_laden(daten_ordner).filter(|k| !k.schluessel_hash.is_empty()) {
+                    Some(mut k) => {
+                        k.aktiv = true;
+                        konfig_schreiben(daten_ordner, &k)?;
+                        println!("Fernwartung eingeschaltet (Zugangsschlüssel unverändert, einen neuen gibt es mit 'fernwartung neu').");
+                    }
+                    None => {
+                        let (k, s) = neuer_schluessel(daten_ordner)?;
+                        schluessel_anzeigen(daten_ordner, &k, &s);
+                    }
+                }
+            }
+            "neu" | "schluessel" => {
+                let (k, s) = neuer_schluessel(daten_ordner)?;
+                schluessel_anzeigen(daten_ordner, &k, &s);
+                println!("Der alte Schlüssel gilt ab sofort nicht mehr.");
+            }
+            "aus" | "off" => {
+                if abschalten(daten_ordner)? {
+                    if LAEUFT.load(Ordering::SeqCst) {
+                        STOPP.notify_one();
+                    }
+                    println!("Fernwartung abgeschaltet.");
+                } else {
+                    println!("Die Fernwartung war nicht eingerichtet.");
+                }
+                return Ok(());
+            }
+            "" => {
+                match konfig_laden(daten_ordner) {
+                    Some(k) if k.aktiv && !k.schluessel_hash.is_empty() => println!(
+                        "Fernwartung ist eingeschaltet, Port {}{}. Fingerabdruck: {}",
+                        k.port,
+                        if LAEUFT.load(Ordering::SeqCst) { "" } else { " (läuft gerade nicht – Port belegt?)" },
+                        fingerabdruck(daten_ordner).unwrap_or_default()
+                    ),
+                    Some(_) => println!("Fernwartung ist abgeschaltet. Einschalten: fernwartung ein"),
+                    None => println!("Fernwartung ist nicht eingerichtet. Einschalten: fernwartung ein"),
+                }
+                println!("Befehle: fernwartung ein | neu (neuer Schlüssel) | aus");
+                return Ok(());
+            }
+            _ => {
+                println!("Benutzung: fernwartung [ein|neu|aus]");
+                return Ok(());
+            }
+        }
+        // Eingeschaltet: starten, falls sie noch nicht läuft
+        if !LAEUFT.load(Ordering::SeqCst) {
+            tokio::spawn(starten(welt.clone()));
+        }
+        Ok(())
+    })();
+    if let Err(e) = ergebnis {
+        println!("Fernwartung: {e}");
+    }
+}
+
 /// Startet die Fernwartung, wenn sie eingerichtet und eingeschaltet ist.
 pub async fn starten(welt: GeteilteWelt) {
+    use std::sync::atomic::Ordering;
+    if LAEUFT.swap(true, Ordering::SeqCst) {
+        return; // läuft schon
+    }
+    lauschen(welt).await;
+    LAEUFT.store(false, Ordering::SeqCst);
+}
+
+async fn lauschen(welt: GeteilteWelt) {
     let ordner = sperren(&welt).daten_ordner.clone();
     let Some(konfig) = konfig_laden(&ordner).filter(|k| k.aktiv && !k.schluessel_hash.is_empty()) else { return };
     let tls = match tls_config(&ordner) {
@@ -143,10 +245,23 @@ pub async fn starten(welt: GeteilteWelt) {
         fingerabdruck(&ordner).unwrap_or_default()
     );
     let annehmer = tokio_rustls::TlsAcceptor::from(tls);
-    let konfig = Arc::new(konfig);
     loop {
-        let Ok((sock, adresse)) = listener.accept().await else { continue };
-        let (welt, annehmer, konfig) = (welt.clone(), annehmer.clone(), konfig.clone());
+        let (sock, adresse) = tokio::select! {
+            r = listener.accept() => match r {
+                Ok(v) => v,
+                Err(_) => continue,
+            },
+            _ = STOPP.notified() => {
+                println!("Fernwartung beendet.");
+                return;
+            }
+        };
+        // Die Einstellungen bei jeder Verbindung neu lesen: ein neuer Schlüssel gilt sofort
+        let Some(konfig) = konfig_laden(&ordner).filter(|k| k.aktiv && !k.schluessel_hash.is_empty()) else {
+            continue;
+        };
+        let konfig = Arc::new(konfig);
+        let (welt, annehmer) = (welt.clone(), annehmer.clone());
         tokio::spawn(async move {
             if let Err(e) = verbindung(sock, annehmer, welt, konfig, adresse.to_string()).await {
                 if e.contains("HandshakeFailure") || e.contains("CertificateUnknown") || e.contains("BadCertificate") {

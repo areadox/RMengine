@@ -70,6 +70,7 @@ sich an- und abmeldet, und du kannst Befehle eintippen:
 | `verkuende <text>`     | Nachricht an alle Spieler                            |
 | `rolle <name> <rolle>` | Rolle vergeben (spieler, baumeister, admin), auch für Figuren, die gerade nicht im Spiel sind |
 | `speichern`            | alle Spieler sofort speichern                        |
+| `fernwartung`          | Fernwartung für den Welteditor: `fernwartung ein` schaltet sie sofort ein (beim ersten Mal mit neuem Zugangsschlüssel), `fernwartung neu` erzeugt einen neuen Schlüssel, `fernwartung aus` schaltet ab, ohne Zusatz zeigt es den Zustand |
 | `ende`                 | alle speichern und den Server beenden                |
 
 Hast du im Welteditor etwas geändert, tippst du hier einfach `neuladen`. Auch
@@ -128,6 +129,10 @@ curl -fsSL https://github.com/areadox/RMengine/releases/latest/download/install.
 rmengine --fernwartung
 ```
 
+Läuft der Server schon in einem Fenster (zum Beispiel unter Windows), tippst du
+stattdessen in der Server-Konsole `fernwartung ein`. Das wirkt sofort, ohne
+Neustart.
+
 Das zeigt drei Dinge an. Schreib sie dir auf:
 
 - den **Port** (4001), den du in der Firewall freigeben musst, zusammen mit dem
@@ -185,9 +190,11 @@ Danach den Server starten (oder neu starten). Im Protokoll steht dann
   Auf dem Server liegt nur ein Hash des Schlüssels.
 - Über die Fernwartung sind **nur die Welt-Dateien** erreichbar. Spielstände
   und Programme sind ausgeschlossen.
-- **Neuer Schlüssel:** noch einmal `rmengine --fernwartung` ausführen. Der alte
-  gilt dann nicht mehr.
-- **Abschalten:** `rmengine --fernwartung-aus`.
+- **Neuer Schlüssel:** in der Server-Konsole `fernwartung neu` oder noch einmal
+  `rmengine --fernwartung` ausführen. Der alte gilt dann nicht mehr.
+- **Abschalten:** in der Server-Konsole `fernwartung aus` (sofort) oder
+  `rmengine --fernwartung-aus` (ab dem nächsten Start).
+- **Zustand ansehen:** in der Server-Konsole `fernwartung`.
 - Die Dateien `fernwartung.toml`, `fernwartung.crt` und `fernwartung.key`
   liegen neben dem Datenordner. `fernwartung.key` darf niemand sonst bekommen.
 

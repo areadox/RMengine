@@ -70,7 +70,7 @@ das Update und veröffentlicht alles als Release.
 - ASCII-Stadtkarte, die automatisch aus den Raumkoordinaten entsteht, mit Stockwerken, Geländearten, Legende und Diagonalen
 - zentrale Verwaltung von Items, Monstern, Fertigkeiten und Zaubern, alles in TOML
 - gründliche Prüfung der Daten mit deutschen Fehlermeldungen und Tippfehler-Vorschlägen
-- `neuladen` im laufenden Spiel und eine **Server-Konsole** im Fenster der Engine (neuladen, wer, verkuende, rolle, ende …)
+- `neuladen` im laufenden Spiel und eine **Server-Konsole** im Fenster der Engine (neuladen, wer, verkuende, rolle, fernwartung, ende …)
 - Spieler werden gespeichert: Inventar, Ausrüstung, Fertigkeiten, Zauber, besuchte Räume, Spielzeit
 - **Spielstand** (`sp`) mit Balken, Ausrüstungsboni und Fortschritt; **Spielerbuch** für persönliche Einstellungen (Karte, Kurzmodus, Zeilenbreite, Titel, Passwort …)
 - Monster wandern in ihrem Gebiet umher und sprechen
