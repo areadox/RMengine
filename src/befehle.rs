@@ -453,33 +453,84 @@ fn raum_zeigen(w: &Welt, sid: u64, voll: bool) {
     let e = &s.sp.einstellungen;
     let mut aus = String::new();
 
-    if w.d.welt.karte_beim_umsehen && e.karte {
+    let karte = if w.d.welt.karte_beim_umsehen && e.karte {
         let radius = (w.d.welt.karten_radius + e.kartengroesse).max(1);
-        aus.push_str(&karte::zeichnen(w, &s.sp, radius, false));
-        aus.push('\n');
-    }
-    aus.push_str(&format!("{{fett}}{{gelb}}{}{{/}}", raum.name));
-    if crate::oberwelt::ist_oberwelt(&raum.id) {
-        aus.push_str(&format!(" {{grau}}({}, {}){{/}}", raum.x, raum.y));
-    } else if s.baut() {
-        aus.push_str(&format!(" {{grau}}[{}]{{/}}", raum.id));
-    }
-    aus.push('\n');
-    if voll || !e.kurz {
-        aus.push_str(&umbrechen(&raum.beschreibung, s.breite()));
-        aus.push('\n');
-    }
+        karte::zeichnen(w, &s.sp, radius, false)
+    } else {
+        String::new()
+    };
 
+    // Name, Beschreibung und Ausgänge
+    let mut kopf = format!("{{fett}}{{gelb}}{}{{/}}", raum.name);
+    if crate::oberwelt::ist_oberwelt(&raum.id) {
+        kopf.push_str(&format!(" {{grau}}({}, {}){{/}}", raum.x, raum.y));
+    } else if s.baut() {
+        kopf.push_str(&format!(" {{grau}}[{}]{{/}}", raum.id));
+    }
     let mut ausgaenge: Vec<String> = raum.ausgaenge.keys().map(|r| r.anzeige().to_string()).collect();
     let himmelsrichtungen = raum.ausgaenge.keys().filter(|r| r.versatz().2 == 0 && r.versatz() != (0, 0, 0)).count();
     if himmelsrichtungen == 8 {
         ausgaenge.retain(|a| a == "hinein" || a == "hinaus");
         ausgaenge.insert(0, "in alle Richtungen".into());
     }
-    if ausgaenge.is_empty() {
-        aus.push_str("{cyan}Es gibt keine sichtbaren Ausgänge.{/}\n");
+    let ausgaenge = if ausgaenge.is_empty() {
+        "{cyan}Es gibt keine sichtbaren Ausgänge.{/}".to_string()
     } else {
-        aus.push_str(&format!("{{cyan}}Ausgänge: {}{{/}}\n", aufzaehlen(&ausgaenge)));
+        format!("{{cyan}}Ausgänge: {}{{/}}", aufzaehlen(&ausgaenge))
+    };
+    let mut absaetze: Vec<(String, bool)> = vec![(kopf, false)];
+    if voll || !e.kurz {
+        for (i, a) in raum.beschreibung.trim().split("\n\n").enumerate() {
+            if !a.trim().is_empty() {
+                absaetze.push((a.to_string(), i > 0));
+            }
+        }
+    }
+    absaetze.push((ausgaenge, false));
+
+    let breite = s.breite();
+    let mut karten_zeilen: Vec<String> = karte.trim_end().lines().map(str::to_string).collect();
+    // Hinweise unter der Karte, die breiter sind als die Karte selbst (z.B. "Hier geht es
+    // auch nach oben"), kommen beim Nebeneinander mit in die Textspalte
+    let mut hinweise: Vec<String> = Vec::new();
+    while karten_zeilen.len() > 1 {
+        let letzte = text::sichtbare_laenge(karten_zeilen.last().expect("da"));
+        let sonst = karten_zeilen[..karten_zeilen.len() - 1].iter().map(|z| text::sichtbare_laenge(z)).max().unwrap_or(0);
+        if letzte <= sonst {
+            break;
+        }
+        hinweise.insert(0, karten_zeilen.pop().expect("da").trim().to_string());
+    }
+    // Eine Kopfzeile, die breiter ist als die Karte, steht beim Nebeneinander allein darüber
+    let mut kopfzeile = None;
+    if karten_zeilen.len() > 1 {
+        let erste = text::sichtbare_laenge(&karten_zeilen[0]);
+        let sonst = karten_zeilen[1..].iter().map(|z| text::sichtbare_laenge(z)).max().unwrap_or(0);
+        if erste > sonst {
+            kopfzeile = Some(karten_zeilen.remove(0));
+        }
+    }
+    let kartenbreite = karten_zeilen.iter().map(|z| text::sichtbare_laenge(z)).max().unwrap_or(0);
+    let daneben = e.karte_daneben.unwrap_or(w.d.welt.karte_daneben);
+    let rechts = breite.saturating_sub(kartenbreite + 3);
+    if !karten_zeilen.is_empty() && daneben && rechts >= 25 {
+        // Text rechts neben der Karte, darunter in voller Breite weiter
+        absaetze.extend(hinweise.into_iter().map(|h| (h, false)));
+        if let Some(k) = &kopfzeile {
+            aus.push_str(k);
+            aus.push('\n');
+        }
+        let zeilen = text::umbrechen_fliessend(&absaetze, rechts, karten_zeilen.len(), breite);
+        aus.push_str(&text::nebeneinander(&karten_zeilen, &zeilen, 3));
+    } else {
+        if !karten_zeilen.is_empty() {
+            aus.push_str(&karte);
+            aus.push('\n');
+        }
+        for z in text::umbrechen_fliessend(&absaetze, breite, 0, breite) {
+            aus.push_str(&z);
+            aus.push('\n');
+        }
     }
 
     let boden = w.boden.get(&raum.id).cloned().unwrap_or_default();
@@ -1721,7 +1772,7 @@ fn als_schalter(wert: &str) -> Option<bool> {
 }
 
 const EINSTELLUNGEN: &[&str] = &[
-    "farben", "karte", "kartengroesse", "kurz", "breite", "prompt", "ankuendigungen", "npc", "autoangriff", "kampfzahlen",
+    "farben", "karte", "kartengroesse", "kartenlage", "kurz", "breite", "prompt", "ankuendigungen", "npc", "autoangriff", "kampfzahlen",
     "titel", "beschreibung", "passwort",
 ];
 
@@ -1741,6 +1792,11 @@ fn spielerbuch_zeigen(w: &Welt, sid: u64) {
     t.push_str(&zeile("farben", an_aus(sp.farben), "farbige Texte"));
     t.push_str(&zeile("karte", an_aus(e.karte), "Karte beim Umsehen zeigen"));
     t.push_str(&zeile("kartengroesse", groesse, "klein, normal oder gross"));
+    let lage = match e.karte_daneben.unwrap_or(w.d.welt.karte_daneben) {
+        true => "daneben",
+        false => "oben",
+    };
+    t.push_str(&zeile("kartenlage", lage, "Raumtext neben der Karte (daneben) oder darunter (oben)"));
     t.push_str(&zeile("kurz", an_aus(e.kurz), "beim Gehen keine Raumbeschreibung (schau zeigt sie)"));
     let breite = if e.breite_auto { format!("auto ({})", w.spieler[&sid].breite()) } else { e.breite.to_string() };
     t.push_str(&zeile("breite", &breite, "Zeilenbreite: auto (passt sich dem Fenster an) oder 40 bis 200"));
@@ -1805,6 +1861,17 @@ fn spielerbuch(w: &mut Welt, sid: u64, rest: &str) {
         }
     } else {
         match was.as_str() {
+            "kartenlage" | "lage" => match normalisieren(wert).as_str() {
+                "daneben" | "neben" | "rechts" | "seitlich" => {
+                    e.karte_daneben = Some(true);
+                    "Die Raumbeschreibung steht jetzt neben der Karte (wenn das Fenster breit genug ist).".into()
+                }
+                "oben" | "ueber" | "darueber" | "unten" | "darunter" => {
+                    e.karte_daneben = Some(false);
+                    "Die Karte steht jetzt über der Raumbeschreibung.".into()
+                }
+                _ => "Bitte daneben oder oben angeben.".into(),
+            },
             "kartengroesse" | "kartengrosse" | "groesse" => match normalisieren(wert).as_str() {
                 "klein" => {
                     e.kartengroesse = -1;

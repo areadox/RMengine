@@ -96,6 +96,8 @@ pub struct Einstellungen {
     pub karte: bool,
     pub kurz: bool,
     pub kartengroesse: i32,
+    /// Raumtext neben der Karte (None = wie in welt.toml)
+    pub karte_daneben: Option<bool>,
     pub breite: usize,
     /// Zeilenbreite automatisch an das Fenster des Clients anpassen (NAWS)
     pub breite_auto: bool,
@@ -114,6 +116,7 @@ impl Default for Einstellungen {
             karte: true,
             kurz: false,
             kartengroesse: 0,
+            karte_daneben: None,
             breite: 78,
             breite_auto: true,
             prompt: true,

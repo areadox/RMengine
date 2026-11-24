@@ -20,6 +20,7 @@ baumeister = []
 
 karte_beim_umsehen  = true        # Bei jedem "schau" die kleine Karte zeigen
 karten_radius       = 1           # Räume in jede Richtung (1 = 3x3 Räume; "karte" zeigt mehr)
+karte_daneben       = true        # Raumbeschreibung rechts neben der Karte (false = darunter)
 stadtkarte_stil     = "kasten"    # "kasten" = ( ) und [ ] im Rahmen, "linien" = ein Zeichen pro Raum
 karten_hintergrund  = "*"         # Füllzeichen für leere Stellen
 nur_besuchte_raeume_auf_karte = false   # true = "Nebel des Krieges"

@@ -173,6 +173,8 @@ pub struct WeltConfig {
     pub baumeister: Vec<String>,
     pub karte_beim_umsehen: bool,
     pub karten_radius: i32,
+    /// Raumbeschreibung rechts neben der Karte (sonst darunter)
+    pub karte_daneben: bool,
     pub nur_besuchte_raeume_auf_karte: bool,
     pub ausgaenge_beidseitig: bool,
     pub takt_sekunden: u64,
@@ -198,6 +200,7 @@ impl Default for WeltConfig {
             baumeister: Vec::new(),
             karte_beim_umsehen: true,
             karten_radius: 3,
+            karte_daneben: true,
             nur_besuchte_raeume_auf_karte: false,
             ausgaenge_beidseitig: true,
             takt_sekunden: 3,

@@ -100,6 +100,86 @@ pub fn umbrechen(t: &str, breite: usize) -> String {
     absaetze.join("\n\n")
 }
 
+/// Bricht Absätze fließend um: Die ersten `n` Zeilen sind höchstens `schmal` breit
+/// (neben der Karte), alle weiteren höchstens `breit`. Jeder Absatz ist
+/// (Text, Leerzeile davor?).
+pub fn umbrechen_fliessend(absaetze: &[(String, bool)], schmal: usize, n: usize, breit: usize) -> Vec<String> {
+    let mut zeilen: Vec<String> = Vec::new();
+    for (absatz, leer_davor) in absaetze {
+        if *leer_davor && !zeilen.is_empty() {
+            zeilen.push(String::new());
+        }
+        let max = |z: usize| if z < n { schmal } else { breit };
+        let mut zeile = String::new();
+        let mut laenge = 0;
+        for wort in absatz.split_whitespace() {
+            let wl = sichtbare_laenge(wort);
+            if laenge > 0 && laenge + 1 + wl > max(zeilen.len()) {
+                zeilen.push(std::mem::take(&mut zeile));
+                laenge = 0;
+            }
+            if laenge > 0 {
+                zeile.push(' ');
+                laenge += 1;
+            }
+            zeile.push_str(wort);
+            laenge += wl;
+        }
+        if !zeile.is_empty() {
+            zeilen.push(zeile);
+        }
+    }
+    zeilen
+}
+
+/// Die Farben, die am Ende eines Textes noch eingeschaltet sind (zum Wiedereinschalten
+/// in der nächsten Zeile, z.B. "{fett}{gelb}").
+pub fn offene_farben(t: &str) -> String {
+    let mut offen: Vec<&str> = Vec::new();
+    let mut rest = t;
+    while let Some(pos) = rest.find('{') {
+        let danach = &rest[pos + 1..];
+        match danach.find('}') {
+            Some(ende) if ist_farbe(&danach[..ende]) => {
+                let name = &danach[..ende];
+                if name == "/" {
+                    offen.clear();
+                } else {
+                    offen.push(name);
+                }
+                rest = &danach[ende + 1..];
+            }
+            _ => rest = danach,
+        }
+    }
+    offen.iter().map(|n| format!("{{{n}}}")).collect()
+}
+
+/// Setzt zwei Spalten nebeneinander: links (z.B. die Karte), rechts der Text.
+/// Zeilen, die unter der linken Spalte weitergehen, beginnen ganz links.
+pub fn nebeneinander(links: &[String], rechts: &[String], abstand: usize) -> String {
+    let lb = links.iter().map(|z| sichtbare_laenge(z)).max().unwrap_or(0);
+    let mut aus = String::new();
+    let mut farbe = String::new();
+    for i in 0..links.len().max(rechts.len()) {
+        let r = rechts.get(i).filter(|r| !r.is_empty());
+        if let Some(l) = links.get(i) {
+            // Nur auffüllen, wenn rechts etwas folgt (keine Leerzeichen am Zeilenende)
+            aus.push_str(&if r.is_some() { auffuellen(l, lb + abstand) } else { l.clone() });
+            aus.push_str("{/}");
+        }
+        if let Some(r) = r {
+            // Farben pro Zeile schließen, damit sie nicht in die Karte hineinlaufen
+            let mit = format!("{farbe}{r}");
+            farbe = offene_farben(&mit);
+            aus.push_str(&mit);
+            aus.push_str("{/}");
+        }
+        aus.push('\n');
+    }
+    aus
+}
+
 /// Bereitet Text für das Versenden über Telnet vor.
 pub fn fuer_telnet(t: &str, farben: bool, zeilenende: bool) -> Vec<u8> {
     let mut s = farben_umwandeln(t, farben).replace("\r\n", "\n").replace('\n', "\r\n");
@@ -161,4 +241,25 @@ pub fn vorschlag<'a>(wort: &str, kandidaten: impl Iterator<Item = &'a String>) -
         .filter(|(d, _)| *d <= grenze)
         .min_by_key(|(d, _)| *d)
         .map(|(_, k)| k.clone())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fliessend_umbrechen() {
+        let abs = vec![("eins zwei drei vier fuenf sechs".to_string(), false)];
+        // zwei schmale Zeilen (10), dann breit (40)
+        let z = umbrechen_fliessend(&abs, 10, 2, 40);
+        assert_eq!(z, vec!["eins zwei", "drei vier", "fuenf sechs"]);
+    }
+
+    #[test]
+    fn farben_laufen_nicht_in_die_karte() {
+        assert_eq!(offene_farben("a {fett}{gelb}b"), "{fett}{gelb}");
+        assert_eq!(offene_farben("{rot}a{/} b"), "");
+        let t = nebeneinander(&["{gruen}#{/}".into(), "##".into()], &["{rot}x".into(), "y".into()], 1);
+        assert_eq!(t, "{gruen}#{/}  {/}{rot}x{/}\n## {/}{rot}y{/}\n");
+    }
 }

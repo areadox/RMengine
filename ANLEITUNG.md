@@ -267,6 +267,7 @@ wird mit `spielerbuch <einstellung> <wert>`, zum Beispiel
 | `farben`         | an / aus              | farbige Texte                                |
 | `karte`          | an / aus              | Karte beim Umsehen                           |
 | `kartengroesse`  | klein / normal / gross | Größe der Karte                             |
+| `kartenlage`     | daneben / oben        | Raumtext neben der Karte oder darunter       |
 | `kurz`           | an / aus              | beim Gehen keine Raumbeschreibung            |
 | `breite`         | auto oder 40 bis 200  | Zeilenbreite; auto = so breit wie das Fenster |
 | `prompt`         | an / aus              | Eingabezeile mit Lebenspunkten und Mana      |
@@ -448,9 +449,30 @@ In `welt.toml` stellst du ein:
 
 ```toml
 karten_radius      = 1          # 1 = 3x3 Räume; der Befehl "karte" zeigt mehr
+karte_daneben      = true       # Raumbeschreibung rechts neben der Karte (false = darunter)
 stadtkarte_stil    = "kasten"   # oder "linien": ein Zeichen pro Raum, ohne Rahmen
 karten_hintergrund = "*"        # Füllzeichen, z.B. "*" oder " "
 ```
+
+Mit `karte_daneben = true` steht die Raumbeschreibung rechts neben der Karte
+und läuft darunter in voller Breite weiter:
+
+```
+[Dorf]            Der Dorfplatz
++-------------+   Du stehst auf dem kopfsteingepflasterten Dorfplatz von
+|******|******|   Eichenhain. In der Mitte plätschert ein alter Brunnen. Im
+|*[L]-( )*(M)-|   Osten hängt das Schild einer Taverne, im Westen hörst du
+|******|*/****|   Hammerschläge. Eine Straße führt nach Norden, im Süden
+|*[S]-(X)-[K]*|   erhebt sich ein kleiner Tempel.
+|*o**/*|******|   Ausgänge: Norden, Nordosten, Osten, Süden, Südwesten und
+|o(G)&[T]*****|   Westen
+|~~~~~~~~~****|
++-------------+
+```
+
+Ist das Fenster des Spielers zu schmal (weniger als 25 Zeichen neben der
+Karte), steht die Karte automatisch darüber. Jeder Spieler kann es im
+Spielerbuch mit `spielerbuch kartenlage oben` oder `daneben` selbst wählen.
 
 ### Geländearten (in welt.toml)
 
