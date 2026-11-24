@@ -70,7 +70,7 @@ das Update und veröffentlicht alles als Release.
 - ASCII-Stadtkarte, die automatisch aus den Raumkoordinaten entsteht, mit Stockwerken, Geländearten, Legende und Diagonalen
 - zentrale Verwaltung von Items, Monstern, Fertigkeiten und Zaubern, alles in TOML
 - gründliche Prüfung der Daten mit deutschen Fehlermeldungen und Tippfehler-Vorschlägen
-- `neuladen` im laufenden Spiel
+- `neuladen` im laufenden Spiel und eine **Server-Konsole** im Fenster der Engine (neuladen, wer, verkuende, rolle, ende …)
 - Spieler werden gespeichert: Inventar, Ausrüstung, Fertigkeiten, Zauber, besuchte Räume, Spielzeit
 - **Spielstand** (`sp`) mit Balken, Ausrüstungsboni und Fortschritt; **Spielerbuch** für persönliche Einstellungen (Karte, Kurzmodus, Zeilenbreite, Titel, Passwort …)
 - Monster wandern in ihrem Gebiet umher und sprechen
@@ -98,6 +98,7 @@ das Update und veröffentlicht alles als Release.
 | `karte.rs`   | Kartendarstellung für Städte und Dungeons                    |
 | `oberwelt.rs`| Oberwelt: Kartenbild laden, Sicht, Felder als Räume, Karten  |
 | `netz.rs`    | Telnet-Server und Login                                      |
+| `konsole.rs` | Befehle im Konsolenfenster des Servers                       |
 | `telnet.rs`  | Telnet-Aushandlung und MUD-Protokolle (GMCP, MSDP, MCCP2 …)  |
 | `clientdaten.rs` | Spieldaten für Clients: Werte, Raum, Gespräche, MSSP     |
 | `spieler.rs` | Speichern, Laden, Passwörter                                 |

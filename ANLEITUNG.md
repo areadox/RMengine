@@ -14,7 +14,8 @@ Spiel `neuladen`, und die Änderung ist da. Ein Neustart ist dafür nicht nötig
    die Datei `RMengine-Setup-….exe` herunter und führe sie aus. Administratorrechte
    sind nicht nötig. Installiert wird nach **Dokumente\RMengine**.
 2. Im Startmenü unter **RMengine** findest du:
-   - *RMengine starten*: startet den Server
+   - *RMengine starten*: startet den Server in einem Konsolenfenster (siehe
+     „Die Server-Konsole“)
    - *Weltdaten bearbeiten*: öffnet den Ordner mit deiner Welt
    - *Weltdaten prüfen*: sucht Fehler in den Dateien
    - *Nach Updates suchen*: installiert eine neue Version
@@ -53,6 +54,28 @@ telnet localhost 4000
 **Wichtig:** Trag in `welt.toml` unter `admins` deinen eigenen Figurennamen ein
 und lege diese Figur gleich an. Sie ist dann Admin und kann im Spiel weitere
 Rollen vergeben (siehe „Rollen: Spieler, Baumeister, Admin“).
+
+### Die Server-Konsole
+
+Der Server läuft in einem Konsolenfenster (unter Windows das schwarze Fenster,
+das „RMengine starten“ öffnet, unter Linux das Terminal). Dort siehst du, wer
+sich an- und abmeldet, und du kannst Befehle eintippen:
+
+| Befehl                 | Wirkung                                              |
+|------------------------|------------------------------------------------------|
+| `hilfe`                | alle Befehle der Konsole                             |
+| `neuladen`             | Weltdaten neu einlesen; die Spieler bleiben im Spiel |
+| `pruefen`              | Weltdaten prüfen, ohne sie zu übernehmen             |
+| `wer`                  | wer gerade spielt, wo und mit welchem Programm       |
+| `verkuende <text>`     | Nachricht an alle Spieler                            |
+| `rolle <name> <rolle>` | Rolle vergeben (spieler, baumeister, admin), auch für Figuren, die gerade nicht im Spiel sind |
+| `speichern`            | alle Spieler sofort speichern                        |
+| `ende`                 | alle speichern und den Server beenden                |
+
+Hast du im Welteditor etwas geändert, tippst du hier einfach `neuladen`. Auch
+Strg+C oder das Schließen des Fensters speichert vorher alle Spieler.
+Läuft der Server als Dienst ohne Fenster (Linux, systemd), gibt es keine
+Konsole. Dann benutzt du `neuladen` im Spiel oder die Fernwartung.
 
 ### Aktualisieren
 

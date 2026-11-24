@@ -37,6 +37,9 @@ pub async fn starten(welt: GeteilteWelt) -> io::Result<()> {
     println!("Der Server läuft auf Port {port}.");
     println!("Verbinde dich z.B. mit:  telnet localhost {port}   (oder mit einem MUD-Programm wie Mudlet)");
 
+    // Befehle im Konsolenfenster (neuladen, wer, ende ...)
+    tokio::spawn(crate::konsole::starten(welt.clone()));
+
     // Der Takt der Welt
     let w = welt.clone();
     tokio::spawn(async move {

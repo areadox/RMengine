@@ -18,6 +18,7 @@ mod fernwartung_protokoll;
 mod gespraech;
 mod kampf;
 mod karte;
+mod konsole;
 mod netz;
 mod oberwelt;
 mod spieler;
@@ -47,6 +48,7 @@ sonst der Ordner 'daten' neben dem Programm.";
 #[tokio::main]
 async fn main() {
     update::aufraeumen();
+    konsole::fenster_vorbereiten(&format!("RMengine {}", update::VERSION));
     let args: Vec<String> = std::env::args().skip(1).collect();
     let hat = |namen: &[&str]| args.iter().any(|a| namen.contains(&a.as_str()));
 
@@ -137,6 +139,14 @@ async fn main() {
     let welt = Arc::new(Mutex::new(welt::Welt::neu(d, &ordner)));
 
     let w = welt.clone();
+    let beenden = |w: &netz::GeteilteWelt| {
+        println!("\nServer wird beendet, alle Spieler werden gespeichert ...");
+        let w = netz::sperren(w);
+        w.sende_alle("{rot}Der Server wird heruntergefahren. Bis bald!{/}", &[]);
+        w.alle_speichern();
+        // Sofort beenden: das Lesen der Konsole würde das Herunterfahren sonst aufhalten
+        std::process::exit(0);
+    };
     tokio::select! {
         ergebnis = netz::starten(welt) => {
             if let Err(e) = ergebnis {
@@ -145,13 +155,25 @@ async fn main() {
                 warten_und_beenden(1);
             }
         }
-        _ = tokio::signal::ctrl_c() => {
-            println!("\nServer wird beendet, alle Spieler werden gespeichert ...");
-            let w = netz::sperren(&w);
-            w.sende_alle("{rot}Der Server wird heruntergefahren. Bis bald!{/}", &[]);
-            w.alle_speichern();
-        }
+        _ = tokio::signal::ctrl_c() => beenden(&w),
+        // Windows: Konsolenfenster wird mit dem X geschlossen – vorher noch speichern
+        _ = fenster_geschlossen() => beenden(&w),
     }
+}
+
+#[cfg(windows)]
+async fn fenster_geschlossen() {
+    match tokio::signal::windows::ctrl_close() {
+        Ok(mut s) => {
+            s.recv().await;
+        }
+        Err(_) => std::future::pending::<()>().await,
+    }
+}
+
+#[cfg(not(windows))]
+async fn fenster_geschlossen() {
+    std::future::pending::<()>().await
 }
 
 /// ./daten, wenn es den Ordner gibt – sonst daten/ neben dem Programm
