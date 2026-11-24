@@ -45,8 +45,9 @@ Source: "{#Root}\dist\windows\rmengine.exe"; DestDir: "{app}"; Flags: ignorevers
 Source: "{#Root}\dist\windows\rmeditor.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#Root}\ANLEITUNG.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#Root}\README.md"; DestDir: "{app}"; Flags: ignoreversion
-; Die Beispielwelt nur kopieren, wenn es die Datei noch nicht gibt – eigene Änderungen bleiben erhalten.
-Source: "{#Root}\daten\*"; DestDir: "{app}\daten"; Flags: onlyifdoesntexist uninsneveruninstall recursesubdirs createallsubdirs
+; Die Beispielwelt nur bei der ersten Installation kopieren. Gibt es schon eine Welt
+; (daten\welt.toml), bleibt sie unberührt – auch neue Beispieldateien kommen nicht hinzu.
+Source: "{#Root}\daten\*"; DestDir: "{app}\daten"; Flags: onlyifdoesntexist uninsneveruninstall recursesubdirs createallsubdirs; Check: BeispielweltNoetig
 
 [Icons]
 Name: "{group}\RMengine starten"; Filename: "{app}\rmengine.exe"; WorkingDir: "{app}"
@@ -67,3 +68,21 @@ Type: files; Name: "{app}\rmengine.exe.alt"
 Type: files; Name: "{app}\rmengine.exe.neu"
 Type: files; Name: "{app}\rmeditor.exe.alt"
 Type: files; Name: "{app}\rmeditor.exe.neu"
+
+[Code]
+var
+  WeltGeprueft: Boolean;
+  WeltDa: Boolean;
+
+{ Einmal vor dem Kopieren nachsehen, ob es schon eine Welt gibt (danach würde
+  welt.toml ja durch das Kopieren selbst existieren). }
+function BeispielweltNoetig: Boolean;
+begin
+  if not WeltGeprueft then
+  begin
+    WeltDa := FileExists(ExpandConstant('{app}\daten\welt.toml'));
+    WeltGeprueft := True;
+  end;
+  Result := not WeltDa;
+end;
+
