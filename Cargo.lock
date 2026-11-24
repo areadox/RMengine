@@ -2150,7 +2150,7 @@ dependencies = [
 
 [[package]]
 name = "rmeditor"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "eframe",
  "egui",
@@ -2164,8 +2164,9 @@ dependencies = [
 
 [[package]]
 name = "rmengine"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
+ "flate2",
  "rand",
  "rcgen",
  "rustls",

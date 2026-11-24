@@ -20,7 +20,7 @@ pub enum Folge {
 
 /// Zeilenbreite des Spielers (Einstellung im Spielerbuch)
 fn breite(w: &Welt, sid: u64) -> usize {
-    w.spieler.get(&sid).map(|s| s.sp.einstellungen.breite).unwrap_or(78)
+    w.spieler.get(&sid).map(|s| s.breite()).unwrap_or(78)
 }
 
 pub fn ausfuehren(w: &mut Welt, sid: u64, eingabe: &str) -> Folge {
@@ -257,6 +257,16 @@ fn geste(w: &Welt, sid: u64, i: usize, rest: &str) {
 }
 
 pub fn prompt(w: &Welt, sid: u64) {
+    crate::clientdaten::werte(w, sid);
+    prompt_text(w, sid);
+    // Ende des Prompts markieren (EOR oder GA), damit Clients ihn erkennen
+    if let Some(s) = w.spieler.get(&sid) {
+        let ende = crate::telnet::prompt_ende(&crate::telnet::sperren(&s.proto));
+        crate::telnet::senden(&s.sender, ende);
+    }
+}
+
+fn prompt_text(w: &Welt, sid: u64) {
     if let Some(s) = w.spieler.get(&sid) {
         let p = &s.sp;
         if !p.einstellungen.prompt {
@@ -456,7 +466,7 @@ fn raum_zeigen(w: &Welt, sid: u64, voll: bool) {
     }
     aus.push('\n');
     if voll || !e.kurz {
-        aus.push_str(&umbrechen(&raum.beschreibung, e.breite));
+        aus.push_str(&umbrechen(&raum.beschreibung, s.breite()));
         aus.push('\n');
     }
 
@@ -505,6 +515,7 @@ fn raum_zeigen(w: &Welt, sid: u64, voll: bool) {
         }
     }
     w.sende(sid, aus.trim_end());
+    crate::clientdaten::raum(w, sid);
 }
 
 fn gehen(w: &mut Welt, sid: u64, richt: Richtung) {
@@ -944,6 +955,7 @@ fn sagen(w: &Welt, sid: u64, t: &str) {
     let s = &w.spieler[&sid].sp;
     w.sende(sid, &format!("{{cyan}}Du sagst: „{t}“{{/}}"));
     w.sende_raum(&s.raum, &format!("{{cyan}}{} sagt: „{t}“{{/}}", s.name), &[sid]);
+    crate::clientdaten::gespraech(w, &w.spieler_im_raum(&s.raum), "say", &s.name, &format!("{} sagt: „{t}“", s.name));
 
     // Hören NPCs zu? Wer mit Namen angesprochen wird, antwortet immer.
     // Ist nur ein NPC da, antwortet er, wenn er etwas zum Thema weiß.
@@ -1098,13 +1110,22 @@ fn rufen(w: &Welt, sid: u64, t: &str) {
     let s = &w.spieler[&sid].sp;
     w.sende(sid, &format!("{{hellgelb}}Du rufst: „{t}“{{/}}"));
     w.sende_alle(&format!("{{hellgelb}}{} ruft: „{t}“{{/}}", s.name), &[sid]);
+    let alle: Vec<u64> = w.spieler.keys().copied().collect();
+    crate::clientdaten::gespraech(w, &alle, "shout", &s.name, &format!("{} ruft: „{t}“", s.name));
 }
 
 fn wer(w: &Welt, sid: u64) {
+    let admin = w.spieler.get(&sid).is_some_and(|s| s.rolle >= crate::spieler::Rolle::Admin);
     let mut t = format!("{{fett}}In {} sind gerade unterwegs:{{/}}\n", w.d.welt.name);
     for s in w.spieler.values() {
         let marke = s.rolle.marke();
-        t.push_str(&format!("  {}{marke}\n", s.sp.voller_name()));
+        // Admins sehen auch, mit welchem Programm jemand spielt
+        let client = if admin {
+            format!(" {{grau}}({}){{/}}", crate::telnet::sperren(&s.proto).client_name())
+        } else {
+            String::new()
+        };
+        t.push_str(&format!("  {}{marke}{client}\n", s.sp.voller_name()));
     }
     t.push_str(&format!("{} Spieler", w.spieler.len()));
     w.sende(sid, &t);
@@ -1721,7 +1742,8 @@ fn spielerbuch_zeigen(w: &Welt, sid: u64) {
     t.push_str(&zeile("karte", an_aus(e.karte), "Karte beim Umsehen zeigen"));
     t.push_str(&zeile("kartengroesse", groesse, "klein, normal oder gross"));
     t.push_str(&zeile("kurz", an_aus(e.kurz), "beim Gehen keine Raumbeschreibung (schau zeigt sie)"));
-    t.push_str(&zeile("breite", &e.breite.to_string(), "Zeilenbreite für Texte, 40 bis 200"));
+    let breite = if e.breite_auto { format!("auto ({})", w.spieler[&sid].breite()) } else { e.breite.to_string() };
+    t.push_str(&zeile("breite", &breite, "Zeilenbreite: auto (passt sich dem Fenster an) oder 40 bis 200"));
     t.push_str(&zeile("prompt", an_aus(e.prompt), "Eingabezeile mit Lebenspunkten und Mana"));
     t.push_str("\n{fett}Mitteilungen{/}\n");
     t.push_str(&zeile("ankuendigungen", an_aus(e.ankuendigungen), "melden, wenn Spieler kommen und gehen"));
@@ -1735,6 +1757,16 @@ fn spielerbuch_zeigen(w: &Welt, sid: u64) {
     let besch = if sp.beschreibung.is_empty() { "(keine)".to_string() } else { sp.beschreibung.clone() };
     t.push_str(&format!("  {{gelb}}{:<15}{{/}} {besch}\n", "beschreibung"));
     t.push_str(&format!("  {{gelb}}{:<15}{{/}} {{grau}}ändern mit: spielerbuch passwort <alt> <neu>{{/}}\n", "passwort"));
+    {
+        let p = crate::telnet::sperren(&w.spieler[&sid].proto);
+        t.push_str(&format!(
+            "\n{{fett}}Dein Programm{{/}}\n  {{gelb}}{:<15}{{/}} {}\n  {{gelb}}{:<15}{{/}} {}\n",
+            "client",
+            p.client_name(),
+            "protokolle",
+            p.aktiv()
+        ));
+    }
     t.push_str("\nÄndern: {gelb}spielerbuch <einstellung> <wert>{/}, z.B. {gelb}spielerbuch karte aus{/}");
     w.sende(sid, &t);
 }
@@ -1791,9 +1823,14 @@ fn spielerbuch(w: &mut Welt, sid: u64, rest: &str) {
             "breite" => match wert.parse::<usize>() {
                 Ok(b) if (40..=200).contains(&b) => {
                     e.breite = b;
+                    e.breite_auto = false;
                     format!("Texte werden jetzt auf {b} Zeichen umbrochen.")
                 }
-                _ => "Bitte eine Zahl von 40 bis 200 angeben.".into(),
+                _ if normalisieren(wert) == "auto" => {
+                    e.breite_auto = true;
+                    "Die Zeilenbreite passt sich jetzt deinem Fenster an (wenn dein Programm sie meldet).".into()
+                }
+                _ => "Bitte 'auto' oder eine Zahl von 40 bis 200 angeben.".into(),
             },
             "titel" => {
                 if wert.is_empty() || matches!(normalisieren(wert).as_str(), "loeschen" | "-" | "keiner") {

@@ -8,14 +8,14 @@ use rand::Rng;
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
-use tokio::sync::mpsc::UnboundedSender;
-
-pub type Sender = UnboundedSender<Vec<u8>>;
+pub use crate::telnet::Sender;
 
 /// Ein eingeloggter Spieler.
 pub struct Sitzung {
     pub sp: SpielerDaten,
     pub sender: Sender,
+    /// Was mit dem Client ausgehandelt wurde (GMCP, Fenstergröße, ...)
+    pub proto: crate::telnet::Geteilt,
     /// Die tatsächliche Rolle: gespeicherte Rolle oder welt.toml, je nachdem was höher ist
     pub rolle: Rolle,
     pub abklingzeiten: HashMap<String, Instant>,
@@ -37,10 +37,26 @@ impl Sitzung {
     }
 
     pub fn sende(&self, t: &str) {
-        let _ = self.sender.send(text::fuer_telnet(t, self.sp.farben, true));
+        self.roh(text::fuer_telnet(t, self.sp.farben, true));
     }
     pub fn sende_ohne_umbruch(&self, t: &str) {
-        let _ = self.sender.send(text::fuer_telnet(t, self.sp.farben, false));
+        self.roh(text::fuer_telnet(t, self.sp.farben, false));
+    }
+    /// Fertige Bytes (passend zum Zeichensatz des Clients umgewandelt).
+    pub fn roh(&self, b: Vec<u8>) {
+        let b = crate::telnet::sperren(&self.proto).kodieren(b);
+        crate::telnet::senden(&self.sender, b);
+    }
+
+    /// Zeilenbreite: eingestellt – oder bei "auto" die Fensterbreite des Clients.
+    pub fn breite(&self) -> usize {
+        let e = &self.sp.einstellungen;
+        if e.breite_auto {
+            if let Some((b, _)) = crate::telnet::sperren(&self.proto).naws {
+                return (b as usize).saturating_sub(1).clamp(30, 250);
+            }
+        }
+        e.breite
     }
 }
 
@@ -271,7 +287,7 @@ impl Welt {
         sp
     }
 
-    pub fn anmelden(&mut self, mut sp: SpielerDaten, sender: Sender) -> Result<u64, String> {
+    pub fn anmelden(&mut self, mut sp: SpielerDaten, sender: Sender, proto: crate::telnet::Geteilt) -> Result<u64, String> {
         if self.ist_online(&sp.name) {
             return Err("Diese Figur ist bereits in der Welt unterwegs.".into());
         }
@@ -294,6 +310,7 @@ impl Welt {
         self.spieler.insert(id, Sitzung {
                 sp,
                 sender,
+                proto,
                 rolle,
                 abklingzeiten: HashMap::new(),
                 kampf_ziel: None,

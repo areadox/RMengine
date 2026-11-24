@@ -204,6 +204,10 @@ name   = "Höhle"
 symbol = "o"
 farbe  = "grau"
 klammern = "<>"
+nutzt    = ["fels", "steine", "spinnweben"]
+geruch   = "Es riecht feucht und muffig."
+geraeusch = "Wasser tropft irgendwo von der Decke."
+gefuehl  = "Die Wände sind feucht und kalt."
 
 # ---------------------------------------------------------------------
 # Farben der Verzierungen auf der Stadtkarte (Zeichen = Farbe)
@@ -211,12 +215,22 @@ klammern = "<>"
 #   deko = "o&"                  verstreut um das Kästchen
 #   deko_richtung = { sued = "~" }  eine ganze Seite, z.B. ein Bach
 # ---------------------------------------------------------------------
-nutzt    = ["fels", "steine", "spinnweben"]
-geruch   = "Es riecht feucht und muffig."
-geraeusch = "Wasser tropft irgendwo von der Decke."
-gefuehl  = "Die Wände sind feucht und kalt."
 [deko]
 "o" = "gruen"
 "&" = "hellgruen"
 "~" = "hellblau"
 "^" = "grau"
+
+# ---------------------------------------------------------------------
+# Angaben für MUD-Verzeichnisse (MSSP). Name, Spielerzahl, Laufzeit usw.
+# schickt der Server selbst – hier kannst du Weiteres ergänzen oder
+# überschreiben. Alles freiwillig.
+# ---------------------------------------------------------------------
+[mssp]
+GENRE    = "Fantasy"
+GAMEPLAY = "Adventure"
+STATUS   = "Alpha"
+# HOSTNAME = "mud.example.de"
+# WEBSITE  = "https://..."
+# CONTACT  = "du@example.de"
+# DISCORD  = "https://discord.gg/..."

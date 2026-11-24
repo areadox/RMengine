@@ -97,6 +97,8 @@ pub struct Einstellungen {
     pub kurz: bool,
     pub kartengroesse: i32,
     pub breite: usize,
+    /// Zeilenbreite automatisch an das Fenster des Clients anpassen (NAWS)
+    pub breite_auto: bool,
     pub prompt: bool,
     pub ankuendigungen: bool,
     pub npc_sprueche: bool,
@@ -113,6 +115,7 @@ impl Default for Einstellungen {
             kurz: false,
             kartengroesse: 0,
             breite: 78,
+            breite_auto: true,
             prompt: true,
             ankuendigungen: true,
             npc_sprueche: true,

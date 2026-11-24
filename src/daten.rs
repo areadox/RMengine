@@ -354,6 +354,9 @@ struct WeltDatei {
     namen: BTreeMap<String, String>,
     #[serde(default)]
     kampf: KampfConfig,
+    /// Zusätzliche Angaben für MUD-Verzeichnisse (MSSP), z.B. GENRE = "Fantasy"
+    #[serde(default)]
+    mssp: BTreeMap<String, String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -707,6 +710,8 @@ pub struct Daten {
     /// Anzeigenamen für IDs, z.B. staerke -> "Stärke"
     pub namen: BTreeMap<String, String>,
     pub kampf: KampfConfig,
+    /// Zusätzliche Serverinfos für MUD-Verzeichnisse ([mssp] in welt.toml)
+    pub mssp: BTreeMap<String, String>,
     /// Befehle und Gesten aus befehle.toml / befehle/*.toml
     pub befehle: crate::befehlskonfig::Befehle,
     pub oberwelt: Option<Oberwelt>,
@@ -880,6 +885,7 @@ pub fn laden(ordner: &Path) -> Result<Daten, Vec<String>> {
         deko_farben: wd.deko,
         namen: wd.namen,
         kampf: wd.kampf,
+        mssp: wd.mssp,
         befehle: Default::default(),
         oberwelt: None,
         bibliothek: BTreeMap::new(),

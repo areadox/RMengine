@@ -65,6 +65,7 @@ das Update und veröffentlicht alles als Release.
 ## Funktionen
 
 - Telnet-Server für mehrere Spieler gleichzeitig, mit Farben und verdeckter Passworteingabe
+- **MUD-Protokolle** für Programme wie Mudlet, TinTin++ oder MUSHclient: GMCP (Lebensbalken, Automapper, Chat), MSDP, MCCP2-Kompression, NAWS (Zeilenbreite passt sich dem Fenster an), TTYPE/MTTS, EOR/GA, CHARSET (UTF-8 oder ISO-8859-1) und MSSP für MUD-Verzeichnisse
 - **Oberwelt:** eine Landschaft, die man als Textbild zeichnet, mit geländeabhängiger Sicht (Wald dämpft, Berge verdecken, Gipfel geben Weitblick), Städten und Dungeons als Eingängen, besonderen Orten, automatischen Beschreibungen und `weltkarte`
 - ASCII-Stadtkarte, die automatisch aus den Raumkoordinaten entsteht, mit Stockwerken, Geländearten, Legende und Diagonalen
 - zentrale Verwaltung von Items, Monstern, Fertigkeiten und Zaubern, alles in TOML
@@ -97,6 +98,8 @@ das Update und veröffentlicht alles als Release.
 | `karte.rs`   | Kartendarstellung für Städte und Dungeons                    |
 | `oberwelt.rs`| Oberwelt: Kartenbild laden, Sicht, Felder als Räume, Karten  |
 | `netz.rs`    | Telnet-Server und Login                                      |
+| `telnet.rs`  | Telnet-Aushandlung und MUD-Protokolle (GMCP, MSDP, MCCP2 …)  |
+| `clientdaten.rs` | Spieldaten für Clients: Werte, Raum, Gespräche, MSSP     |
 | `spieler.rs` | Speichern, Laden, Passwörter                                 |
 | `text.rs`    | Farben, Zeilenumbruch, Tippfehler-Vorschläge                 |
 | `update.rs`  | Update-Funktion über GitHub Releases                         |

@@ -238,7 +238,7 @@ wird mit `spielerbuch <einstellung> <wert>`, zum Beispiel
 | `karte`          | an / aus              | Karte beim Umsehen                           |
 | `kartengroesse`  | klein / normal / gross | Größe der Karte                             |
 | `kurz`           | an / aus              | beim Gehen keine Raumbeschreibung            |
-| `breite`         | 40 bis 200            | Zeilenbreite für Texte                       |
+| `breite`         | auto oder 40 bis 200  | Zeilenbreite; auto = so breit wie das Fenster |
 | `prompt`         | an / aus              | Eingabezeile mit Lebenspunkten und Mana      |
 | `ankuendigungen` | an / aus              | Meldungen, wenn Spieler kommen und gehen     |
 | `npc`            | an / aus              | Sprüche von Bewohnern und Tieren             |
@@ -1157,3 +1157,68 @@ einem Vorschlag:
 nicht erreichen kann) sind nur Hinweise.
 
 Spielerfiguren werden im Ordner `spieler/` gespeichert, eine Datei pro Figur.
+
+---
+
+## 17. MUD-Programme und Protokolle
+
+Man kann mit jedem Telnet-Programm spielen. Besser geht es mit einem
+MUD-Programm (Client) wie **Mudlet**, **TinTin++**, **MUSHclient** oder
+**Blightmud**. RMengine erkennt beim Verbinden selbst, was das Programm kann.
+Einstellen musst du nichts.
+
+| Protokoll | Was es bringt                                                         |
+|-----------|-----------------------------------------------------------------------|
+| NAWS      | Das Programm meldet seine Fensterbreite, und Texte werden passend umbrochen. |
+| TTYPE/MTTS| Das Programm nennt seinen Namen (Admins sehen ihn bei `wer`).          |
+| EOR / GA  | Markiert das Ende des Prompts, damit das Programm ihn sicher erkennt.  |
+| CHARSET   | UTF-8 für Umlaute. Alte Programme bekommen auf Wunsch ISO-8859-1.     |
+| MCCP2     | Kompression: deutlich weniger Datenverkehr                            |
+| GMCP      | Daten im Hintergrund für Lebensbalken, Automapper und Chatfenster     |
+| MSDP      | dasselbe für Programme, die MSDP statt GMCP benutzen                  |
+| MSSP      | Infos für MUD-Verzeichnisse (Name, Spielerzahl, Laufzeit …)           |
+
+Im **Spielerbuch** steht unter „Dein Programm“, welches Programm erkannt wurde
+und welche Protokolle laufen. Mit `spielerbuch breite auto` (Standard) passt
+sich die Zeilenbreite dem Fenster an, mit `spielerbuch breite 80` ist sie fest.
+
+### GMCP-Pakete (für Skripte in Mudlet & Co.)
+
+| Paket               | Wann                       | Inhalt                                                    |
+|---------------------|----------------------------|-----------------------------------------------------------|
+| `Char.Name`         | beim Einloggen             | `name`, `fullname`                                        |
+| `Char.Vitals`       | bei Änderung, vor dem Prompt | `hp`, `maxhp`, `mp`, `maxmp`, `ep`, `maxep` (LP, MP, AP) |
+| `Char.Status`       | bei Änderung, vor dem Prompt | `name`, `level`, `xp`, `xp_next`, `free_points`, `role`, `dead`, `enemy`, `enemy_health` (Prozent) |
+| `Room.Info`         | bei jedem Raum             | `num`, `id`, `name`, `area`, `environment`, `x`, `y`, `z`, `coords`, `map`, `exits` (`{"n": 12345, ...}`) |
+| `Comm.Channel.Text` | bei `sage` und `rufe`      | `channel` (`say`/`shout`), `talker`, `text`               |
+| `Core.Ping`         | auf Anfrage                | Antwort auf den Ping des Programms                        |
+
+`num` ist eine feste Nummer, die aus der Raum-ID berechnet wird. Sie bleibt
+gleich, solange du die ID nicht änderst, und der Automapper erkennt den Raum so
+wieder. `area` ist das `gebiet` des Raums, `environment` die Geländeart.
+Richtungen in `exits`: `n ne e se s sw w nw u d in out`.
+
+### MSDP-Variablen
+
+`CHARACTER_NAME`, `SERVER_ID`, `SERVER_TIME`, `HEALTH`, `HEALTH_MAX`, `MANA`,
+`MANA_MAX`, `MOVEMENT`, `MOVEMENT_MAX`, `LEVEL`, `EXPERIENCE`, `EXPERIENCE_MAX`,
+`EXPERIENCE_TNL`, `OPPONENT_NAME`, `OPPONENT_HEALTH`, `OPPONENT_HEALTH_MAX`,
+`ROOM`, `ROOM_NAME`, `ROOM_VNUM`, `ROOM_AREA`, `ROOM_TERRAIN` und `ROOM_EXITS`.
+Die Befehle `LIST`, `REPORT`, `UNREPORT`, `SEND` und `RESET` werden verstanden.
+Mit `REPORT` bestellte Werte kommen automatisch, sobald sie sich ändern.
+
+### Eintrag in MUD-Verzeichnissen (MSSP)
+
+Verzeichnisse wie mudverse.com oder Grapevine fragen den Server per MSSP ab.
+Name, Spielerzahl, Laufzeit, Anzahl der Räume und die Protokolle schickt
+RMengine selbst. Weitere Angaben trägst du in `welt.toml` ein:
+
+```toml
+[mssp]
+GENRE    = "Fantasy"
+GAMEPLAY = "Adventure"
+STATUS   = "Alpha"
+HOSTNAME = "mud.example.de"
+WEBSITE  = "https://..."
+```
+

@@ -1,6 +1,6 @@
 [package]
 name = "rmeditor"
-version = "0.2.2"
+version = "0.2.3"
 edition = "2021"
 description = "Grafischer Welteditor für RMengine: Räume auf einer Karte bauen, verbinden und beschreiben."
 repository = "https://github.com/areadox/RMengine"
