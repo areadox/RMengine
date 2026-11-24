@@ -7,6 +7,7 @@
 
 use crate::befehle::{finde_gegenstand, gruppieren, passt};
 use crate::daten::{LehrDef, MonsterDef};
+use crate::gemeinschaft::nummer;
 use crate::text::{auffuellen, gross, normalisieren};
 use crate::welt::Welt;
 
@@ -41,20 +42,49 @@ fn npc_sagt(w: &Welt, sid: u64, npc: &MonsterDef, text: &str) {
 }
 
 /// Befehl "waren": was die Händler und Lehrmeister hier anbieten.
+/// Alle Waren der Händler im Raum, in der Reihenfolge der Anzeige (für "kaufe 3").
+fn alle_waren(w: &Welt, sid: u64) -> Vec<(MonsterDef, crate::daten::GegenstandDef)> {
+    let mut v = Vec::new();
+    for (_, d) in npcs_im_raum(w, sid, |d| d.haendler.is_some()) {
+        for id in &d.haendler.as_ref().expect("Händler").waren {
+            if let Some(g) = w.d.gegenstaende.get(id) {
+                v.push((d.clone(), g.clone()));
+            }
+        }
+    }
+    v
+}
+
+/// Alles, was Lehrmeister im Raum lehren, in der Reihenfolge der Anzeige (für "lerne 2").
+fn alle_lehren(w: &Welt, sid: u64) -> Vec<(MonsterDef, LehrDef)> {
+    let mut v = Vec::new();
+    for (_, d) in npcs_im_raum(w, sid, |d| !d.lehrt.is_empty()) {
+        for l in &d.lehrt {
+            if w.d.fertigkeiten.contains_key(&l.id) || w.d.zauber.contains_key(&l.id) {
+                v.push((d.clone(), l.clone()));
+            }
+        }
+    }
+    v
+}
+
 pub fn waren(w: &Welt, sid: u64, rest: &str) {
     let liste = npcs_im_raum(w, sid, |d| d.haendler.is_some() || !d.lehrt.is_empty());
-    let liste: Vec<_> = if rest.is_empty() {
-        liste
-    } else {
-        liste.into_iter().filter(|(_, d)| passt(rest, &d.name, &d.id, &d.schluesselwoerter)).collect()
-    };
-    if liste.is_empty() {
+    if liste.iter().all(|(_, d)| !rest.is_empty() && !passt(rest, &d.name, &d.id, &d.schluesselwoerter)) {
         w.sende(sid, "Hier verkauft und lehrt niemand etwas.");
         return;
     }
     let sp = &w.spieler[&sid].sp;
     let mut t = String::new();
+    // Nummern laufen über alle Händler im Raum, damit "kaufe 3" eindeutig ist
+    let (mut nr_ware, mut nr_lehre) = (0, 0);
     for (_, d) in liste {
+        let zeigen = rest.is_empty() || passt(rest, &d.name, &d.id, &d.schluesselwoerter);
+        if !zeigen {
+            nr_ware += d.haendler.as_ref().map(|h| h.waren.iter().filter(|g| w.d.gegenstaende.contains_key(*g)).count()).unwrap_or(0);
+            nr_lehre += d.lehrt.iter().filter(|l| w.d.fertigkeiten.contains_key(&l.id) || w.d.zauber.contains_key(&l.id)).count();
+            continue;
+        }
         if let Some(h) = &d.haendler {
             t.push_str(&format!("{{fett}}{} verkauft:{{/}}\n", gross(&d.name)));
             if h.waren.is_empty() {
@@ -62,8 +92,9 @@ pub fn waren(w: &Welt, sid: u64, rest: &str) {
             }
             for id in &h.waren {
                 let Some(g) = w.d.gegenstaende.get(id) else { continue };
+                nr_ware += 1;
                 t.push_str(&format!(
-                    "  {} {{hellgelb}}{}{{/}}\n",
+                    "  {{gelb}}{nr_ware:>2}.{{/}} {} {{hellgelb}}{}{{/}}\n",
                     auffuellen(&gross(&g.name), 32),
                     betrag(w, verkaufspreis(d, g.wert))
                 ));
@@ -79,8 +110,9 @@ pub fn waren(w: &Welt, sid: u64, rest: &str) {
                 if let Some(f) = w.d.fertigkeiten.get(&l.id) {
                     let bis = l.bis.unwrap_or(f.max_stufe);
                     let hat = sp.fertigkeiten.get(&f.id).copied().unwrap_or(0);
+                    nr_lehre += 1;
                     t.push_str(&format!(
-                        "  {} {{hellgelb}}{}{{/}} je Lektion {{grau}}(bis Stufe {bis}, du: {hat}){}{{/}}\n",
+                        "  {{gelb}}{nr_lehre:>2}.{{/}} {} {{hellgelb}}{}{{/}} je Lektion {{grau}}(bis Stufe {bis}, du: {hat}){}{{/}}\n",
                         auffuellen(&f.name, 24),
                         betrag(w, l.preis),
                         bedingung(w, l)
@@ -88,8 +120,9 @@ pub fn waren(w: &Welt, sid: u64, rest: &str) {
                 } else if let Some(z) = w.d.zauber.get(&l.id) {
                     let art = if z.ist_technik() { "Technik" } else { "Zauber" };
                     let kann = if sp.zauber.contains(&z.id) { ", kannst du schon" } else { "" };
+                    nr_lehre += 1;
                     t.push_str(&format!(
-                        "  {} {{hellgelb}}{}{{/}} {{grau}}({art}{kann}){}{{/}}\n",
+                        "  {{gelb}}{nr_lehre:>2}.{{/}} {} {{hellgelb}}{}{{/}} {{grau}}({art}{kann}){}{{/}}\n",
                         auffuellen(&z.name, 24),
                         betrag(w, l.preis),
                         bedingung(w, l)
@@ -99,7 +132,7 @@ pub fn waren(w: &Welt, sid: u64, rest: &str) {
         }
     }
     t.push_str(&format!(
-        "\nDu hast {{hellgelb}}{}{{/}}. Befehle: {{gelb}}kaufe <ware>{{/}}, {{gelb}}verkaufe <ding>{{/}}, {{gelb}}lerne <was>{{/}}",
+        "\nDu hast {{hellgelb}}{}{{/}}. Befehle: {{gelb}}kaufe <nr|ware>{{/}}, {{gelb}}verkaufe <ding>{{/}}, {{gelb}}lerne <nr|was>{{/}}",
         betrag(w, sp.geld)
     ));
     w.sende(sid, &t);
@@ -135,12 +168,16 @@ pub fn kaufen(w: &mut Welt, sid: u64, rest: &str) {
         return;
     }
     let (anzahl, such) = anzahl_und_name(rest);
-    let treffer = npcs_im_raum(w, sid, |d| d.haendler.is_some()).into_iter().find_map(|(_, d)| {
-        let h = d.haendler.as_ref()?;
-        let i = finde_gegenstand(&w.d, &h.waren, such)?;
-        let g = w.d.gegenstaende.get(&h.waren[i])?;
-        Some((d.clone(), g.clone()))
-    });
+    // "kaufe 3" = Ware Nummer 3 aus der Liste ("kaufe 2 3" = zweimal Nummer 3)
+    let treffer = match nummer(such) {
+        Some(n) => alle_waren(w, sid).into_iter().nth(n),
+        None => npcs_im_raum(w, sid, |d| d.haendler.is_some()).into_iter().find_map(|(_, d)| {
+            let h = d.haendler.as_ref()?;
+            let i = finde_gegenstand(&w.d, &h.waren, such)?;
+            let g = w.d.gegenstaende.get(&h.waren[i])?;
+            Some((d.clone(), g.clone()))
+        }),
+    };
     let Some((npc, g)) = treffer else {
         if npcs_im_raum(w, sid, |d| d.haendler.is_some()).is_empty() {
             w.sende(sid, "Hier gibt es keinen Händler.");
@@ -228,7 +265,10 @@ pub fn lernen(w: &mut Welt, sid: u64, rest: &str) {
         return;
     }
     let such = normalisieren(rest);
-    let gefunden = lehrer.iter().find_map(|(_, d)| {
+    let gefunden = if let Some(n) = nummer(rest) {
+        alle_lehren(w, sid).into_iter().nth(n)
+    } else {
+        lehrer.iter().find_map(|(_, d)| {
         d.lehrt.iter().find(|l| {
             let (name, woerter) = match (w.d.fertigkeiten.get(&l.id), w.d.zauber.get(&l.id)) {
                 (Some(f), _) => (f.name.clone(), Vec::new()),
@@ -238,7 +278,8 @@ pub fn lernen(w: &mut Welt, sid: u64, rest: &str) {
             passt(&such, &name, &l.id, &woerter) || normalisieren(&name) == such
         })
         .map(|l| ((*d).clone(), l.clone()))
-    });
+        })
+    };
     let Some((npc, l)) = gefunden else {
         w.sende(sid, "Das kann dir hier niemand beibringen. ({gelb}waren{/} zeigt, was gelehrt wird)");
         return;

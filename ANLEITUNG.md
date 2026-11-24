@@ -230,7 +230,15 @@ funktionieren auch hier: Die Engine tauscht sich aus und startet sich selbst neu
 
 ## 3. Befehle für Spieler
 
-Die wichtigsten Befehle zeigt `hilfe`. Zwei davon gehören jeder Figur:
+Die wichtigsten Befehle zeigt `hilfe`.
+
+**Auswahlen gehen auch mit Zahlen:** Listen im Spiel sind nummeriert, und statt
+des Namens kann man die Nummer tippen: bei der Rassenwahl (`3` oder `info 2`),
+bei `waren` (`kaufe 2`, `kaufe 3 5` = dreimal Nummer 5, `lerne 1`), bei
+`zauber` (`zaubere 4`, `spezial 6 ratte`), bei Aufgaben (`annehmen 1`,
+`abbrechen 1`) und bei `beitreten` und `austreten`.
+
+Zwei Befehle gehören jeder Figur:
 
 ### Spielstand (`spielstand` oder kurz `sp`)
 
@@ -1390,7 +1398,8 @@ verkauf_prozent = 100           # Verkaufspreis in % vom Wert
 ankauf_prozent  = 50            # er zahlt die Hälfte des Werts
 ```
 
-Spieler: `waren` (Angebot zeigen), `kaufe brot`, `kaufe 3 brot`,
+Spieler: `waren` (Angebot zeigen, nummeriert), `kaufe brot` oder `kaufe 2`
+(Nummer aus der Liste), `kaufe 3 brot` bzw. `kaufe 3 2` (dreimal),
 `verkaufe pelz`.
 
 ### Lehrmeister
@@ -1411,7 +1420,8 @@ gilde = ""               # nur für Mitglieder dieser Gilde (optional)
 ```
 
 Spieler: `waren` zeigt auch, was gelehrt wird. Gelernt wird mit
-`lerne schwertkampf`. Voraussetzungen von Fertigkeiten werden geprüft.
+`lerne schwertkampf` oder mit der Nummer aus der Liste (`lerne 1`).
+Voraussetzungen von Fertigkeiten werden geprüft.
 
 **Achtung TOML:** Felder des NPCs (wie `gilde = "..."`) müssen **vor** dem
 ersten `[[npc.lehrt]]` oder `[npc.haendler]` stehen. Sonst gehören sie zur
@@ -1545,6 +1555,6 @@ titel        = ""
 | `besuchen` | man den Raum `ziel` betritt                                   |
 | `sprechen` | man mit dem NPC `ziel` redet                                  |
 
-Spieler: `aufgaben`, `aufgaben erledigt`, `annehmen [name]`, `abgeben`,
-`abbrechen <name>`. Zum Abgeben reicht es auch, mit dem Geber zu reden.
+Spieler: `aufgaben`, `aufgaben erledigt`, `annehmen [nr|name]`, `abgeben`,
+`abbrechen <nr|name>`. Zum Abgeben reicht es auch, mit dem Geber zu reden.
 

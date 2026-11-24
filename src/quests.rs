@@ -68,7 +68,7 @@ fn verfuegbar(w: &Welt, sid: u64, q: &QuestDef) -> bool {
 }
 
 /// Quests, die NPCs im Raum anbieten: (NPC-Name, Quest)
-fn angebote(w: &Welt, sid: u64) -> Vec<(String, QuestDef)> {
+fn angebote_im_raum(w: &Welt, sid: u64) -> Vec<(String, QuestDef)> {
     let raum = &w.spieler[&sid].sp.raum;
     let mut v = Vec::new();
     for mid in w.monster_im_raum(raum) {
@@ -100,10 +100,13 @@ pub fn angesprochen(w: &mut Welt, sid: u64, mid: u64, nach_aufgabe: bool) {
         return;
     }
     let angebote: Vec<QuestDef> = w.d.quests.values().filter(|q| q.geber == npc.id && verfuegbar(w, sid, q)).cloned().collect();
+    // Nummern wie bei "annehmen <nr>" (über alle Angebote im Raum)
+    let alle: Vec<String> = angebote_im_raum(w, sid).into_iter().map(|(_, q)| q.id).collect();
     for q in &angebote {
         let text = if q.angebot.is_empty() { format!("Ich hätte da etwas für dich: {}.", q.name) } else { q.angebot.clone() };
         npc_sagt(w, sid, &npc.name, &text);
-        w.sende(sid, &format!("{{grau}}({}: {} – annehmen mit {{gelb}}annehmen {}{{/}}{{grau}}){{/}}", art_name(q), q.name, q.name.to_lowercase()));
+        let nr = alle.iter().position(|id| *id == q.id).map(|i| i + 1).unwrap_or(1);
+        w.sende(sid, &format!("{{grau}}({}: {} – annehmen mit {{gelb}}annehmen {nr}{{/}}{{grau}}){{/}}", art_name(q), q.name));
     }
     // Läuft schon etwas bei diesem NPC? Dann daran erinnern.
     if angebote.is_empty() {
@@ -120,16 +123,22 @@ pub fn angesprochen(w: &mut Welt, sid: u64, mid: u64, nach_aufgabe: bool) {
 
 /// Befehl "annehmen [quest]"
 pub fn annehmen(w: &mut Welt, sid: u64, rest: &str) {
-    let angebote = angebote(w, sid);
+    let angebote = angebote_im_raum(w, sid);
     if angebote.is_empty() {
         w.sende(sid, "Hier bietet dir niemand eine Aufgabe an. Frag die Leute: sage hast du eine aufgabe?");
         return;
     }
     let such = normalisieren(rest);
-    let gewaehlt = if such.is_empty() {
+    let gewaehlt = if let Some(n) = crate::gemeinschaft::nummer(rest) {
+        angebote.into_iter().nth(n)
+    } else if such.is_empty() {
         if angebote.len() > 1 {
-            let namen: Vec<String> = angebote.iter().map(|(_, q)| q.name.clone()).collect();
-            w.sende(sid, &format!("Welche Aufgabe? {}", namen.join(", ")));
+            let mut t = String::from("Welche Aufgabe willst du annehmen?\n");
+            for (i, (npc, q)) in angebote.iter().enumerate() {
+                t.push_str(&format!("  {{gelb}}{:>2}.{{/}} {} {{grau}}({}, von {}){{/}}\n", i + 1, q.name, art_name(q), npc));
+            }
+            t.push_str("Tippe: annehmen <nr>");
+            w.sende(sid, &t);
             return;
         }
         angebote.into_iter().next()
@@ -180,9 +189,9 @@ pub fn anzeigen(w: &Welt, sid: u64, rest: &str) {
         return;
     }
     let mut t = String::from("{fett}Deine Aufgaben:{/}\n");
-    for (id, st) in &sp.quests {
+    for (nr, (id, st)) in sp.quests.iter().enumerate() {
         let Some(q) = w.d.quests.get(id) else { continue };
-        t.push_str(&format!("{{hellgelb}}{}{{/}} {{grau}}({}){{/}}\n", q.name, art_name(q)));
+        t.push_str(&format!("{{gelb}}{:>2}.{{/}} {{hellgelb}}{}{{/}} {{grau}}({}){{/}}\n", nr + 1, q.name, art_name(q)));
         if !q.beschreibung.is_empty() {
             t.push_str(&format!("  {{grau}}{}{{/}}\n", q.beschreibung.trim()));
         }
@@ -200,21 +209,22 @@ pub fn anzeigen(w: &Welt, sid: u64, rest: &str) {
             t.push_str(&format!("  → {{hellgruen}}Fertig! Kehre zu {geber} zurück.{{/}}\n"));
         }
     }
-    t.push_str("{grau}(abbrechen <aufgabe> gibt eine Aufgabe auf){/}");
+    t.push_str("{grau}(abbrechen <nr> gibt eine Aufgabe auf){/}");
     w.sende(sid, &t);
 }
 
 /// Befehl "abbrechen <quest>"
 pub fn abbrechen(w: &mut Welt, sid: u64, rest: &str) {
     let such = normalisieren(rest);
-    let id = w.spieler[&sid]
-        .sp
-        .quests
-        .keys()
+    let mut laufend = w.spieler[&sid].sp.quests.keys();
+    let id = match crate::gemeinschaft::nummer(rest) {
+        Some(n) => laufend.nth(n).cloned(),
+        None => laufend
         .find(|id| !such.is_empty() && w.d.quests.get(*id).is_some_and(|q| normalisieren(&q.name).contains(&such) || normalisieren(&q.id) == such))
-        .cloned();
+        .cloned(),
+    };
     let Some(id) = id else {
-        w.sende(sid, "Welche Aufgabe willst du abbrechen? (aufgaben zeigt sie)");
+        w.sende(sid, "Welche Aufgabe willst du abbrechen? (aufgaben zeigt sie mit Nummern)");
         return;
     };
     let name = w.d.quests.get(&id).map(|q| q.name.clone()).unwrap_or_default();

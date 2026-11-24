@@ -1279,14 +1279,16 @@ fn zauber_liste(w: &Welt, sid: u64) {
         text::auffuellen(&k.join(" "), 12)
     };
     let mut t = String::new();
-    for (technik, titel, befehl) in [(false, "Deine Zaubersprüche", "zaubere <name> [ziel]"), (true, "Deine Kampftechniken", "spezial <name> [ziel]")] {
+    let mut nr = 0;
+    for (technik, titel, befehl) in [(false, "Deine Zaubersprüche", "zaubere <nr|name> [ziel]"), (true, "Deine Kampftechniken", "spezial <nr|name> [ziel]")] {
         let liste: Vec<_> = sp.zauber.iter().filter_map(|id| w.d.zauber.get(id)).filter(|z| z.ist_technik() == technik).collect();
         if liste.is_empty() {
             continue;
         }
         t.push_str(&format!("{{fett}}{titel}{{/}}  {{grau}}({befehl}){{/}}\n"));
         for z in liste {
-            t.push_str(&format!("  {{magenta}}{:<18}{{/}} {} {{grau}}{}{{/}}\n", z.name, kosten(z), z.beschreibung));
+            nr += 1;
+            t.push_str(&format!("  {{gelb}}{nr:>2}.{{/}} {{magenta}}{:<18}{{/}} {} {{grau}}{}{{/}}\n", z.name, kosten(z), z.beschreibung));
         }
     }
     w.sende(sid, t.trim_end());
@@ -1299,10 +1301,27 @@ fn zaubern(w: &mut Welt, sid: u64, rest: &str, technik: bool) {
         w.sende(sid, &format!("{was} ({{gelb}}zauber{{/}} zeigt, was du kannst)"));
         return;
     }
-    // Welcher Zauber ist gemeint? Der längste passende Name gewinnt.
+    // Welcher Zauber ist gemeint? Die Nummer aus "zauber" – oder der längste passende Name.
     let such = normalisieren(rest);
     let mut bester: Option<(String, usize)> = None;
-    for zid in &w.spieler[&sid].sp.zauber {
+    let (erstes, _) = such.split_once(' ').unwrap_or((&such, ""));
+    if let Some(n) = crate::gemeinschaft::nummer(erstes) {
+        let welt: &Welt = w;
+        let sp = &welt.spieler[&sid].sp;
+        let mut reihenfolge: Vec<String> = Vec::new();
+        for t in [false, true] {
+            reihenfolge.extend(sp.zauber.iter().filter(|id| welt.d.zauber.get(*id).is_some_and(|z| z.ist_technik() == t)).cloned());
+        }
+        match reihenfolge.get(n) {
+            Some(id) => bester = Some((id.clone(), erstes.len())),
+            None => {
+                w.sende(sid, "Diese Nummer gibt es nicht. ({gelb}zauber{/} zeigt die Liste)");
+                return;
+            }
+        }
+    }
+    let per_nummer = bester.is_some();
+    for zid in w.spieler[&sid].sp.zauber.iter().filter(|_| !per_nummer) {
         let Some(z) = w.d.zauber.get(zid) else { continue };
         let mut namen = vec![normalisieren(&z.name), normalisieren(&z.id)];
         namen.extend(z.schluesselwoerter.iter().map(|k| normalisieren(k)));

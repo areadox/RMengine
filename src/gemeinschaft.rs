@@ -46,10 +46,19 @@ pub fn waehlbare_rassen(d: &Daten) -> Vec<&GemeinschaftDef> {
 
 /// Sucht eine Rasse nach Name oder ID.
 pub fn rasse_finden<'a>(d: &'a Daten, such: &str) -> Option<&'a GemeinschaftDef> {
+    // Auch über die Nummer aus der Liste
+    if let Some(n) = nummer(such) {
+        return waehlbare_rassen(d).into_iter().nth(n);
+    }
     let s = normalisieren(such);
     waehlbare_rassen(d)
         .into_iter()
         .find(|r| normalisieren(&r.id) == s || normalisieren(&r.name) == s || normalisieren(&r.name).starts_with(&s) && !s.is_empty())
+}
+
+/// "2" oder "2." -> Some(1): eine Nummer aus einer Liste (ab 1)
+pub fn nummer(t: &str) -> Option<usize> {
+    t.trim().trim_end_matches(['.', ')']).parse::<usize>().ok().filter(|n| *n > 0).map(|n| n - 1)
 }
 
 /// Rasse festlegen (bei der Erschaffung).
@@ -70,10 +79,10 @@ fn rasse_setzen(sp: &mut SpielerDaten, r: &GemeinschaftDef) {
 /// Text für die Rassenwahl beim Einloggen.
 pub fn rassen_auswahl(d: &Daten) -> String {
     let mut t = String::from("\n{fett}Wähle die Rasse deiner Figur:{/}\n");
-    for r in waehlbare_rassen(d) {
-        t.push_str(&format!("  {{gelb}}{:<12}{{/}} {}\n", r.name, kurz(d, r)));
+    for (i, r) in waehlbare_rassen(d).into_iter().enumerate() {
+        t.push_str(&format!("  {{gelb}}{:>2}. {:<12}{{/}} {}\n", i + 1, r.name, kurz(d, r)));
     }
-    t.push_str("Tippe den Namen der Rasse (oder 'info <rasse>' für mehr): ");
+    t.push_str("Tippe die Nummer oder den Namen (oder 'info <nr|rasse>' für mehr): ");
     t
 }
 
@@ -128,7 +137,7 @@ pub fn rasse(w: &mut Welt, sid: u64, rest: &str) {
     }
     // Ältere Figuren ohne Rasse dürfen einmal wählen
     if rest.is_empty() {
-        let t = rassen_auswahl(&w.d).replace("Tippe den Namen der Rasse (oder 'info <rasse>' für mehr): ", "Wählen mit: rasse <name>");
+        let t = rassen_auswahl(&w.d).replace("Tippe die Nummer oder den Namen (oder 'info <nr|rasse>' für mehr): ", "Wählen mit: rasse <nr|name>");
         w.sende(sid, t.trim());
         return;
     }
@@ -168,20 +177,28 @@ pub fn beitreten(w: &mut Welt, sid: u64, rest: &str) {
         return;
     }
     let such = normalisieren(rest);
-    let gewaehlt = moeglich.iter().find(|(id, gilde, _)| {
-        let g = if *gilde { w.d.gilden.get(id) } else { w.d.berufe.get(id) };
-        such.is_empty() || g.is_some_and(|g| normalisieren(&g.name).contains(&such) || normalisieren(&g.id) == such)
-    });
+    let gewaehlt = match nummer(rest) {
+        Some(n) => moeglich.get(n),
+        None => moeglich.iter().find(|(id, gilde, _)| {
+            let g = if *gilde { w.d.gilden.get(id) } else { w.d.berufe.get(id) };
+            such.is_empty() || g.is_some_and(|g| normalisieren(&g.name).contains(&such) || normalisieren(&g.id) == such)
+        }),
+    };
     let Some((id, ist_gilde, npc)) = gewaehlt.cloned() else {
         w.sende(sid, "Dem kannst du hier nicht beitreten.");
         return;
     };
     if such.is_empty() && moeglich.len() > 1 {
-        let namen: Vec<String> = moeglich
-            .iter()
-            .filter_map(|(id, gilde, _)| if *gilde { w.d.gilden.get(id) } else { w.d.berufe.get(id) }.map(|g| g.name.clone()))
-            .collect();
-        w.sende(sid, &format!("Wem willst du beitreten? {}", namen.join(", ")));
+        let mut t = String::from("Wem willst du beitreten?\n");
+        for (i, (id, gilde, _)) in moeglich.iter().enumerate() {
+            let g = if *gilde { w.d.gilden.get(id) } else { w.d.berufe.get(id) };
+            if let Some(g) = g {
+                let art = if *gilde { "Gilde" } else { "Beruf" };
+                t.push_str(&format!("  {{gelb}}{:>2}.{{/}} {} {{grau}}({art}){{/}}\n", i + 1, g.name));
+            }
+        }
+        t.push_str("Tippe: beitreten <nr>");
+        w.sende(sid, &t);
         return;
     }
     let Some(g) = (if ist_gilde { w.d.gilden.get(&id) } else { w.d.berufe.get(&id) }).cloned() else { return };
@@ -238,7 +255,21 @@ pub fn austreten(w: &mut Welt, sid: u64, rest: &str) {
     let such = normalisieren(rest);
     let sp = &w.spieler[&sid].sp;
     let gilde = w.d.gilden.get(&sp.gilde);
-    let (id, ist_gilde) = if gilde.is_some_and(|g| such == "gilde" || normalisieren(&g.name).contains(&such) && !such.is_empty()) {
+    // Mitgliedschaften durchnummeriert: zuerst die Gilde, dann die Berufe
+    let mut liste: Vec<(String, bool)> = Vec::new();
+    if gilde.is_some() {
+        liste.push((sp.gilde.clone(), true));
+    }
+    liste.extend(sp.berufe.iter().filter(|b| w.d.berufe.contains_key(*b)).map(|b| (b.clone(), false)));
+    let (id, ist_gilde) = if let Some(n) = nummer(rest) {
+        match liste.get(n) {
+            Some(e) => e.clone(),
+            None => {
+                w.sende(sid, "Diese Nummer gibt es nicht.");
+                return;
+            }
+        }
+    } else if gilde.is_some_and(|g| such == "gilde" || normalisieren(&g.name).contains(&such) && !such.is_empty()) {
         (sp.gilde.clone(), true)
     } else if let Some(b) = sp
         .berufe
@@ -247,7 +278,20 @@ pub fn austreten(w: &mut Welt, sid: u64, rest: &str) {
     {
         (b.clone(), false)
     } else {
-        w.sende(sid, "Woraus willst du austreten? (austreten gilde, austreten <beruf>)");
+        if liste.is_empty() {
+            w.sende(sid, "Du bist in keiner Gilde und hast keinen Beruf.");
+            return;
+        }
+        let mut t = String::from("Woraus willst du austreten?\n");
+        for (i, (id, ist_gilde)) in liste.iter().enumerate() {
+            let g = if *ist_gilde { w.d.gilden.get(id) } else { w.d.berufe.get(id) };
+            if let Some(g) = g {
+                let art = if *ist_gilde { "Gilde" } else { "Beruf" };
+                t.push_str(&format!("  {{gelb}}{:>2}.{{/}} {} {{grau}}({art}){{/}}\n", i + 1, g.name));
+            }
+        }
+        t.push_str("Tippe: austreten <nr>");
+        w.sende(sid, &t);
         return;
     };
     let Some(g) = (if ist_gilde { w.d.gilden.get(&id) } else { w.d.berufe.get(&id) }).cloned() else { return };
