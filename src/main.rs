@@ -12,6 +12,7 @@ mod behaelter;
 mod befehlskonfig;
 mod befehlsliste;
 mod beschreibung;
+mod bereitschaft;
 mod clientdaten;
 mod daten;
 mod fernwartung;

@@ -51,6 +51,7 @@ text_ziel   = "{name} spricht einen Segen. Du fühlst dich geborgen."
 id   = "feuerpfeil"
 erbt = "vorlage_kampfzauber"
 name = "Feuerpfeil"
+gilde = "magier"                 # nur für die Magiergilde
 schluesselwoerter = ["feuer", "pfeil"]
 beschreibung = "Ein brennender Pfeil aus reiner Magie."
 mana_kosten = 8
@@ -76,6 +77,7 @@ text_raum   = "{name} schließt die Augen und löst sich in Licht auf."
 [[zauber]]
 id   = "schutzschild"
 name = "Schutzschild"
+gilde = "magier"
 schluesselwoerter = ["schild"]
 beschreibung = "Ein schimmernder Schild, der 30 Schaden abfängt."
 fertigkeit  = "magie"
@@ -89,6 +91,7 @@ text_ende   = "Der schimmernde Schild um dich verblasst."
 [[zauber]]
 id   = "baerenkraft"
 name = "Bärenkraft"
+gilde = "lichtorden"
 schluesselwoerter = ["kraft", "staerke"]
 beschreibung = "Stärke +3 und 20 % mehr Schaden für zwei Minuten."
 fertigkeit  = "magie"
@@ -107,6 +110,7 @@ text_ende   = "Die Bärenkraft verlässt dich."
 id   = "lebensquell"
 erbt = "vorlage_heilzauber"
 name = "Lebensquell"
+gilde = "lichtorden"
 beschreibung = "Heilt 30 Sekunden lang alle 3 Sekunden 5 LP."
 mana_kosten = 18
 wirkungen = [ { art = "heilen", wert = 5, dauer = 30, intervall = 3 } ]
@@ -120,6 +124,7 @@ text_selbst = "Ein sanfter Quell des Lebens umfließt {ziel}."
 id   = "wuchtschlag"
 typ  = "technik"
 name = "Wuchtschlag"
+gilde = "kriegerbund"              # Techniken gibt es nur für Gilden
 schluesselwoerter = ["wucht"]
 beschreibung = "Ein gewaltiger Schlag mit 80 % mehr Schaden."
 ziel = "gegner"
@@ -135,6 +140,7 @@ text_raum   = "{name} holt weit aus und schlägt mit voller Wucht auf {ziel} ein
 id   = "giftklinge"
 typ  = "technik"
 name = "Giftklinge"
+gilde = "kriegerbund"              # Techniken gibt es nur für Gilden
 schluesselwoerter = ["gift"]
 beschreibung = "Ein Schnitt mit vergifteter Klinge: 4 Schaden alle 2 Sekunden."
 ziel = "gegner"
@@ -150,6 +156,7 @@ text_selbst = "Du ritzt {ziel} mit deiner {gruen}vergifteten Klinge{/}!"
 id   = "schildstoss"
 typ  = "technik"
 name = "Schildstoß"
+gilde = "kriegerbund"              # Techniken gibt es nur für Gilden
 beschreibung = "Stößt den Gegner mit dem Schild – er ist 3 Sekunden benommen."
 ziel = "gegner"
 fertigkeit = "schildblock"
@@ -172,3 +179,17 @@ wirkungen = [ { art = "tempo", wert = 25, dauer = 30 } ]
 text_selbst = "Du stößt einen markerschütternden Kampfschrei aus!"
 text_raum   = "{name} stößt einen markerschütternden Kampfschrei aus!"
 text_ende   = "Dein Kampfrausch legt sich."
+
+[[zauber]]
+id   = "eissplitter"
+erbt = "vorlage_kampfzauber"
+name = "Eissplitter"
+gilde = "magier"
+schluesselwoerter = ["eis"]
+beschreibung = "Scharfe Eissplitter: 10 Schaden, der Gegner ist 1 Sekunde benommen."
+mana_kosten   = 12
+mindest_stufe = 5
+wirkungen = [ { art = "schaden", wert = 10 }, { art = "betaeuben", wert = 1 } ]
+text_selbst = "Ein Schauer {hellcyan}Eissplitter{/} prasselt auf {ziel}!"
+text_raum   = "{name} lässt Eissplitter auf {ziel} prasseln."
+

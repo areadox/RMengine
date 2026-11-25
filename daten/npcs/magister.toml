@@ -1,0 +1,51 @@
+# =====================================================================
+#  NPC: Magister Orelius, Meister der Magiergilde
+# =====================================================================
+#  Nimmt in die Gilde der Magier auf (beitreten), lehrt Zauber und
+#  verkauft Zauberstäbe. Mit angelegtem Zauberstab kann man einen
+#  Kampfzauber bereithalten (bereite feuerpfeil).
+
+[npc]
+id        = "magister"
+erbt      = "vorlage_dorfbewohner"
+name      = "Magister Orelius"
+akkusativ = "Magister Orelius"
+dativ     = "Magister Orelius"
+schluesselwoerter = ["magister", "orelius", "magier"]
+raumtext  = "Magister Orelius blättert in einem dicken, staubigen Buch."
+beschreibung = """
+Ein hagerer alter Mann mit einem Bart bis zum Gürtel. Auf seiner Robe sind
+silberne Sterne gestickt, und seine Fingerspitzen sind schwarz von Ruß."""
+stufe        = 12
+lebenspunkte = 100
+gilde        = "magier"      # nimmt in die Gilde der Magier auf
+
+[npc.gespraech]
+begruessung = "Ah, Besuch. Interessierst du dich für die arkanen Künste, {spieler}?"
+beruf       = "Ich bin der Meister der Magiergilde. Wer Magier werden will, tritt bei mir bei (beitreten)."
+aufgabe     = "Lerne erst einmal, einen Zauberstab richtig zu halten. Dann sehen wir weiter."
+name        = "Orelius. Magister Orelius, wenn ich bitten darf."
+abschied    = "Möge dein Mana nie versiegen."
+unbekannt   = "*murmelt etwas Unverständliches und blättert weiter."
+
+[[npc.thema]]
+woerter = ["zauberstab", "stab", "bereite", "bereit"]
+antwort = "Mit einem Zauberstab in der Hand kannst du einen Kampfzauber bereithalten: bereite feuerpfeil. Dann wirkst du ihn im Kampf ganz von selbst, solange dein Mana reicht."
+
+[npc.haendler]
+waren  = ["zauberstab"]
+ankauf = false
+
+[[npc.lehrt]]
+id    = "magie"
+preis = 6
+bis   = 40
+
+[[npc.lehrt]]
+id    = "schutzschild"
+preis = 25
+
+[[npc.lehrt]]
+id    = "eissplitter"
+preis = 45
+stufe = 3

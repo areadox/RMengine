@@ -88,6 +88,7 @@ beschreibung = """
 Ein hölzernes Tor in der niedrigen Palisade des Dorfes. Dahinter beginnt
 der {gruen}Dunkelwald{/}."""
 ausgaenge = { nord = "waldrand" }
+npcs      = ["hauptmann"]
 
 [[raum]]
 id       = "taverne"
@@ -268,3 +269,20 @@ gebiet   = "kraeutergarten"
 gelaende = "haus"
 beschreibung = "Warm und feucht. Auf einem Tisch liegen frisch geerntete Pilze."
 gegenstaende = ["pilz"]
+
+[[raum]]
+id       = "magierturm"
+name     = "Der Magierturm"
+symbol   = "Z"
+x = 1
+y = -1
+gebiet   = "dorf"
+gelaende = "haus"
+beschreibung = """
+Ein schmaler Turm aus dunklem Stein, vollgestellt mit Regalen voller Bücher,
+Phiolen und seltsamer Instrumente. In der Luft liegt ein Knistern, als wäre
+gerade ein Blitz eingeschlagen."""
+ausgaenge = { nordwest = "dorfplatz", west = "tempel" }
+npcs      = ["magister"]
+geruch    = "Es riecht nach Pergament, Wachs und verbranntem Schwefel."
+geraeusch = "Irgendwo blubbert ein Kolben leise vor sich hin."

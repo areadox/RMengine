@@ -26,6 +26,7 @@ karten_fertigkeit_stufen = 10              # ... alle 10 Stufen um ein Feld
 karten_fertigkeit_max    = 3               # ... höchstens um 3 Felder
 waehrung   = "Gold"           # So heißt das Geld
 max_berufe = 2                # So viele Berufe darf man gleichzeitig haben
+techniken_nur_gilden = true   # Kampftechniken (spezial) gibt es nur für Gilden
 tragkraft_basis       = 40    # So viel Gewicht trägt jeder ...
 tragkraft_pro_staerke = 3     # ... plus so viel pro Punkt Stärke (beides 0 = unbegrenzt)
 stadtkarte_stil     = "kasten"    # "kasten" = ( ) und [ ] im Rahmen, "linien" = ein Zeichen pro Raum
@@ -46,7 +47,7 @@ regeneration_mp        = 1
 lebenspunkte = 100
 mana         = 50
 gegenstaende = ["brot", "fackel", "landkarte"]
-zauber       = ["kleine_heilung", "heimkehr", "feuerpfeil"]
+zauber       = ["kleine_heilung", "heimkehr"]   # Kampfzauber gibt es bei der Magiergilde
 geld         = 20             # Startgeld
 
 [start.fertigkeiten]       # Fertigkeit = Stufe

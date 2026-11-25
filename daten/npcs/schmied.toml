@@ -47,23 +47,13 @@ antwort = "Finger weg vom Amboss. Der gehörte schon meinem Großvater."
 waren        = ["dolch", "kurzschwert", "streitaxt", "holzschild", "lederhelm"]
 ankauf_typen = ["waffe", "ruestung"]
 
-# Er lehrt Schwertkampf und Kampftechniken ...
+# Er lehrt die Grundlagen (Kampftechniken gibt es beim Kriegerbund am Nordtor)
 [[npc.lehrt]]
 id    = "schwertkampf"
 preis = 5
 bis   = 20
 
 [[npc.lehrt]]
-id    = "wuchtschlag"
-preis = 40
-stufe = 2
-
-[[npc.lehrt]]
 id    = "schildblock"
 preis = 10
 bis   = 10
-
-[[npc.lehrt]]
-id    = "schildstoss"
-preis = 30
-stufe = 3

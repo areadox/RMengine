@@ -27,20 +27,11 @@ abschied    = "Geh mit dem Licht."
 unbekannt   = "*lächelt nur still."
 
 [[npc.lehrt]]
-id    = "schutzschild"
-preis = 25
-
-[[npc.lehrt]]
 id    = "baerenkraft"
 preis = 50
 stufe = 3
 
 [[npc.lehrt]]
 id    = "heilkunde"
-preis = 6
-bis   = 25
-
-[[npc.lehrt]]
-id    = "magie"
 preis = 6
 bis   = 25

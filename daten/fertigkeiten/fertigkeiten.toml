@@ -50,7 +50,7 @@ name = "Orientierung"
 kategorie = "allgemein"
 attribut  = "weisheit"
 lernchance = 0
-beschreibung = "Sich zurechtfinden. Alle 10 Stufen zeigt die Karte ein Feld mehr (welt.toml: karten_fertigkeit)."
+beschreibung = "Sich zurechtfinden. Alle 10 Stufen zeigt die Karte ein Feld mehr."   # siehe karten_fertigkeit in welt.toml
 
 [[fertigkeit]]
 id   = "schmieden"

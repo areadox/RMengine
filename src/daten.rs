@@ -197,6 +197,8 @@ pub struct WeltConfig {
     pub karten_fertigkeit_max: i32,
     /// Wie viele Berufe man gleichzeitig haben darf
     pub max_berufe: u32,
+    /// Kampftechniken gibt es nur für Mitglieder einer Gilde (gilde = "..." bei jeder Technik)
+    pub techniken_nur_gilden: bool,
     /// Tragkraft: so viel Gewicht trägt jeder ...
     pub tragkraft_basis: i32,
     /// ... und so viel mehr pro Punkt Stärke (beides 0 = unbegrenzt)
@@ -230,6 +232,7 @@ impl Default for WeltConfig {
             karten_fertigkeit_stufen: 20,
             karten_fertigkeit_max: 3,
             max_berufe: 2,
+            techniken_nur_gilden: true,
             tragkraft_basis: 40,
             tragkraft_pro_staerke: 3,
         }
@@ -1906,6 +1909,10 @@ fn pruefen(d: &mut Daten, fehler: &mut Vec<String>, warn: &mut Vec<String>) {
         }
         if !z.gilde.is_empty() {
             verweis(&d.gilden, &z.gilde, &wo, "Gilde", fehler);
+        } else if z.ist_technik() && d.welt.techniken_nur_gilden {
+            fehler.push(format!(
+                "{wo}: Kampftechniken gibt es nur für Gilden – bitte gilde = \"...\" angeben (oder techniken_nur_gilden = false in welt.toml)."
+            ));
         }
         if z.waffen_faktor < 0.0 || z.ausdauer_kosten < 0 || z.mana_kosten < 0 {
             fehler.push(format!("{wo}: Kosten und Faktoren dürfen nicht negativ sein."));
@@ -2096,7 +2103,10 @@ mod tests {
         let schmied = &d.monster["schmied"];
         assert_eq!(schmied.beruf, "schmied");
         assert!(schmied.haendler.as_ref().is_some_and(|h| h.waren.contains(&"dolch".to_string())));
-        assert!(schmied.lehrt.iter().any(|l| l.id == "wuchtschlag" && l.stufe == 2));
+        assert!(d.monster["hauptmann"].lehrt.iter().any(|l| l.id == "wuchtschlag"));
+        assert_eq!(d.monster["magister"].gilde, "magier");
+        // Techniken gibt es nur für Gilden
+        assert!(d.zauber.values().filter(|z| z.ist_technik()).all(|z| !z.gilde.is_empty()));
         assert!(d.zauber["wuchtschlag"].ist_technik());
         assert_eq!(d.zauber["schutzschild"].wirkungen[0].dauer, 90.0);
         assert!(matches!(d.monster["ratte"].geld, GeldDef::Bereich(_)));

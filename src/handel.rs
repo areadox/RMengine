@@ -297,9 +297,12 @@ pub fn lernen(w: &mut Welt, sid: u64, rest: &str) {
         npc_sagt(w, sid, &npc, &format!("Komm wieder, wenn du Stufe {} erreicht hast.", l.stufe));
         return;
     }
+    // Zauber und Techniken einer Gilde lernen nur deren Mitglieder
+    let gilde = w.d.zauber.get(&l.id).map(|z| z.gilde.clone()).filter(|g| !g.is_empty()).unwrap_or_else(|| l.gilde.clone());
+    let l = LehrDef { gilde, ..l };
     if !l.gilde.is_empty() && sp.gilde != l.gilde {
         let g = w.d.gilden.get(&l.gilde).map(|g| g.name.clone()).unwrap_or_default();
-        npc_sagt(w, sid, &npc, &format!("Das lehre ich nur Mitgliedern der {g}."));
+        npc_sagt(w, sid, &npc, &format!("Das lehre ich nur Mitgliedern von „{g}“."));
         return;
     }
     if sp.geld < l.preis {

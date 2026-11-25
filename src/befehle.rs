@@ -200,6 +200,7 @@ pub fn ausfuehren(w: &mut Welt, sid: u64, eingabe: &str) -> Folge {
         "zauber" | "spells" | "zaubersprueche" => zauber_liste(w, sid),
         "zaubere" | "zauber_sprechen" | "cast" | "z" => zaubern(w, sid, rest, false),
         "spezial" => zaubern(w, sid, rest, true),
+        "bereite" => crate::bereitschaft::befehl(w, sid, rest),
         "wirkungen" => crate::wirkung::anzeigen(w, sid),
         "waren" => crate::handel::waren(w, sid, rest),
         "kaufe" => crate::handel::kaufen(w, sid, rest),
@@ -340,8 +341,10 @@ fn prompt_text(w: &Welt, sid: u64) {
             .and_then(|m| w.d.monster.get(&m.def).map(|d| (d, m.lebenspunkte)))
             .map(|(d, lp)| format!(" {{hellrot}}[{}: {}]{{/}}", gross(&d.name), kampf::zustand(lp, d.lebenspunkte)))
             .unwrap_or_default();
+        let bereit = crate::bereitschaft::anzeige(w, sid);
+        let bereit = if bereit.is_empty() { String::new() } else { format!(" {{magenta}}[{bereit}]{{/}}") };
         s.sende_ohne_umbruch(&format!(
-            "\n{{gruen}}LP {}/{}{{/}} {{cyan}}MP {}/{}{{/}} {{gelb}}AP {}/{}{{/}}{gegner} > ",
+            "\n{{gruen}}LP {}/{}{{/}} {{cyan}}MP {}/{}{{/}} {{gelb}}AP {}/{}{{/}}{bereit}{gegner} > ",
             p.lebenspunkte, p.max_lebenspunkte, p.mana, p.max_mana, p.ausdauer, p.max_ausdauer
         ));
     }
@@ -1336,7 +1339,7 @@ fn zauber_liste(w: &Welt, sid: u64) {
 }
 
 /// "zaubere ..." oder (mit `technik`) "spezial ...".
-fn zaubern(w: &mut Welt, sid: u64, rest: &str, technik: bool) {
+pub(crate) fn zaubern(w: &mut Welt, sid: u64, rest: &str, technik: bool) {
     let was = if technik { "Welche Technik willst du einsetzen?" } else { "Was willst du zaubern?" };
     if rest.is_empty() {
         w.sende(sid, &format!("{was} ({{gelb}}zauber{{/}} zeigt, was du kannst)"));
@@ -1395,7 +1398,7 @@ fn zaubern(w: &mut Welt, sid: u64, rest: &str, technik: bool) {
         }
         if !z.gilde.is_empty() && s.sp.gilde != z.gilde {
             let g = w.d.gilden.get(&z.gilde).map(|g| g.name.clone()).unwrap_or_default();
-            w.sende(sid, &format!("Das können nur Mitglieder der {g}."));
+            w.sende(sid, &format!("Das können nur Mitglieder von „{g}“."));
             return;
         }
         if let Some(bis) = s.abklingzeiten.get(&zid) {
@@ -1987,7 +1990,8 @@ fn spielstand(w: &Welt, sid: u64) {
     let ort = w.d.raum(&sp.raum).map(|r| r.name.clone()).unwrap_or_default();
     t.push_str("\n{gelb}Unterwegs{/}\n");
     t.push_str(&format!("  Aufenthalt    {ort}\n"));
-    t.push_str(&format!("  Gepäck        {} Gegenstände, {gewicht}\n", sp.inventar.len()));
+    let n = sp.inventar.len();
+    t.push_str(&format!("  Gepäck        {n} {}, {gewicht}\n", if n == 1 { "Gegenstand" } else { "Gegenstände" }));
     t.push_str(&format!(
         "  Erkundet      {besucht} von {} Räumen ({}%)\n",
         w.d.raeume.len(),
@@ -2259,7 +2263,7 @@ fn toeten(w: &mut Welt, sid: u64, rest: &str) {
         let s = &w.spieler[&sid];
         match s.kampf_ziel {
             Some(_) if s.bereit_ab <= Instant::now() => {
-                kampf::spieler_schlaegt(w, sid);
+                crate::bereitschaft::auto_angriff(w, sid);
             }
             Some(_) => {
                 let r = (s.bereit_ab - Instant::now()).as_secs_f64();

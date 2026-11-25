@@ -176,7 +176,7 @@ pub fn angreifen(w: &mut Welt, sid: u64, mid: u64) {
     w.sende(sid, &format!("{{hellrot}}Du greifst {akk} an!{{/}}"));
     w.sende_raum(&raum, &format!("{name} greift {akk} an!"), &[sid]);
     if w.spieler[&sid].bereit_ab <= Instant::now() {
-        spieler_schlaegt(w, sid);
+        crate::bereitschaft::auto_angriff(w, sid);
     }
 }
 
@@ -789,6 +789,18 @@ pub fn takt(w: &mut Welt) {
             }
         }
     }
+    // Wer kein Ziel (mehr) hat, aber angegriffen wird, wehrt sich gegen den Angreifer
+    let angreifer_von: Vec<(u64, u64)> = w
+        .spieler
+        .iter()
+        .filter(|(_, s)| s.kampf_ziel.is_none() && s.tot_bis.is_none())
+        .filter_map(|(sid, _)| w.monster.iter().find(|(_, m)| m.ziele.contains(sid)).map(|(mid, _)| (*sid, *mid)))
+        .collect();
+    for (sid, mid) in angreifer_von {
+        if let Some(s) = w.spieler.get_mut(&sid) {
+            s.kampf_ziel = Some(mid);
+        }
+    }
 
     // 2. Tote, deren Wartezeit abgelaufen ist, erwachen im Tempel.
     let erwachen: Vec<u64> =
@@ -830,7 +842,7 @@ pub fn takt(w: &mut Welt) {
         .map(|(id, _)| *id)
         .collect();
     for sid in angreifer {
-        if spieler_schlaegt(w, sid) {
+        if crate::bereitschaft::auto_angriff(w, sid) {
             beteiligt.insert(sid);
         }
     }

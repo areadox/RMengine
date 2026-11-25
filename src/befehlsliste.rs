@@ -97,6 +97,7 @@ pub const EINGEBAUT: &[Eingebaut] = &[
     b("zauber", &["zauber", "spells", "zaubersprueche"], "spieler", ZAUBER, "zauber", "Deine Zaubersprüche", false),
     b("zaubere", &["zaubere", "zauber_sprechen", "cast", "z"], "spieler", ZAUBER, "zaubere <nr|zauber> [ziel]", "Einen Zauber sprechen", false),
     b("spezial", &["spezial", "technik", "tech", "sa"], "spieler", KAMPF, "spezial <nr|technik> [ziel]", "Eine Kampftechnik einsetzen (kostet Mana/Ausdauer)", false),
+    b("bereite", &["bereite", "bereit", "bereithalten"], "spieler", KAMPF, "bereite [nr|name|nichts]", "Zauber (mit Zauberstab) oder Technik, die der Autoangriff von selbst einsetzt", false),
     b("wirkungen", &["wirkungen", "effekte", "buffs", "affects"], "spieler", ZAUBER, "wirkungen", "Was gerade auf dich wirkt (Schilde, Stärkungen ...)", true),
     // Handel
     b("waren", &["waren", "angebot", "laden", "shop"], "spieler", HANDEL, "waren [händler]", "Was Händler und Lehrmeister hier anbieten", false),

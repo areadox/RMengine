@@ -1,0 +1,46 @@
+# =====================================================================
+#  NPC: Hauptmann Brandt, Meister des Kriegerbunds
+# =====================================================================
+#  Nimmt in den Bund der Krieger auf und lehrt die Kampftechniken.
+
+[npc]
+id        = "hauptmann"
+erbt      = "vorlage_dorfbewohner"
+name      = "Hauptmann Brandt"
+akkusativ = "Hauptmann Brandt"
+dativ     = "Hauptmann Brandt"
+schluesselwoerter = ["hauptmann", "brandt", "wache"]
+raumtext  = "Hauptmann Brandt steht breitbeinig am Tor und mustert jeden Ankömmling."
+beschreibung = """
+Ein grauhaariger Krieger in abgewetztem Kettenhemd. Eine lange Narbe zieht
+sich über seine Wange, und seine Hand ruht nie weit vom Schwertgriff."""
+stufe        = 15
+lebenspunkte = 220
+gilde        = "kriegerbund"   # nimmt in den Bund der Krieger auf
+
+[npc.gespraech]
+begruessung = "*nickt dir knapp zu.* Halt die Augen offen, da draußen im Wald."
+beruf       = "Ich führe die Torwache und den Bund der Krieger. Wer kämpfen lernen will, tritt bei (beitreten)."
+aufgabe     = "Werde erst stärker. Ab Stufe 2 nehme ich dich in den Bund auf."
+name        = "Brandt. Hauptmann Brandt."
+abschied    = "Bleib am Leben."
+unbekannt   = "Davon verstehe ich nichts. Ich verstehe was vom Kämpfen."
+
+[[npc.lehrt]]
+id    = "wuchtschlag"
+preis = 40
+
+[[npc.lehrt]]
+id    = "schildstoss"
+preis = 30
+stufe = 3
+
+[[npc.lehrt]]
+id    = "giftklinge"
+preis = 60
+stufe = 4
+
+[[npc.lehrt]]
+id    = "schwertkampf"
+preis = 8
+bis   = 40

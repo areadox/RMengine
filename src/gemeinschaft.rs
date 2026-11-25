@@ -211,7 +211,7 @@ pub fn beitreten(w: &mut Welt, sid: u64, rest: &str) {
     }
     if ist_gilde && !sp.gilde.is_empty() {
         let alt = w.d.gilden.get(&sp.gilde).map(|g| g.name.clone()).unwrap_or_default();
-        w.sende(sid, &antwort(&format!("Du bist schon in der {alt}. Tritt dort erst aus (austreten gilde).")));
+        w.sende(sid, &antwort(&format!("Du bist schon bei „{alt}“. Tritt dort erst aus (austreten gilde).")));
         return;
     }
     if !ist_gilde && sp.berufe.len() as u32 >= w.d.welt.max_berufe {
@@ -244,10 +244,10 @@ pub fn beitreten(w: &mut Welt, sid: u64, rest: &str) {
     let (name, raum) = (s.sp.name.clone(), s.sp.raum.clone());
     let sp = s.sp.clone();
     w.speichern(&sp);
-    let text = if g.aufnahme_text.is_empty() { format!("Willkommen in der {}!", g.name) } else { g.aufnahme_text.clone() };
+    let text = if g.aufnahme_text.is_empty() { format!("Willkommen bei „{}“!", g.name) } else { g.aufnahme_text.clone() };
     w.sende(sid, &antwort(&text));
     w.sende(sid, &format!("{{hellgruen}}Du gehörst jetzt zu: {}.{{/}}", g.name));
-    w.sende_raum(&raum, &format!("{name} wird in die {} aufgenommen.", g.name), &[sid]);
+    w.sende_raum(&raum, &format!("{name} wird bei „{}“ aufgenommen.", g.name), &[sid]);
 }
 
 /// Befehl "austreten gilde|<beruf>"

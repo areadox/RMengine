@@ -388,6 +388,7 @@ const WELT: &[Feld] = felder![
     f("baumeister", "Baumeister", Typ::Liste, ""),
     f("waehrung", "Name des Geldes", Typ::Text, "z.B. Gold, Taler"),
     f("max_berufe", "Berufe höchstens", Typ::Zahl, ""),
+    f("techniken_nur_gilden", "Techniken nur für Gilden", Typ::Schalter, "Standard: ja. Jede Kampftechnik braucht dann gilde = \"...\"."),
     f("tragkraft_basis", "Tragkraft", Typ::Zahl, "So viel Gewicht trägt jeder (beide 0 = unbegrenzt)."),
     f("tragkraft_pro_staerke", "Tragkraft pro Stärke", Typ::Zahl, "Plus so viel pro Punkt Stärke."),
     f("karte_beim_umsehen", "Karte beim Umsehen", Typ::Schalter, ""),

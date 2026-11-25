@@ -73,3 +73,16 @@ wert = 60
 beschreibung = "Eine zweischneidige Axt, so schwer, dass man sie mit beiden Händen führen muss."
 eigenschaften = { schaden = 14 }
 erholung   = 3.8
+
+[[gegenstand]]
+id   = "zauberstab"
+erbt = "vorlage_waffe"
+name = "ein Zauberstab"
+akkusativ = "einen Zauberstab"
+schluesselwoerter = ["stab", "zauberstab"]
+beschreibung = "Ein glatter Stab aus Eschenholz mit einem trüben Kristall an der Spitze."
+fertigkeit = "magie"
+erholung   = 2.2
+wert       = 40
+# zauberstab = 1: Damit kann man einen Kampfzauber bereithalten (bereite ...)
+eigenschaften = { schaden = 2, zauberstab = 1, intelligenz = 1 }

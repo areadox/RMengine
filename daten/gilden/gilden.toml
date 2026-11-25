@@ -27,9 +27,22 @@ aufnahme_text = "Möge das Licht dich leiten. Willkommen im Orden!"
 [[gilde]]
 id   = "kriegerbund"
 name = "Bund der Krieger"
-beschreibung = "Wer kämpft, gehört hierher. (Noch ohne Gildenmeister – eine Vorbereitung.)"
-aufnahme_stufe = 3
+beschreibung = "Wer kämpft, gehört hierher. Nur Mitglieder lernen und nutzen die Kampftechniken (spezial). Gildenmeister: Hauptmann Brandt am Nordtor."
+aufnahme_stufe = 2
 titel = "der Krieger"
 lebenspunkte = 20
 fertigkeiten = { schwertkampf = 5 }
 zauber = ["kampfschrei"]
+
+[[gilde]]
+id   = "magier"
+name = "Gilde der Magier"
+beschreibung = "Wer die Elemente beherrschen will, lernt hier. Nur Mitglieder sprechen die Kampfzauber der Gilde. Mit einem Zauberstab kann man einen Kampfzauber bereithalten (bereite). Gildenmeister: Magister Orelius im Magierturm."
+aufnahme_stufe = 1
+preis = 15
+titel = "der Zauberlehrling"
+mana  = 25
+fertigkeiten = { magie = 5 }
+zauber = ["feuerpfeil"]
+aufnahme_text = "Willkommen, Lehrling. Hier, dein erster Zauber: der Feuerpfeil. Und kauf dir einen Zauberstab!"
+

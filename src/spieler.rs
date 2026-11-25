@@ -97,6 +97,8 @@ pub struct SpielerDaten {
     pub erledigt: BTreeMap<String, u32>,
     /// Inhalt der Behälter (Taschen, Rucksäcke), die man bei sich hat
     pub behaelter: Vec<Behaelter>,
+    /// Zauber oder Technik, die der Autoangriff von selbst einsetzt (bereite ...)
+    pub bereit: String,
 }
 
 /// Ein gefüllter Behälter. Leere Behälter haben keinen Eintrag.
@@ -196,6 +198,7 @@ impl Default for SpielerDaten {
             quests: BTreeMap::new(),
             erledigt: BTreeMap::new(),
             behaelter: Vec::new(),
+            bereit: String::new(),
         }
     }
 }

@@ -75,7 +75,8 @@ das Update und veröffentlicht alles als Release.
 - **Spielstand** (`sp`) mit Balken, Ausrüstungsboni und Fortschritt; **Spielerbuch** für persönliche Einstellungen (Karte, Kurzmodus, Zeilenbreite, Titel, Passwort …)
 - Monster wandern in ihrem Gebiet umher und sprechen
 - Zauber mit Heilung, Mana und Teleport, Abklingzeiten und Fertigkeitssteigerung; **Schilde und Stärkungen**, die eine Zeit lang wirken (Schild, Rüstung, Werte, Kraft, Tempo, Heilung über Zeit, Gift)
-- **Kampftechniken** (`spezial`) mit Waffenschlag, Mana- und Ausdauerkosten, Betäuben
+- **Kampftechniken** (`spezial`) mit Waffenschlag, Mana- und Ausdauerkosten, Betäuben – nur für Gilden
+- **Bereitschaft** (`bereite`): Der Autoangriff setzt einen Zauber (mit Zauberstab) oder eine Technik von selbst ein
 - **Geld**, **Händler** (`waren`, `kaufe`, `verkaufe`) und **Lehrmeister** (`lerne`)
 - **Rassen** (Wahl bei der Erschaffung), **Gilden** und **Berufe** als Grundlage zum Ausbauen
 - **Aufgaben und Quests** mit Schritten (töten, bringen, besuchen, sprechen) und Belohnungen
@@ -117,6 +118,7 @@ das Update und veröffentlicht alles als Release.
 | `gemeinschaft.rs` | Rassen, Gilden und Berufe                               |
 | `quests.rs`  | Aufgaben und Quests                                          |
 | `behaelter.rs` | Taschen und Rucksäcke, Tragkraft                           |
+| `bereitschaft.rs` | Zauber/Technik für den Autoangriff (bereite)            |
 | `fernwartung.rs` | Fernwartung: verschlüsselter Zugang für den Welteditor   |
 | `fernwartung_protokoll.rs` | Nachrichten der Fernwartung (auch vom Editor benutzt) |
 | `befehlsliste.rs` | alle eingebauten Befehle (auch vom Editor benutzt)      |

@@ -322,6 +322,9 @@ impl Inhalte {
                     }
                 }
                 let wo = format!("{} '{}'", art.einzahl, t.get("id").and_then(|i| i.as_str()).unwrap_or(art.titel));
+                if art.schluessel == "zauber" && lies_text(t, "typ") == "technik" && lies_text(t, "gilde").is_empty() && t.get("vorlage").and_then(|i| i.as_bool()) != Some(true) {
+                    p.push((true, format!("{wo}: Kampftechniken gibt es nur für Gilden – bitte 'Nur für Gilde' wählen.")));
+                }
                 for feld in art.felder.iter().filter(|f| crate::schema::pflicht(art.schluessel, f.name)) {
                     if t.get(feld.name).is_none_or(|i| i.as_str() == Some("")) {
                         p.push((true, format!("{wo}: Das Feld '{}' fehlt.", feld.titel)));

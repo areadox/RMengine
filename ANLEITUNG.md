@@ -1255,6 +1255,32 @@ Ein Zauber darf mehrere Wirkungen haben. In Texten setzt der Treiber für
 `{name}` den Zaubernden ein, für `{ziel}` das Ziel und für `{zauber}` den Namen
 des Zaubers. Mit dem Zaubern übt man die zugehörige Fertigkeit.
 
+### Nur für Gilden
+
+Mit `gilde = "..."` gehört ein Zauber oder eine Technik einer Gilde: Nur ihre
+Mitglieder können ihn lernen und benutzen. **Kampftechniken gibt es nur für
+Gilden** (`techniken_nur_gilden = true` in `welt.toml`, das ist der Standard).
+Jede Technik braucht dann eine `gilde`, sonst meldet die Prüfung einen Fehler.
+In der Beispielwelt sind die Magier eine Gilde (Magister Orelius im
+Magierturm, Feuerpfeil, Schutzschild, Eissplitter), die Techniken gehören dem
+Bund der Krieger (Hauptmann Brandt am Nordtor).
+
+### Bereitschaft: Zauber und Techniken im Autoangriff
+
+Im Kampf greift man nach `toete <monster>` automatisch weiter an. Mit
+`bereite <nr|name>` legt man fest, was der Autoangriff statt eines normalen
+Schlags einsetzt:
+
+- **Zauber** nur mit einem angelegten **Zauberstab**: einem Gegenstand mit
+  `eigenschaften = { zauberstab = 1 }`.
+- **Techniken** ohne besonderen Gegenstand.
+- Es geht nur, was gegen Gegner wirkt (`ziel = "gegner"`) und zur eigenen
+  Gilde passt.
+- Fehlt Mana oder Ausdauer oder läuft die Abklingzeit noch, schlägt man
+  normal zu. Sobald es wieder geht, kommt der Zauber bzw. die Technik.
+- `bereite` zeigt die Liste, `bereite nichts` schaltet es ab. Der Prompt
+  zeigt, was bereit ist, z.B. `[Feuerpfeil]`.
+
 Spieler lernen Zauber und Techniken bei Lehrmeistern (Kapitel 18), durch
 Belohnungen für Quests (Kapitel 20), über ihre Rasse oder Gilde (Kapitel 19)
 oder von Anfang an (`zauber` in `[start]`).
