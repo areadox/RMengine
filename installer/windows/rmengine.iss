@@ -38,7 +38,11 @@ UninstallDisplayName=RMengine
 Name: "german"; MessagesFile: "compiler:Languages\German.isl"
 
 [Tasks]
-Name: "desktopicon"; Description: "Verknüpfung auf dem Desktop anlegen"; Flags: unchecked
+; Nur bei der ersten Installation: Beispielwelt oder leere Welt? Bei einem Update
+; (es gibt schon daten\welt.toml) erscheint die Frage nicht.
+Name: "beispielwelt"; Description: "Beispielwelt „Eichenhain“ (Dorf, Wald, Händler, Gilden, Quests – zum Ausprobieren)"; GroupDescription: "Welt:"; Flags: exclusive; Check: KeineWeltDa
+Name: "leerewelt"; Description: "Leere Welt (nur ein Startraum – zum Selberbauen)"; GroupDescription: "Welt:"; Flags: exclusive unchecked; Check: KeineWeltDa
+Name: "desktopicon"; Description: "Verknüpfung auf dem Desktop anlegen"; GroupDescription: "Zusätzlich:"; Flags: unchecked
 
 [Files]
 Source: "{#Root}\dist\windows\rmengine.exe"; DestDir: "{app}"; Flags: ignoreversion
@@ -47,7 +51,7 @@ Source: "{#Root}\ANLEITUNG.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#Root}\README.md"; DestDir: "{app}"; Flags: ignoreversion
 ; Die Beispielwelt nur bei der ersten Installation kopieren. Gibt es schon eine Welt
 ; (daten\welt.toml), bleibt sie unberührt – auch neue Beispieldateien kommen nicht hinzu.
-Source: "{#Root}\daten\*"; DestDir: "{app}\daten"; Flags: onlyifdoesntexist uninsneveruninstall recursesubdirs createallsubdirs; Check: BeispielweltNoetig
+Source: "{#Root}\daten\*"; DestDir: "{app}\daten"; Flags: onlyifdoesntexist uninsneveruninstall recursesubdirs createallsubdirs; Tasks: beispielwelt; Check: BeispielweltNoetig
 
 [Icons]
 Name: "{group}\RMengine starten"; Filename: "{app}\rmengine.exe"; WorkingDir: "{app}"
@@ -61,6 +65,8 @@ Name: "{userdesktop}\RMengine"; Filename: "{app}\rmengine.exe"; WorkingDir: "{ap
 Name: "{userdesktop}\RMengine Welteditor"; Filename: "{app}\rmeditor.exe"; Parameters: """{app}\daten"""; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]
+; Leere Welt anlegen (rmengine legt nichts an, wenn es schon eine Welt gibt)
+Filename: "{app}\rmengine.exe"; Parameters: """{app}\daten"" --neue-welt"; WorkingDir: "{app}"; Flags: runhidden waituntilterminated; Tasks: leerewelt
 Filename: "{app}\rmengine.exe"; Description: "RMengine jetzt starten"; WorkingDir: "{app}"; Flags: postinstall nowait skipifsilent
 
 [UninstallDelete]
@@ -73,6 +79,12 @@ Type: files; Name: "{app}\rmeditor.exe.neu"
 var
   WeltGeprueft: Boolean;
   WeltDa: Boolean;
+
+{ Für die Auswahl Beispielwelt/leere Welt: gibt es im gewählten Ordner schon eine Welt? }
+function KeineWeltDa: Boolean;
+begin
+  Result := not FileExists(ExpandConstant('{app}\daten\welt.toml'));
+end;
 
 { Einmal vor dem Kopieren nachsehen, ob es schon eine Welt gibt (danach würde
   welt.toml ja durch das Kopieren selbst existieren). }

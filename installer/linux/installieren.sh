@@ -3,7 +3,20 @@
 #   Programm und Welt:  ~/.local/share/rmengine
 #   Befehl:             ~/.local/bin/rmengine
 # Vorhandene Weltdaten und Spielstände werden NIE überschrieben.
+#
+# Bei der ersten Installation wird gefragt, ob die Beispielwelt oder eine leere
+# Welt angelegt werden soll. Ohne Frage:
+#   installieren.sh --beispielwelt     bzw.   installieren.sh --leere-welt
 set -euo pipefail
+
+WELT=""
+for a in "$@"; do
+  case "$a" in
+    --beispielwelt) WELT="beispiel" ;;
+    --leere-welt)   WELT="leer" ;;
+    *) echo "Unbekannte Angabe: $a (möglich: --beispielwelt, --leere-welt)" >&2; exit 1 ;;
+  esac
+done
 
 ZIEL="${RMENGINE_ZIEL:-$HOME/.local/share/rmengine}"
 BIN="${RMENGINE_BIN:-$HOME/.local/bin}"
@@ -21,8 +34,25 @@ install -m 755 "$QUELLE/deinstallieren.sh" "$ZIEL/"
 if [ -e "$ZIEL/daten/welt.toml" ]; then
   echo "Deine Weltdaten in $ZIEL/daten bleiben unverändert."
 else
-  cp -r "$QUELLE/daten" "$ZIEL/daten"
-  echo "Beispielwelt nach $ZIEL/daten kopiert."
+  if [ -z "$WELT" ]; then
+    WELT="beispiel"
+    # Auch bei "curl ... | bash" vom Terminal fragen
+    if { exec 3</dev/tty; } 2>/dev/null; then
+      echo
+      echo "Welche Welt soll angelegt werden?"
+      echo "  1) Beispielwelt \"Eichenhain\" (Dorf, Wald, Händler, Gilden, Quests – zum Ausprobieren)"
+      echo "  2) Leere Welt (nur ein Startraum – zum Selberbauen)"
+      read -r -u 3 -p "Auswahl [1]: " antwort || antwort=""
+      exec 3<&-
+      case "$antwort" in 2*|l*|L*) WELT="leer" ;; esac
+    fi
+  fi
+  if [ "$WELT" = "leer" ]; then
+    "$ZIEL/rmengine" "$ZIEL/daten" --neue-welt
+  else
+    cp -r "$QUELLE/daten" "$ZIEL/daten"
+    echo "Beispielwelt nach $ZIEL/daten kopiert."
+  fi
 fi
 ln -sf "$ZIEL/rmengine" "$BIN/rmengine"
 if [ -f "$ZIEL/rmeditor" ]; then

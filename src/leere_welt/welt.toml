@@ -1,0 +1,267 @@
+# =====================================================================
+#  welt.toml – die Grundeinstellungen deiner Welt
+# =====================================================================
+#  Alles, was mit # beginnt, ist ein Kommentar und wird ignoriert.
+
+[welt]
+name       = "Meine Welt"
+port       = 4000                 # Mit diesem Port verbinden sich die Spieler
+startraum  = "start"              # Hier beginnen neue Spieler
+willkommen = """
+Willkommen! Diese Welt ist noch ganz neu – hier entsteht etwas."""
+
+# Rollen: Spieler < Baumeister (baut die Welt) < Admin (verwaltet alles).
+# Wer hier steht, hat MINDESTENS diese Rolle. Weitere Rollen vergibt ein
+# Admin im Spiel mit:  rolle <name> spieler|baumeister|admin
+# WICHTIG: Trag hier deinen eigenen Figurennamen ein und lege die Figur sofort an!
+admins     = ["Admin"]
+baumeister = []
+
+karte_beim_umsehen  = true        # Bei jedem "schau" die kleine Karte zeigen
+karten_radius       = 1           # Räume in jede Richtung (1 = 3x3 Räume; "karte" zeigt mehr)
+karte_daneben       = true        # Raumbeschreibung rechts neben der Karte (false = darunter)
+karten_fertigkeit        = ""              # Diese Fertigkeit macht die Karte größer ("" = aus)
+karten_fertigkeit_stufen = 10              # ... alle 10 Stufen um ein Feld
+karten_fertigkeit_max    = 3               # ... höchstens um 3 Felder
+waehrung   = "Gold"           # Name des Geldes, wenn es unten keine [geld]-Einheiten gibt
+max_berufe = 2                # So viele Berufe darf man gleichzeitig haben
+techniken_nur_gilden = true   # Kampftechniken (spezial) gibt es nur für Gilden
+tragkraft_basis       = 40    # So viel Gewicht trägt jeder ...
+tragkraft_pro_staerke = 3     # ... plus so viel pro Punkt Stärke (beides 0 = unbegrenzt)
+stadtkarte_stil     = "kasten"    # "kasten" = ( ) und [ ] im Rahmen, "linien" = ein Zeichen pro Raum
+karten_hintergrund  = "*"         # Füllzeichen für leere Stellen
+nur_besuchte_raeume_auf_karte = false   # true = "Nebel des Krieges"
+ausgaenge_beidseitig = true       # Rückwege automatisch anlegen
+
+takt_sekunden          = 3        # Alle 3 Sekunden "lebt" die Welt (Monster laufen ...)
+zuruecksetzen_minuten  = 10       # Dann werden Gegenstände/Monster wieder aufgefüllt
+speichern_minuten      = 5        # Automatisches Speichern
+regeneration_lp        = 1        # Erholung pro Takt
+regeneration_mp        = 1
+
+# ---------------------------------------------------------------------
+# Damit beginnen neue Spieler
+# ---------------------------------------------------------------------
+[start]
+lebenspunkte = 100
+mana         = 50
+gegenstaende = []            # z.B. ["brot", "fackel"]
+zauber       = []            # z.B. ["kleine_heilung"]
+geld         = 200            # Startgeld (in der kleinsten Einheit: 200 Kupfer = 2 Gold)
+
+[start.fertigkeiten]       # Fertigkeit = Stufe, z.B. schwertkampf = 1
+
+[start.werte]              # Frei wählbare Grundwerte
+staerke      = 10
+geschick     = 10
+ausdauer     = 10
+intelligenz  = 10
+weisheit     = 10
+
+# ---------------------------------------------------------------------
+# Kampf: Echtzeit, keine Runden. Jeder Angriff hat eine Erholungszeit.
+# Alle Zeiten in Sekunden (Kommazahlen erlaubt, z.B. 2.5).
+# ---------------------------------------------------------------------
+[kampf]
+auto_angriff        = true    # nach "toete ratte" geht der Kampf von selbst weiter
+waffenlos_schaden   = 2       # Schaden ohne Waffe
+waffenlos_erholung  = 2.5     # Sekunden zwischen zwei Faustschlägen
+zauber_erholung     = 2.0     # Sekunden nach einem Kampfzauber
+ausdauer            = 100     # Ausdauer zu Beginn (jeder Angriff kostet etwas)
+ausdauer_pro_angriff = 5
+ausdauer_erholung   = 3       # pro Takt
+
+# Stufen: Für die nächste Stufe braucht man  ep_basis * stufe ^ ep_faktor
+# Erfahrungspunkte (Stufe 1: 100, Stufe 2: 283, Stufe 3: 520, ...)
+ep_basis            = 100
+ep_faktor           = 1.5
+lp_pro_stufe        = 10      # so viel mehr Lebenspunkte pro Stufe
+mp_pro_stufe        = 5
+ausdauer_pro_stufe  = 5
+punkte_pro_stufe    = 2       # zum Verteilen mit "steigere staerke" usw.
+
+# Tod: Man bleibt liegen und kann von anderen wiederbelebt werden.
+# Nach der Wartezeit (oder mit "aufgeben") erwacht man im Wiederbelebungsraum.
+wiederbelebung_raum       = "start"
+tod_wartezeit             = 300   # Sekunden (= 5 Minuten)
+wiederbelebung_lp_prozent = 50    # so viele Lebenspunkte hat man danach
+tod_ep_verlust_prozent    = 0     # Verlust an Erfahrung (0 = keiner)
+tod_gegenstaende          = "behalten"   # oder "fallen_lassen"
+
+monster_erholung_prozent  = 5     # Monster heilen sich außerhalb des Kampfes
+
+# ---------------------------------------------------------------------
+# Anzeigenamen: IDs dürfen keine Umlaute haben, hier stehen die schönen
+# Namen für Werte, Ausrüstungsplätze und Eigenschaften.
+# ---------------------------------------------------------------------
+[namen]
+staerke     = "Stärke"
+geschick    = "Geschick"
+ausdauer    = "Ausdauer"
+intelligenz = "Intelligenz"
+weisheit    = "Weisheit"
+waffe       = "Waffe"
+schild      = "Schild"
+kopf        = "Kopf"
+koerper     = "Körper"
+haende      = "Hände"
+beine       = "Beine"
+fuesse      = "Füße"
+hals        = "Hals"
+umhang      = "Umhang"
+licht       = "Licht"
+schaden     = "Schaden"
+ruestung    = "Rüstung"
+
+# ---------------------------------------------------------------------
+# Geländearten: So sehen Räume auf der Karte aus
+# klammern: Kästchen auf der Stadtkarte, z.B. "()" draußen, "[]" Gebäude
+# nutzt:    allgemeine Beschreibungen aus daten/beschreibungen (für alle Räume dieser Art)
+# geruch / geraeusch / gefuehl: was man mit riech / hoer / taste wahrnimmt
+# symbol:   nur für den Stil "linien" (im Kästchen steht das symbol des Raums)
+# Farben: rot gruen gelb blau magenta cyan weiss grau schwarz
+#         hellrot hellgruen hellgelb hellblau hellmagenta hellcyan hellweiss
+# ---------------------------------------------------------------------
+[gelaende.platz]
+name   = "Platz"
+symbol = "+"
+farbe  = "hellgelb"
+klammern = "()"
+geruch   = "Es riecht nach Rauch aus den Schornsteinen."
+geraeusch = "Stimmen, Schritte und das Gackern von Hühnern."
+
+[gelaende.strasse]
+name   = "Straße"
+symbol = "."
+farbe  = "weiss"
+klammern = "()"
+geraeusch = "Irgendwo bellt ein Hund."
+
+[gelaende.haus]
+name   = "Gebäude"
+symbol = "#"
+farbe  = "hellweiss"
+klammern = "[]"
+
+[gelaende.tempel]
+name   = "Tempel"
+symbol = "T"
+farbe  = "hellcyan"
+klammern = "[]"
+geruch   = "Ein Hauch von Weihrauch hängt in der Luft."
+geraeusch = "Es ist so still, dass du deinen eigenen Atem hörst."
+
+[gelaende.wald]
+name   = "Wald"
+symbol = "♣"
+farbe  = "gruen"
+klammern = "{}"
+deko     = "o&"          # Bäume rund um Waldräume
+deko_dichte = 60
+geruch   = "Es riecht nach feuchtem Laub, Moos und Pilzen."
+geraeusch = "Vögel zwitschern, und irgendwo knackt ein Ast."
+
+[gelaende.lichtung]
+name   = "Wiese"
+symbol = "\""
+farbe  = "hellgruen"
+klammern = "()"
+deko     = "o"
+deko_dichte = 25
+geruch   = "Süßer Blütenduft liegt in der Luft."
+geraeusch = "Bienen summen zwischen den Blumen."
+
+[gelaende.garten]
+name     = "Garten"
+symbol   = "%"
+farbe    = "hellgruen"
+klammern = "()"
+deko     = "o&"            # verstreute Bäume und Büsche
+deko_dichte = 45           # Prozent der freien Stellen rund um den Raum
+geruch   = "Es duftet nach Kräutern und Blüten."
+geraeusch = "Bienen summen geschäftig."
+
+[gelaende.wasser]
+name   = "Wasser"
+symbol = "~"
+farbe  = "hellblau"
+klammern = "()"
+geruch   = "Es riecht nach Wasser und Schilf."
+geraeusch = "Wasser plätschert leise."
+
+[gelaende.berg]
+name   = "Fels"
+symbol = "^"
+farbe  = "grau"
+klammern = "<>"
+geraeusch = "Der Wind pfeift um die Felsen."
+
+[gelaende.hoehle]
+name   = "Höhle"
+symbol = "o"
+farbe  = "grau"
+klammern = "<>"
+geruch   = "Es riecht feucht und muffig."
+geraeusch = "Wasser tropft irgendwo von der Decke."
+gefuehl  = "Die Wände sind feucht und kalt."
+
+# ---------------------------------------------------------------------
+# Farben der Verzierungen auf der Stadtkarte (Zeichen = Farbe)
+# Verzierungen setzt man bei Geländearten oder Räumen mit
+#   deko = "o&"                  verstreut um das Kästchen
+#   deko_richtung = { sued = "~" }  eine ganze Seite, z.B. ein Bach
+# ---------------------------------------------------------------------
+[deko]
+"o" = "gruen"
+"&" = "hellgruen"
+"~" = "hellblau"
+"^" = "grau"
+
+# ---------------------------------------------------------------------
+# Angaben für MUD-Verzeichnisse (MSSP). Name, Spielerzahl, Laufzeit usw.
+# schickt der Server selbst – hier kannst du Weiteres ergänzen oder
+# überschreiben. Alles freiwillig.
+# ---------------------------------------------------------------------
+[mssp]
+GENRE    = "Fantasy"
+GAMEPLAY = "Adventure"
+STATUS   = "Alpha"
+# HOSTNAME = "mud.example.de"
+# WEBSITE  = "https://..."
+# CONTACT  = "du@example.de"
+# DISCORD  = "https://discord.gg/..."
+
+# ---------------------------------------------------------------------
+# Geld: Einheiten und Umrechnung
+# ---------------------------------------------------------------------
+# Alle Beträge in den Daten (wert, preis, geld ...) stehen in der KLEINSTEN
+# Einheit. Mit diesen Einheiten wird z.B. 1475 als "14 Gold 7 Silber 5 Kupfer"
+# angezeigt. Ohne Einheiten gibt es nur eine Währung mit dem Namen aus 'waehrung'.
+[geld]
+anzeige = "lang"        # "lang" = 2 Gold 5 Silber, "kurz" = 2G 5S
+
+[[geld.einheiten]]
+name     = "Gold"
+mehrzahl = "Gold"       # z.B. "Taler" / "Münzen" für die Mehrzahl
+kurz     = "G"
+wert     = 100          # 1 Gold = 100 Kupfer
+
+[[geld.einheiten]]
+name     = "Silber"
+kurz     = "S"
+wert     = 10
+
+[[geld.einheiten]]
+name     = "Kupfer"
+kurz     = "K"
+wert     = 1            # die kleinste Einheit hat immer wert = 1
+
+# ---------------------------------------------------------------------
+# Darstellung: wie Listen im Spiel aussehen (Vorschau im Welteditor)
+# ---------------------------------------------------------------------
+[darstellung]
+haendler    = "kategorien"   # einfach, tabelle, pergament, kategorien
+spielstand  = "beides"       # einfach, bogen, kompakt, beides (sp = kompakt, sp voll = bogen)
+spielerbuch = "buch"         # einfach, buch, schalter
+rahmen      = "unicode"      # unicode oder ascii (alte Programme bekommen immer ascii)
+

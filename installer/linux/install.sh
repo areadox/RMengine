@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Lädt die neueste RMengine-Version herunter und installiert sie:
 #   curl -fsSL https://github.com/areadox/RMengine/releases/latest/download/install.sh | bash
+# Ohne Nachfrage mit leerer Welt bzw. Beispielwelt:
+#   ... | bash -s -- --leere-welt        ... | bash -s -- --beispielwelt
 set -euo pipefail
 URL="https://github.com/areadox/RMengine/releases/latest/download/rmengine-linux-x86_64.tar.gz"
 
@@ -17,4 +19,4 @@ else
   wget -qO "$TMP/rmengine.tar.gz" "$URL"
 fi
 tar -xzf "$TMP/rmengine.tar.gz" -C "$TMP"
-bash "$TMP/rmengine/installieren.sh"
+bash "$TMP/rmengine/installieren.sh" "$@"

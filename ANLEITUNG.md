@@ -13,6 +13,12 @@ Spiel `neuladen`, und die Änderung ist da. Ein Neustart ist dafür nicht nötig
 1. Lade auf der [Release-Seite](https://github.com/areadox/RMengine/releases/latest)
    die Datei `RMengine-Setup-….exe` herunter und führe sie aus. Administratorrechte
    sind nicht nötig. Installiert wird nach **Dokumente\RMengine**.
+   Bei der ersten Installation wählst du die Welt:
+   - **Beispielwelt „Eichenhain“**: Dorf, Wald, Händler, Gilden und Quests –
+     gut zum Ausprobieren und Abschauen
+   - **Leere Welt**: nur ein Startraum, zum Selberbauen
+
+   Bei einem Update wird nicht gefragt, deine Welt bleibt, wie sie ist.
 2. Im Startmenü unter **RMengine** findest du:
    - *RMengine starten*: startet den Server in einem Konsolenfenster (siehe
      „Die Server-Konsole“)
@@ -33,13 +39,35 @@ und `rmengine.exe` starten.
 curl -fsSL https://github.com/areadox/RMengine/releases/latest/download/install.sh | bash
 ```
 
-Das Programm landet in `~/.local/share/rmengine`, die Welt in
-`~/.local/share/rmengine/daten`. Danach:
+Bei der ersten Installation fragt das Skript, ob die Beispielwelt oder eine
+leere Welt angelegt werden soll. Ohne Nachfrage geht es so:
+
+```bash
+curl -fsSL https://github.com/areadox/RMengine/releases/latest/download/install.sh | bash -s -- --leere-welt
+```
+
+(oder `--beispielwelt`). Das Programm landet in `~/.local/share/rmengine`, die
+Welt in `~/.local/share/rmengine/daten`. Danach:
 
 ```bash
 rmengine            # Server starten
 rmengine --pruefen  # Weltdaten prüfen
 ```
+
+### Eine leere Welt anlegen
+
+Eine leere Welt kannst du auch später jederzeit anlegen, z.B. um neben der
+Beispielwelt eine eigene zu bauen:
+
+```bash
+rmengine meinewelt --neue-welt     # legt den Ordner "meinewelt" an
+rmengine meinewelt                 # und startet ihn
+```
+
+Die leere Welt hat eine vollständige `welt.toml` (mit Erklärungen,
+Geländearten, Geld und Darstellung), einen Startraum und die üblichen Ordner.
+Eine vorhandene Welt wird dabei nie überschrieben. Öffne den Ordner im
+Welteditor und baue los.
 
 ### Verbinden
 

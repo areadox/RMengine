@@ -1,6 +1,6 @@
 [package]
 name = "rmengine"
-version = "0.2.12"
+version = "0.2.13"
 edition = "2021"
 description = "RMengine – ein datengetriebener MUD-Treiber: Welten werden in TOML-Dateien gebaut, nicht programmiert."
 repository = "https://github.com/areadox/RMengine"

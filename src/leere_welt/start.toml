@@ -1,0 +1,17 @@
+# =====================================================================
+#  Der erste Raum deiner Welt
+# =====================================================================
+#  Weitere Räume legst du am bequemsten im Welteditor an (Kartenansicht).
+#  Koordinaten: x wird nach OSTEN größer, y nach NORDEN, z nach OBEN.
+#  Ausgänge: nord, nordost, ost, suedost, sued, suedwest, west, nordwest, hoch, runter
+
+[[raum]]
+id       = "start"
+name     = "Ein leerer Platz"
+x = 0
+y = 0
+gebiet   = "start"
+gelaende = "platz"
+beschreibung = """
+Du stehst auf einem leeren Platz. Noch gibt es hier nichts – aber von hier
+aus wird eine ganze Welt entstehen."""

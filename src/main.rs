@@ -48,6 +48,8 @@ Benutzung:
                                      (erzeugt einen neuen Zugangsschlüssel)
   rmengine --fernwartung-aus         Fernwartung abschalten
   rmengine --keine-updatepruefung    Beim Start nicht nach Updates suchen
+  rmengine [datenordner] --neue-welt Eine leere Welt zum Selberbauen anlegen
+                                     (nur wenn es dort noch keine Welt gibt)
 
 Ohne Angabe wird der Ordner 'daten' im aktuellen Verzeichnis benutzt,
 sonst der Ordner 'daten' neben dem Programm.";
@@ -88,6 +90,18 @@ async fn main() {
         .map(PathBuf::from)
         .unwrap_or_else(datenordner_suchen);
 
+    if hat(&["--neue-welt"]) {
+        let ordner = args.iter().find(|a| !a.starts_with("--")).map(PathBuf::from).unwrap_or_else(|| PathBuf::from("daten"));
+        match leere_welt_anlegen(&ordner) {
+            Ok(true) => println!("Leere Welt in '{}' angelegt.", ordner.display()),
+            Ok(false) => println!("In '{}' gibt es schon eine Welt – nichts verändert.", ordner.display()),
+            Err(e) => {
+                eprintln!("Die Welt konnte nicht angelegt werden: {e}");
+                std::process::exit(1);
+            }
+        }
+        std::process::exit(0);
+    }
     if hat(&["--fernwartung"]) {
         match fernwartung::einrichten(&ordner) {
             Ok(()) => warten_und_beenden(0),
@@ -193,6 +207,23 @@ fn datenordner_suchen() -> PathBuf {
         .unwrap_or(hier)
 }
 
+/// Legt eine leere Welt an: welt.toml, ein Startraum und die üblichen Ordner.
+/// Eine vorhandene Welt wird nie angetastet (Ergebnis false).
+fn leere_welt_anlegen(ordner: &std::path::Path) -> std::io::Result<bool> {
+    if ordner.join("welt.toml").exists() {
+        return Ok(false);
+    }
+    for u in [
+        "raeume", "gegenstaende", "monster", "npcs", "fertigkeiten", "zauber", "beschreibungen",
+        "vorlagen", "rassen", "gilden", "berufe", "quests", "befehle",
+    ] {
+        std::fs::create_dir_all(ordner.join(u))?;
+    }
+    std::fs::write(ordner.join("raeume").join("start.toml"), include_str!("leere_welt/start.toml"))?;
+    std::fs::write(ordner.join("welt.toml"), include_str!("leere_welt/welt.toml"))?;
+    Ok(true)
+}
+
 /// Unter Windows schließt sich das Fenster sonst sofort und man kann nichts lesen.
 fn warten_und_beenden(code: i32) -> ! {
     if cfg!(windows) && std::env::var_os("PROMPT").is_none() {
@@ -201,4 +232,19 @@ fn warten_und_beenden(code: i32) -> ! {
         let _ = std::io::stdin().read_line(&mut s);
     }
     std::process::exit(code);
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn leere_welt_laedt_fehlerfrei() {
+        let ordner = std::env::temp_dir().join(format!("rmengine_leer_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&ordner);
+        assert!(super::leere_welt_anlegen(&ordner).unwrap());
+        assert!(!super::leere_welt_anlegen(&ordner).unwrap(), "vorhandene Welt darf nicht überschrieben werden");
+        let d = crate::daten::laden(&ordner).unwrap_or_else(|f| panic!("{f:?}"));
+        assert!(d.warnungen.is_empty(), "{:?}", d.warnungen);
+        assert_eq!(d.raeume.len(), 1);
+        let _ = std::fs::remove_dir_all(&ordner);
+    }
 }
