@@ -264,6 +264,7 @@ impl Inhalte {
             Ziel::Gilde => self.ids_von(&["gilde"], false),
             Ziel::Beruf => self.ids_von(&["beruf"], false),
             Ziel::Quest => self.ids_von(&["quest"], false),
+            Ziel::Befehl => self.ids_von(&["befehl"], false),
             Ziel::Beschreibung => self.ids_von(&["beschreibung"], false),
             Ziel::Gleich => {
                 if art.gruppe() == "monster" {
@@ -432,6 +433,7 @@ fn ziel_name(z: Ziel, art: &Art) -> &'static str {
         Ziel::Gilde => "gilde",
         Ziel::Beruf => "beruf",
         Ziel::Quest => "quest",
+        Ziel::Befehl => "befehl",
         Ziel::Beschreibung => "beschreibung",
         Ziel::Gleich => match art.gruppe() {
             "monster" => "gleich:monster",
@@ -449,6 +451,7 @@ fn schritt_ziel(art: &str) -> Option<Ziel> {
         "bringen" => Some(Ziel::Gegenstand),
         "besuchen" => Some(Ziel::Raum),
         "sprechen" => Some(Ziel::Npc),
+        "befehl" => Some(Ziel::Befehl),
         _ => None,
     }
 }
@@ -720,6 +723,22 @@ fn feld_zeigen(ui: &mut egui::Ui, ctx: &mut Kontext, t: &mut dyn TableLike, feld
     let hinweis = geerbt.as_ref().map(|g| format!("(geerbt) {g}")).unwrap_or_default();
     let mut geaendert = false;
     match feld.typ {
+        Typ::Bild => {
+            ui.horizontal(|ui| {
+                beschriftung(ui, feld, pflicht);
+                let mut v = lies_text(t, feld.name);
+                let edit = egui::TextEdit::multiline(&mut v)
+                    .font(egui::TextStyle::Monospace)
+                    .desired_rows(6)
+                    .code_editor()
+                    .hint_text(&hinweis)
+                    .desired_width(f32::INFINITY);
+                if crate::kontext::feld(ui, edit).changed() {
+                    text_setzen(t, feld.name, &v);
+                    geaendert = true;
+                }
+            });
+        }
         Typ::Text | Typ::Mehrzeilig => {
             ui.horizontal(|ui| {
                 beschriftung(ui, feld, pflicht);
@@ -743,7 +762,13 @@ fn feld_zeigen(ui: &mut egui::Ui, ctx: &mut Kontext, t: &mut dyn TableLike, feld
                     Some(i) => i.as_array().map(|a| a.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>().join("\n")).unwrap_or_default(),
                     None => String::new(),
                 };
-                let hinweis = if hinweis.is_empty() { "Mehrere Zeilen = zufällige Auswahl".to_string() } else { hinweis.clone() };
+                let hinweis = if !hinweis.is_empty() {
+                    hinweis.clone()
+                } else if feld.name == "befehle" {
+                    "Ein Befehl pro Zeile, z.B. sage Hallo {rest}".to_string()
+                } else {
+                    "Mehrere Zeilen = zufällige Auswahl".to_string()
+                };
                 if crate::kontext::feld(ui, egui::TextEdit::multiline(&mut v).desired_rows(2).hint_text(hinweis).desired_width(f32::INFINITY)).changed() {
                     let zeilen: Vec<String> = v.lines().map(|z| z.trim().to_string()).filter(|z| !z.is_empty()).collect();
                     match zeilen.len() {
@@ -948,7 +973,7 @@ fn feld_zeigen(ui: &mut egui::Ui, ctx: &mut Kontext, t: &mut dyn TableLike, feld
 }
 
 /// Vorschau für Geld und Darstellung – genau so, wie es im Spiel aussieht.
-fn vorschau(ui: &mut egui::Ui, art: &Art, t: &Table, ctx: &Kontext) {
+fn vorschau(ui: &mut egui::Ui, art: &Art, t: &mut Table, ctx: &Kontext) {
     use crate::darstellung as d;
     let geld = |n: u64| d::betrag(n, &ctx.geld.0, ctx.geld.1);
     let rahmen = |text: String, ascii: bool| if ascii { d::ascii(&text) } else { text };
@@ -990,6 +1015,63 @@ fn vorschau(ui: &mut egui::Ui, art: &Art, t: &Table, ctx: &Kontext) {
             let sb = stil("spielerbuch");
             ui.label(RichText::new(format!("Spielerbuch ({sb})")).strong());
             farbig(ui, &rahmen(d::spielerbuch(&sb, &d::beispiel_buch(), breite), ascii));
+
+            // Inventar
+            let inv = stil("inventar");
+            ui.horizontal(|ui| {
+                ui.label(RichText::new(format!("Inventar: i ({inv})")).strong());
+                if inv == "figur" && lies_text(t, "figur").trim().is_empty() {
+                    if ui.button("Eingebaute Figur übernehmen").on_hover_text("Kopiert die eingebaute Figur und ihre Plätze in die Felder oben – dann kannst du sie ändern.").clicked() {
+                        text_setzen(t, "figur", d::STANDARD_FIGUR);
+                        let mut liste = ArrayOfTables::new();
+                        for p in d::standard_plaetze() {
+                            let mut e = Table::new();
+                            e.insert("platz", toml_edit::value(p.platz.as_str()));
+                            e.insert("zeile", toml_edit::value(p.zeile as i64));
+                            e.insert("spalte", toml_edit::value(p.spalte as i64));
+                            e.insert("ausrichtung", toml_edit::value(if p.rechts { "rechts" } else { "links" }));
+                            liste.push(e);
+                        }
+                        t.insert("figur_plaetze", Item::ArrayOfTables(liste));
+                    }
+                }
+            });
+            let beispiel = d::beispiel_inventar(&geld(4530));
+            let text = if inv == "figur" {
+                let bild = lies_text(t, "figur");
+                let mut plaetze: Vec<d::FigurPlatz> = t
+                    .get("figur_plaetze")
+                    .map(|i| {
+                        untertabellen(i)
+                            .into_iter()
+                            .map(|e| d::FigurPlatz {
+                                platz: lies_text(e, "platz"),
+                                zeile: e.get("zeile").and_then(|i| i.as_integer()).unwrap_or(0).max(0) as usize,
+                                spalte: e.get("spalte").and_then(|i| i.as_integer()).unwrap_or(0).max(0) as usize,
+                                rechts: lies_text(e, "ausrichtung") == "rechts",
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                let bild = if bild.trim().is_empty() {
+                    if plaetze.is_empty() {
+                        plaetze = d::standard_plaetze();
+                    }
+                    d::STANDARD_FIGUR.to_string()
+                } else {
+                    bild.trim_matches('\n').to_string()
+                };
+                d::inventar_figur(&beispiel, &bild, &plaetze, breite)
+                    .unwrap_or_else(|| "{grau}(Zu schmal für die Figur – der Spieler sieht die einfache Liste.){/}".into())
+            } else {
+                let mut x = String::from("{fett}Du trägst bei dir:{/}\n  ein Kurzschwert\n  [2x] ein roter Heiltrank\n  eine Karte\n{fett}Angelegt:{/}\n");
+                for (p, n) in &beispiel.angelegt {
+                    x.push_str(&format!("  {:<10} {n}\n", format!("<{p}>")));
+                }
+                x.push_str(&beispiel.fuss.join("\n"));
+                x
+            };
+            farbig(ui, &text);
         }
         _ => {}
     }
@@ -1512,7 +1594,7 @@ impl Inhalte {
                     ui.add_space(8.0);
                     ui.label(RichText::new(format!("Weitere Felder in der Datei (bleiben erhalten): {}", fremd.join(", "))).color(GRAU).small());
                 }
-                vorschau(ui, art, &tabelle, &ctx);
+                vorschau(ui, art, &mut tabelle, &ctx);
             });
         }
         if let Some(t) = self.tabelle_mut(art, o) {

@@ -42,6 +42,12 @@ enum Ziehen {
 }
 
 pub struct App {
+    weltliste: crate::weltliste::Weltliste,
+    /// Weltauswahl als Fenster (wenn schon eine Welt offen ist)
+    welten_fenster: bool,
+    neue_welt_eingabe: String,
+    /// Wechsel zu dieser Welt, obwohl es ungespeicherte Änderungen gibt?
+    wechsel_fragen: Option<PathBuf>,
     server_fenster: ServerFenster,
     update_fenster: UpdateFenster,
     bereich: Bereich,
@@ -93,9 +99,25 @@ pub struct App {
 }
 
 impl App {
-    pub fn neu(cc: &eframe::CreationContext<'_>, ordner: PathBuf) -> App {
+    pub fn neu(cc: &eframe::CreationContext<'_>, ordner: Option<PathBuf>) -> App {
         cc.egui_ctx.set_visuals(egui::Visuals::dark());
+        let weltliste = crate::weltliste::Weltliste::laden();
+        // Ohne Angabe: Weltauswahl zeigen (oder die zuletzt benutzte / ./daten öffnen)
+        let (ordner, sofort) = match ordner {
+            Some(o) => (o, true),
+            None if !weltliste.welten.is_empty() && weltliste.beim_start_fragen => (weltliste.zuletzt().unwrap_or_else(|| ordner_suchen(None)), false),
+            None => {
+                let o = weltliste.zuletzt().unwrap_or_else(|| ordner_suchen(None));
+                // Gibt es dort keine Welt, gleich die Auswahl zeigen (ohne Fehlermeldung)
+                let da = o.join("welt.toml").exists();
+                (o, da)
+            }
+        };
         let mut app = App {
+            weltliste,
+            welten_fenster: false,
+            neue_welt_eingabe: String::new(),
+            wechsel_fragen: None,
             server_fenster: ServerFenster::default(),
             update_fenster: UpdateFenster::default(),
             bereich: Bereich::Raeume,
@@ -140,8 +162,131 @@ impl App {
             darf_schliessen: false,
             neu_laden_fragen: false,
         };
-        app.laden();
+        if sofort {
+            app.laden();
+        }
         app
+    }
+
+    /// Eine andere Welt öffnen (fragt bei ungespeicherten Änderungen nach)
+    fn welt_oeffnen(&mut self, pfad: PathBuf) {
+        if self.welt.is_some() && self.geaendert() {
+            self.wechsel_fragen = Some(pfad);
+            return;
+        }
+        self.ordner_eingabe = pfad.display().to_string();
+        self.auswahl = None;
+        self.welten_fenster = false;
+        self.laden();
+    }
+
+    /// Die Weltauswahl: zuletzt benutzte Welten, andere öffnen, neue anlegen, Server
+    fn welten_auswahl(&mut self, ui: &mut egui::Ui) {
+        use crate::weltliste::{info, normal, wann};
+        let aktuell = self.welt.as_ref().map(|_| normal(Path::new(self.ordner_eingabe.trim())));
+        let mut oeffnen = None;
+        let mut entfernen = None;
+        if self.weltliste.welten.is_empty() {
+            ui.label(egui::RichText::new("Noch keine Welt geöffnet.").weak());
+        } else {
+            ui.label(egui::RichText::new("Zuletzt bearbeitet").strong());
+            egui::ScrollArea::vertical().max_height(360.0).id_salt("welten").show(ui, |ui| {
+                egui::Grid::new("welten_grid").num_columns(4).spacing([12.0, 6.0]).striped(true).show(ui, |ui| {
+                    for e in self.weltliste.welten.clone() {
+                        let pfad = PathBuf::from(&e.pfad);
+                        let i = info(&pfad);
+                        let name = if i.name.is_empty() { pfad.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default() } else { i.name.clone() };
+                        let offen = aktuell.as_deref() == Some(e.pfad.as_str());
+                        ui.vertical(|ui| {
+                            ui.set_min_width(240.0);
+                            let mut kopf = egui::RichText::new(if offen { format!("{name}  (offen)") } else { name }).strong();
+                            if !i.da {
+                                kopf = kopf.color(Color32::from_rgb(150, 150, 150));
+                            }
+                            ui.add(egui::Label::new(kopf).wrap_mode(egui::TextWrapMode::Extend));
+                            // Nur die letzten Ordner zeigen, der ganze Pfad steht im Tooltip
+                            let teile: Vec<&str> = e.pfad.split(['/', '\\']).filter(|t| !t.is_empty()).collect();
+                            let kurz = if teile.len() > 3 { format!("…/{}", teile[teile.len() - 3..].join("/")) } else { e.pfad.clone() };
+                            ui.add(egui::Label::new(egui::RichText::new(kurz).small().weak()).wrap_mode(egui::TextWrapMode::Extend)).on_hover_text(&e.pfad);
+                        });
+                        match &i.server {
+                            Some(a) => {
+                                let s = if i.schluessel_gemerkt { "Schlüssel gemerkt" } else { "Schlüssel wird abgefragt" };
+                                ui.label(format!("🌐 {a}")).on_hover_text(format!("Arbeitskopie der Fernwartung – {s}"));
+                            }
+                            None => {
+                                ui.label("💻 lokal");
+                            }
+                        }
+                        ui.label(egui::RichText::new(wann(e.zuletzt)).weak());
+                        ui.horizontal(|ui| {
+                            if i.da {
+                                if ui.add_enabled(!offen, egui::Button::new("Öffnen")).clicked() {
+                                    oeffnen = Some(pfad.clone());
+                                }
+                            } else {
+                                ui.label(egui::RichText::new("nicht gefunden").color(Color32::from_rgb(240, 110, 110)));
+                            }
+                            if ui.small_button("✖").on_hover_text("Aus der Liste nehmen (die Dateien bleiben)").clicked() {
+                                entfernen = Some(e.pfad.clone());
+                            }
+                        });
+                        ui.end_row();
+                    }
+                });
+            });
+            let mut fragen = self.weltliste.beim_start_fragen;
+            if ui.checkbox(&mut fragen, "Beim Start diese Auswahl zeigen (sonst die zuletzt benutzte Welt öffnen)").changed() {
+                self.weltliste.beim_start_fragen = fragen;
+                self.weltliste.speichern();
+            }
+        }
+        if let Some(p) = entfernen {
+            self.weltliste.entfernen(&p);
+        }
+        ui.add_space(10.0);
+        ui.separator();
+        ui.label(egui::RichText::new("Andere Welt öffnen").strong());
+        ui.horizontal(|ui| {
+            ui.label("Datenordner (mit welt.toml):");
+            let r = crate::kontext::feld(ui, egui::TextEdit::singleline(&mut self.ordner_eingabe).desired_width(380.0));
+            if ui.button("Öffnen").clicked() || (r.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter))) {
+                oeffnen = Some(PathBuf::from(self.ordner_eingabe.trim()));
+            }
+        });
+        ui.add_space(6.0);
+        ui.label(egui::RichText::new("Neue leere Welt").strong());
+        ui.horizontal(|ui| {
+            ui.label("Ordner:");
+            crate::kontext::feld(ui, egui::TextEdit::singleline(&mut self.neue_welt_eingabe).hint_text("z.B. C:\\Users\\Du\\Documents\\MeineWelt").desired_width(380.0));
+            let ziel = PathBuf::from(self.neue_welt_eingabe.trim());
+            let ok = !self.neue_welt_eingabe.trim().is_empty();
+            if ui.add_enabled(ok, egui::Button::new("Anlegen und öffnen")).on_hover_text("welt.toml mit allen Einstellungen, ein Startraum und die üblichen Ordner").clicked() {
+                match crate::neue_welt::anlegen(&ziel) {
+                    Ok(true) => {
+                        self.melden(format!("Leere Welt in '{}' angelegt.", ziel.display()), false);
+                        oeffnen = Some(ziel);
+                    }
+                    Ok(false) => {
+                        self.melden("Dort gibt es schon eine Welt – sie wird geöffnet.", false);
+                        oeffnen = Some(ziel);
+                    }
+                    Err(e) => self.ladefehler = Some(format!("Die Welt konnte nicht angelegt werden: {e}")),
+                }
+            }
+        });
+        ui.add_space(6.0);
+        ui.label(egui::RichText::new("Die Welt liegt auf einem Server?").strong());
+        ui.horizontal(|ui| {
+            if ui.button("🌐 Mit einem Server verbinden").clicked() {
+                self.server_fenster.offen = true;
+                self.server_fenster.anderen_zeigen();
+            }
+            ui.label(egui::RichText::new("Einmal verbunden, steht die Welt danach oben in der Liste – mit gemerktem Schlüssel.").weak());
+        });
+        if let Some(p) = oeffnen {
+            self.welt_oeffnen(p);
+        }
     }
 
     fn laden(&mut self) {
@@ -197,6 +342,7 @@ impl App {
                     self.oberwelt_ansicht = false;
                 }
                 self.probleme = self.alle_probleme();
+                self.weltliste.eintragen(&ordner);
                 let n = self.welt().raeume.len();
                 self.melden(format!("{n} Räume aus '{}' geladen.", ordner.display()), false);
             }
@@ -608,6 +754,35 @@ impl eframe::App for App {
 impl App {
     /// Die Fenster für Fernwartung und Updates.
     fn netz_fenster(&mut self, ctx: &egui::Context) {
+        if self.welten_fenster && self.welt.is_some() {
+            let mut offen = true;
+            egui::Window::new("🌍 Welten").open(&mut offen).min_width(680.0).default_width(720.0).collapsible(false).show(ctx, |ui| {
+                self.welten_auswahl(ui);
+            });
+            self.welten_fenster &= offen;
+        }
+        if let Some(pfad) = self.wechsel_fragen.clone() {
+            egui::Window::new("Ungespeicherte Änderungen").collapsible(false).resizable(false).anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0]).show(ctx, |ui| {
+                ui.label(format!("Die aktuelle Welt hat ungespeicherte Änderungen.\nVor dem Wechsel zu '{}' speichern?", pfad.display()));
+                ui.horizontal(|ui| {
+                    if ui.button("Speichern und wechseln").clicked() {
+                        self.speichern();
+                        self.wechsel_fragen = None;
+                        if !self.geaendert() {
+                            self.welt_oeffnen(pfad.clone());
+                        }
+                    }
+                    if ui.button("Verwerfen und wechseln").clicked() {
+                        self.wechsel_fragen = None;
+                        self.welt = None;
+                        self.welt_oeffnen(pfad.clone());
+                    }
+                    if ui.button("Abbrechen").clicked() {
+                        self.wechsel_fragen = None;
+                    }
+                });
+            });
+        }
         let daten = PathBuf::from(self.ordner_eingabe.trim());
         let ungespeichert = self.geaendert();
         if self.server_fenster.offen {
@@ -636,32 +811,18 @@ impl App {
 impl App {
     fn startseite(&mut self, ui: &mut egui::Ui) {
         ui.heading("RMengine – Welteditor");
-        ui.add_space(8.0);
-        ui.label("Datenordner (der Ordner mit welt.toml):");
-        ui.horizontal(|ui| {
-            let r = crate::kontext::feld(ui, egui::TextEdit::singleline(&mut self.ordner_eingabe).desired_width(400.0));
-            if ui.button("Öffnen").clicked() || (r.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter))) {
-                self.laden();
-            }
-        });
+        ui.add_space(4.0);
+        ui.label("Welche Welt möchtest du bearbeiten?");
         if let Some(f) = &self.ladefehler {
             ui.add_space(8.0);
             ui.colored_label(Color32::from_rgb(240, 110, 110), f);
         }
-        ui.add_space(20.0);
-        ui.separator();
         ui.add_space(8.0);
-        ui.label(egui::RichText::new("Die Welt liegt auf einem Server?").strong());
-        ui.label("Dann hol sie dir über die Fernwartung auf diesen Rechner, bearbeite sie hier und lade sie wieder hoch.");
-        ui.add_space(4.0);
-        ui.horizontal(|ui| {
-            if ui.button("🌐 Mit einem Server verbinden").clicked() {
-                self.server_fenster.offen = true;
-            }
-            if ui.button("⟳ Nach Updates suchen").clicked() {
-                self.update_fenster.oeffnen(ui.ctx());
-            }
-        });
+        self.welten_auswahl(ui);
+        ui.add_space(12.0);
+        if ui.button("⟳ Nach Updates suchen").clicked() {
+            self.update_fenster.oeffnen(ui.ctx());
+        }
     }
 
     fn tastatur(&mut self, ctx: &egui::Context) {
@@ -751,6 +912,9 @@ impl App {
                     }
                     if ui.button("⟳ Updates").on_hover_text("Nach einer neuen Version suchen").clicked() {
                         self.update_fenster.oeffnen(ui.ctx());
+                    }
+                    if ui.button("🌍 Welten").on_hover_text("Eine andere Welt öffnen oder eine neue anlegen").clicked() {
+                        self.welten_fenster = !self.welten_fenster;
                     }
                     let server = Arbeitskopie::zu_datenordner(Path::new(self.ordner_eingabe.trim()));
                     let text = match &server {

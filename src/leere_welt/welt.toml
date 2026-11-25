@@ -263,5 +263,6 @@ wert     = 1            # die kleinste Einheit hat immer wert = 1
 haendler    = "kategorien"   # einfach, tabelle, pergament, kategorien
 spielstand  = "beides"       # einfach, bogen, kompakt, beides (sp = kompakt, sp voll = bogen)
 spielerbuch = "buch"         # einfach, buch, schalter
+inventar    = "figur"        # einfach oder figur (angelegte Dinge an einer Figur, Rest daneben)
 rahmen      = "unicode"      # unicode oder ascii (alte Programme bekommen immer ascii)
 

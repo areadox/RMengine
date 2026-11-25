@@ -193,6 +193,10 @@ Danach den Server starten (oder neu starten). Im Protokoll steht dann
    Fingerabdruck des Servers. Vergleiche ihn mit dem aus Schritt 1, und nur
    wenn er übereinstimmt, klickst du auf *Stimmt überein – verbinden*.
 
+Danach steht die Arbeitskopie in der Weltauswahl des Editors (🌐 mit der
+Adresse). Mit *Schlüssel auf diesem PC merken* musst du Adresse und Schlüssel
+nie wieder eingeben: Welt in der Auswahl öffnen, fertig.
+
 ### 3. Arbeiten
 
 - Bearbeite die Welt wie gewohnt: Räume, Zauber, Befehle.
@@ -345,6 +349,8 @@ daten/
   npcs/*.toml          NPCs mit Gesprächen, ein NPC pro Datei
   beschreibungen/      allgemeine Beschreibungen (Bäume, Himmel, Möbel ...)
   befehle/             Befehle anpassen und eigene Gesten
+  eigene_befehle/      eigene Befehle mit Bedingungen und Wirkungen (Kapitel 12)
+  quests/, rassen/, gilden/, berufe/   Aufgaben, Rassen, Gilden, Berufe
   vorlagen/            Vorlagen, von denen andere Einträge erben
   fertigkeiten/*.toml  Fertigkeiten
   zauber/*.toml        Zaubersprüche
@@ -616,6 +622,15 @@ dieselben Dateien wie der Server.
 
 Der Editor braucht eine grafische Oberfläche. Er wird mit `rmengine --update`
 automatisch mit aktualisiert.
+
+**Weltauswahl:** Beim Start zeigt der Editor die Welten, die du schon
+bearbeitet hast: lokale Ordner (💻) und Arbeitskopien vom Server (🌐, mit
+gemerktem Schlüssel). Von dort kannst du auch einen anderen Ordner öffnen, eine
+neue leere Welt anlegen oder dich mit einem Server verbinden. Während der Arbeit
+wechselt der Knopf **🌍 Welten** oben rechts die Welt. Soll der Editor gleich die
+zuletzt benutzte Welt öffnen, nimm den Haken bei *Beim Start diese Auswahl
+zeigen* weg. Die Liste steht in `%APPDATA%\RMengine\editor.json` (Windows) bzw.
+`~/.config/rmengine/editor.json` (Linux).
 
 - **Links:** Karte und Ebene (`z`) wählen, Räume suchen und anspringen.
 - **Mitte:** die Karte. Ein Klick wählt einen Raum aus. Ziehen verschiebt ihn.
@@ -1149,7 +1164,7 @@ Admins können mit `erfahrung <spieler> <menge>` zum Testen Erfahrung vergeben.
 
 ---
 
-## 12. Befehle anpassen und eigene Gesten
+## 12. Befehle anpassen, Gesten und eigene Befehle
 
 Alle Befehle lassen sich anpassen, ohne zu programmieren. Die Dateien liegen im
 Ordner `daten/befehle/` (alternativ eine einzelne Datei `daten/befehle.toml`).
@@ -1189,6 +1204,62 @@ andere_ziel = "{name} winkt {ziel_dativ} zu."
 Wirt“), `{ziel_dativ}` im Dativ („dem Wirt“). Den Dativ trägt man bei NPCs und
 Monstern mit `dativ = "dem Wirt"` ein. Mit `rolle` kann eine Geste auch nur für
 Baumeister oder Admins gelten, mit `aktiv = false` wird sie abgeschaltet.
+
+### Eigene Befehle (`daten/eigene_befehle/`)
+
+Eigene Befehle funktionieren wie Gesten, können aber mehr: Sie prüfen
+Bedingungen und haben Wirkungen. Im Welteditor stehen sie unter
+📚 Inhalte → *Eigene Befehle*. Ein Beispiel:
+
+```toml
+[[befehl]]
+id          = "beten"
+woerter     = ["bete", "beten"]
+hilfe       = "Im Tempel beten (heilt ein wenig)"
+raeume      = ["tempel"]                 # nur hier
+nicht_hier  = "Zum Beten solltest du in den Tempel gehen."
+abklingzeit = 60                         # Sekunden bis zum nächsten Mal
+selbst      = "Du kniest nieder und sprichst ein leises Gebet."
+andere      = "{name} kniet nieder und betet leise."
+lp          = 15                         # heilt 15 Lebenspunkte
+```
+
+**Bedingungen** (alle freiwillig):
+
+| Feld | Bedeutung |
+|------|-----------|
+| `raeume`, `gebiete` | nur in diesen Räumen bzw. Gebieten; `nicht_hier` = Meldung sonst |
+| `braucht` | diese Gegenstände muss man dabeihaben (bleiben erhalten) |
+| `nimm` | diese Gegenstände werden verbraucht |
+| `mindest_stufe`, `gilde`, `beruf` | Stufe, Gilde oder Beruf nötig |
+| `fertigkeit`, `fertigkeit_stufe` | eine Fertigkeit ab einer Stufe |
+| `mana_kosten`, `ausdauer_kosten`, `kosten` | kostet Mana, Ausdauer oder Geld (kleinste Münze) |
+| `abklingzeit` | Sekunden, bis man ihn wieder benutzen kann |
+| `nicht_im_kampf` | `true` = nicht mitten im Kampf |
+| `rolle`, `aktiv` | wie bei Gesten |
+
+**Texte:** `selbst`, `andere`, `selbst_ziel`, `ziel`, `andere_ziel` wie bei
+Gesten. Zusätzlich gibt es `{rest}`: alles, was hinter dem Befehl getippt wurde.
+
+**Zufall:** `chance = 30` heißt: klappt in 30 von 100 Fällen. Dann zeigen
+`misserfolg` und `misserfolg_andere` den Text. Kosten werden auch bei einem
+Misserfolg fällig.
+
+**Wirkungen** (nur bei Erfolg):
+
+| Feld | Bedeutung |
+|------|-----------|
+| `lp`, `mp`, `ausdauer` | heilt (oder schadet, mit Minus) |
+| `geld`, `erfahrung` | gibt Geld bzw. Erfahrungspunkte |
+| `gib` | diese Gegenstände bekommt man |
+| `teleport` | versetzt in diesen Raum |
+| `zauber` | legt die Wirkungen dieses Zaubers auf einen selbst, ohne Kosten (z.B. einen Schild) |
+| `befehle` | danach weitere Befehle ausführen, z.B. `["sage Hallo {rest}", "winke {rest}"]` |
+
+Eigene Befehle stehen in der Hilfe unter *Besondere Befehle*. Ruft ein Befehl
+über `befehle` sich selbst auf, wird das übersprungen. Eine Quest kann einen
+Schritt `art = "befehl"` haben: `ziel` ist dann die ID des eigenen Befehls,
+z.B. „Bete dreimal im Tempel“ (`anzahl = 3`).
 
 ---
 
@@ -1532,7 +1603,45 @@ haendler    = "kategorien"  # einfach | tabelle | pergament | kategorien
 spielstand  = "beides"      # einfach | bogen | kompakt | beides
 spielerbuch = "buch"        # einfach | buch | schalter
 rahmen      = "unicode"     # unicode = ╔═╗-Rahmen, ascii = +-+ (für alte Clients)
+inventar    = "figur"       # einfach | figur
 ```
+
+Beim Inventar als Figur (`i`) sieht man ungefähr so etwas:
+
+```
+                      ___                     Waffen
+                     /   \ Lederhelm          Dolch
+                     |   |
+                     \___/                    Essen
+                   ___/ \___                  Laib Brot
+            Fackel/         \
+                 / /|     |\ \                Sonstiges
+     Kurzschwert/ / |     | \ \  Holzschild   Landkarte
+                 /  |     |  \
+                    |  _  |
+                    / / \ \
+                   / /   \ \
+                 _/ /     \ \_
+                |__/       \__|
+Gewicht 12/70   Geld: 45 Gold 3 Silber
+```
+
+Die Figur kannst du selbst zeichnen: `figur = '''...'''` (mit drei einfachen
+Anführungszeichen, dann bleiben Backslashes so, wie sie sind). Wo die Namen
+stehen, sagt `[[darstellung.figur_plaetze]]`:
+
+```toml
+[[darstellung.figur_plaetze]]
+platz       = "waffe"     # waffe, schild, kopf, koerper, haende, beine, fuesse, hals, ring, umhang, licht, ruecken, guertel
+zeile       = 7           # ab 0 = oberste Zeile der Figur
+spalte      = 15          # ab 0
+ausrichtung = "rechts"    # links: Name beginnt an der Spalte, rechts: Name endet dort
+```
+
+Im Welteditor (🎨 Darstellung) holt *Eingebaute Figur übernehmen* die
+eingebaute Figur samt Plätzen in die Felder – dann kannst du sie ändern und
+siehst die Wirkung sofort in der Vorschau. Angelegtes ohne Platz an der Figur
+steht in der Liste unter „Angelegt“.
 
 | Stil          | Aussehen                                                        |
 |---------------|-----------------------------------------------------------------|
@@ -1544,6 +1653,7 @@ rahmen      = "unicode"     # unicode = ╔═╗-Rahmen, ascii = +-+ (für alte
 | `beides`      | `sp` kompakt, `sp voll` ganzer Bogen                            |
 | `buch`        | Spielerbuch als Buch mit Abschnitten                            |
 | `schalter`    | Spielerbuch als Liste mit [x]-Schaltern                         |
+| `figur` (Inventar) | angelegte Dinge stehen an einer Figur, alles andere nach Art geordnet daneben |
 
 Ist das Fenster des Spielers zu schmal, fällt die Anzeige von selbst auf
 `einfach` zurück. Clients ohne UTF-8 bekommen automatisch ASCII-Rahmen.

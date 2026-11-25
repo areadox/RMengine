@@ -77,12 +77,16 @@ struct Datei {
 pub enum Treffer {
     Befehl(&'static str),
     Geste(usize),
+    /// Eigener Befehl (Index in `eigene`)
+    Eigen(usize),
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct Befehle {
     pub anpassung: BTreeMap<String, Anpassung>,
     pub gesten: Vec<GesteDef>,
+    /// IDs der eigenen Befehle (daten/eigene_befehle)
+    pub eigene: Vec<String>,
     /// Eingetipptes Wort -> Befehl oder Geste
     wort: HashMap<String, Treffer>,
 }
@@ -151,7 +155,10 @@ pub fn dateien(ordner: &Path) -> Vec<std::path::PathBuf> {
 }
 
 /// Lädt alle Befehlsdateien (fehlen sie, gelten die Standardwerte).
-pub fn laden(ordner: &Path, fehler: &mut Vec<String>, warn: &mut Vec<String>) -> Befehle {
+pub fn laden(
+    ordner: &Path,
+    eigene: &BTreeMap<String, crate::daten::EigenerBefehlDef>,
+    fehler: &mut Vec<String>, warn: &mut Vec<String>) -> Befehle {
     let mut anpassung: BTreeMap<String, Anpassung> = BTreeMap::new();
     let mut gesten = Vec::new();
     for pfad in dateien(ordner) {
@@ -182,7 +189,7 @@ pub fn laden(ordner: &Path, fehler: &mut Vec<String>, warn: &mut Vec<String>) ->
         gesten.extend(datei.geste);
     }
 
-    let mut b = Befehle { anpassung, gesten, wort: HashMap::new() };
+    let mut b = Befehle { anpassung, gesten, eigene: eigene.keys().cloned().collect(), wort: HashMap::new() };
     let ids: Vec<String> = EINGEBAUT.iter().map(|e| e.id.to_string()).collect();
 
     // Unbekannte Befehle und ungültige Werte
@@ -254,6 +261,15 @@ pub fn laden(ordner: &Path, fehler: &mut Vec<String>, warn: &mut Vec<String>) ->
             eintragen(&mut b, w, Treffer::Geste(i), name.clone());
         }
     }
+    for (i, e) in eigene.values().enumerate() {
+        if !e.aktiv {
+            continue;
+        }
+        let name = format!("eigener Befehl {}", e.id);
+        for w in &e.woerter {
+            eintragen(&mut b, w, Treffer::Eigen(i), name.clone());
+        }
+    }
     b
 }
 
@@ -264,7 +280,7 @@ mod tests {
     #[test]
     fn standardwoerter_ohne_datei() {
         let (mut f, mut w) = (Vec::new(), Vec::new());
-        let b = laden(Path::new("/gibt/es/nicht"), &mut f, &mut w);
+        let b = laden(Path::new("/gibt/es/nicht"), &BTreeMap::new(), &mut f, &mut w);
         assert!(f.is_empty(), "{f:?}");
         assert!(w.is_empty(), "{w:?}");
         assert!(matches!(b.aufloesen("kill"), Some(Treffer::Befehl("toete"))));

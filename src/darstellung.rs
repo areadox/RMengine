@@ -14,6 +14,8 @@ pub const SPIELSTAND_STILE: &[&str] = &["einfach", "bogen", "kompakt", "beides"]
 pub const SPIELERBUCH_STILE: &[&str] = &["einfach", "buch", "schalter"];
 pub const RAHMEN_STILE: &[&str] = &["unicode", "ascii"];
 pub const GELD_ANZEIGEN: &[&str] = &["lang", "kurz"];
+pub const INVENTAR_STILE: &[&str] = &["einfach", "figur"];
+pub const AUSRICHTUNGEN: &[&str] = &["links", "rechts"];
 
 // ---------------------------------------------------------------------------
 // Text-Hilfen (Farbmarkierungen zählen nicht zur Breite)
@@ -726,8 +728,185 @@ fn spielerbuch_schalter(b: &Buch) -> String {
 }
 
 // ---------------------------------------------------------------------------
+// Inventar mit Figur
+// ---------------------------------------------------------------------------
+
+/// Wo ein angelegter Gegenstand an der Figur steht.
+#[derive(Debug, Clone)]
+pub struct FigurPlatz {
+    pub platz: String,
+    /// Zeile und Spalte im Bild (ab 0)
+    pub zeile: usize,
+    pub spalte: usize,
+    /// true = der Name endet an der Spalte (für Plätze links der Figur)
+    pub rechts: bool,
+}
+
+/// Die eingebaute Figur.
+pub const STANDARD_FIGUR: &str = r"                      ___
+                     /   \
+                     |   |
+                     \___/
+                   ___/ \___
+                  /         \
+                 / /|     |\ \
+                / / |     | \ \
+                 /  |     |  \
+                    |  _  |
+                    / / \ \
+                   / /   \ \
+                 _/ /     \ \_
+                |__/       \__|";
+
+/// Wo die Namen an der eingebauten Figur stehen.
+pub fn standard_plaetze() -> Vec<FigurPlatz> {
+    let p = |platz: &str, zeile, spalte, rechts| FigurPlatz { platz: platz.into(), zeile, spalte, rechts };
+    vec![
+        p("kopf", 1, 27, false),
+        p("hals", 3, 27, false),
+        p("umhang", 4, 29, false),
+        p("koerper", 5, 30, false),
+        p("ruecken", 6, 32, false),
+        p("schild", 7, 33, false),
+        p("haende", 8, 31, false),
+        p("guertel", 9, 28, false),
+        p("beine", 11, 29, false),
+        p("fuesse", 13, 32, false),
+        p("licht", 5, 17, true),
+        p("waffe", 7, 15, true),
+        p("ring", 8, 16, true),
+    ]
+}
+
+pub struct Inventar {
+    /// (Platz-ID, Name des Gegenstands)
+    pub angelegt: Vec<(String, String)>,
+    /// Überschrift -> Einträge
+    pub gruppen: Vec<(String, Vec<String>)>,
+    /// Zeilen unter allem (Behälter, Gewicht, Geld)
+    pub fuss: Vec<String>,
+}
+
+/// Kurzer Name ohne Artikel: "ein roter Heiltrank" -> "Roter Heiltrank"
+pub fn kurzname(name: &str) -> String {
+    const ARTIKEL: &[&str] = &["ein", "eine", "einen", "einer", "eines", "der", "die", "das", "den", "dem", "des", "etwas"];
+    let rest = match name.split_once(' ') {
+        Some((a, r)) if ARTIKEL.contains(&a.to_lowercase().as_str()) => r,
+        _ => name,
+    };
+    let mut c = rest.chars();
+    match c.next() {
+        Some(e) => e.to_uppercase().chain(c).collect(),
+        None => String::new(),
+    }
+}
+
+/// Inventar mit Figur. None, wenn es nicht in die Breite passt.
+pub fn inventar_figur(inv: &Inventar, bild: &str, plaetze: &[FigurPlatz], breite: usize) -> Option<String> {
+    const MAX_NAME: usize = 18;
+    // Bild als Raster; true = gehört zu einem Namen (wird farbig)
+    let mut raster: Vec<Vec<(char, bool)>> = bild.lines().map(|z| z.trim_end().chars().map(|c| (c, false)).collect()).collect();
+    let mut ohne_platz: Vec<String> = Vec::new();
+    for (platz, name) in &inv.angelegt {
+        let Some(p) = plaetze.iter().find(|p| p.platz == *platz) else {
+            ohne_platz.push(kurzname(name));
+            continue;
+        };
+        let mut n: Vec<char> = kurzname(name).chars().collect();
+        let max = if p.rechts { (p.spalte + 1).min(MAX_NAME) } else { MAX_NAME };
+        if n.len() > max {
+            n.truncate(max.saturating_sub(1));
+            n.push('…');
+        }
+        let start = if p.rechts { (p.spalte + 1).saturating_sub(n.len()) } else { p.spalte };
+        while raster.len() <= p.zeile {
+            raster.push(Vec::new());
+        }
+        let z = &mut raster[p.zeile];
+        while z.len() < start + n.len() {
+            z.push((' ', false));
+        }
+        for (i, c) in n.into_iter().enumerate() {
+            z[start + i] = (c, true);
+        }
+    }
+    // Liste rechts
+    let mut liste: Vec<String> = Vec::new();
+    let mut gruppen = inv.gruppen.clone();
+    if !ohne_platz.is_empty() {
+        gruppen.insert(0, ("Angelegt".into(), ohne_platz));
+    }
+    for (titel, eintraege) in &gruppen {
+        if eintraege.is_empty() {
+            continue;
+        }
+        if !liste.is_empty() {
+            liste.push(String::new());
+        }
+        liste.push(format!("{{gelb}}{titel}{{/}}"));
+        liste.extend(eintraege.iter().cloned());
+    }
+    if liste.is_empty() {
+        liste.push("{grau}Du trägst nichts bei dir.{/}".into());
+    }
+    let links_breite = raster.iter().map(|z| z.len()).max().unwrap_or(0) + 3;
+    let rest = breite.saturating_sub(links_breite + 1);
+    if rest < 16 {
+        return None;
+    }
+    let mut t = String::new();
+    for i in 0..raster.len().max(liste.len()) {
+        let mut zeile = String::new();
+        let mut farbig = false;
+        let leer = Vec::new();
+        let z = raster.get(i).unwrap_or(&leer);
+        for (c, name) in z {
+            if *name != farbig {
+                zeile.push_str(if *name { "{hellcyan}" } else { "{/}" });
+                farbig = *name;
+            }
+            zeile.push(*c);
+        }
+        if farbig {
+            zeile.push_str("{/}");
+        }
+        zeile.push_str(&" ".repeat(links_breite - z.len()));
+        if let Some(e) = liste.get(i) {
+            zeile.push_str(&links(e, rest));
+        }
+        t.push_str(zeile.trim_end());
+        t.push('\n');
+    }
+    for f in &inv.fuss {
+        t.push_str(f);
+        t.push('\n');
+    }
+    Some(t.trim_end().to_string())
+}
+
+// ---------------------------------------------------------------------------
 // Beispiele (für die Vorschau im Editor und für Tests)
 // ---------------------------------------------------------------------------
+
+#[allow(dead_code)]
+pub fn beispiel_inventar(geld: &str) -> Inventar {
+    let g = |t: &str, e: &[&str]| (t.to_string(), e.iter().map(|s| s.to_string()).collect::<Vec<_>>());
+    Inventar {
+        angelegt: vec![
+            ("waffe".into(), "ein Messer".into()),
+            ("kopf".into(), "eine Lederkappe".into()),
+            ("koerper".into(), "ein Lederwams".into()),
+            ("licht".into(), "eine Fackel".into()),
+        ],
+        gruppen: vec![
+            g("Waffen", &["Kurzschwert"]),
+            g("Tränke", &["Roter Heiltrank (2)"]),
+            g("Sonstiges", &["Karte", "Spielerbuch"]),
+            g("Essen", &["Handvoll Schwarzbeeren"]),
+        ],
+        fuss: vec![format!("{{grau}}Gewicht 9/70{{/}}   Geld: {{hellgelb}}{geld}{{/}}")],
+    }
+}
 
 #[allow(dead_code)]
 pub fn beispiel_laden(gruppiert: bool, geld: &dyn Fn(u64) -> String) -> Laden {
@@ -885,5 +1064,19 @@ mod tests {
         let t = spielerbuch("buch", &beispiel_buch(), 78);
         let breiten: Vec<usize> = t.lines().map(breite).collect();
         assert!(breiten.windows(2).all(|w| w[0] == w[1]), "{breiten:?}\n{}", ohne_farben(&t));
+    }
+
+    #[test]
+    fn inventar_figur() {
+        let inv = beispiel_inventar("1 Gold");
+        let t = super::inventar_figur(&inv, STANDARD_FIGUR, &standard_plaetze(), 78).expect("passt in 78");
+        let roh = ohne_farben(&t);
+        for name in ["Messer", "Lederkappe", "Lederwams", "Fackel", "Kurzschwert", "Waffen"] {
+            assert!(roh.contains(name), "{name} fehlt:\n{roh}");
+        }
+        assert!(roh.lines().all(|z| z.chars().count() <= 78), "{roh}");
+        assert!(super::inventar_figur(&inv, STANDARD_FIGUR, &standard_plaetze(), 50).is_none());
+        assert_eq!(kurzname("ein roter Heiltrank"), "Roter Heiltrank");
+        assert_eq!(kurzname("Handvoll Beeren"), "Handvoll Beeren");
     }
 }

@@ -37,7 +37,7 @@ const KATEGORIEN: &[(&str, &str)] = &[
     ("schluessel", "Schlüssel"),
 ];
 
-fn kategorie(typ: &str) -> (usize, &'static str) {
+pub fn kategorie(typ: &str) -> (usize, &'static str) {
     KATEGORIEN.iter().position(|(t, _)| *t == typ).map(|i| (i, KATEGORIEN[i].1)).unwrap_or((KATEGORIEN.len(), "Sonstiges"))
 }
 

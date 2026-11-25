@@ -30,6 +30,8 @@ mod text;
 mod update;
 mod gemeinschaft;
 mod handel;
+mod neue_welt;
+mod eigene;
 mod quests;
 mod welt;
 mod wirkung;
@@ -92,7 +94,7 @@ async fn main() {
 
     if hat(&["--neue-welt"]) {
         let ordner = args.iter().find(|a| !a.starts_with("--")).map(PathBuf::from).unwrap_or_else(|| PathBuf::from("daten"));
-        match leere_welt_anlegen(&ordner) {
+        match neue_welt::anlegen(&ordner) {
             Ok(true) => println!("Leere Welt in '{}' angelegt.", ordner.display()),
             Ok(false) => println!("In '{}' gibt es schon eine Welt – nichts verändert.", ordner.display()),
             Err(e) => {
@@ -207,23 +209,6 @@ fn datenordner_suchen() -> PathBuf {
         .unwrap_or(hier)
 }
 
-/// Legt eine leere Welt an: welt.toml, ein Startraum und die üblichen Ordner.
-/// Eine vorhandene Welt wird nie angetastet (Ergebnis false).
-fn leere_welt_anlegen(ordner: &std::path::Path) -> std::io::Result<bool> {
-    if ordner.join("welt.toml").exists() {
-        return Ok(false);
-    }
-    for u in [
-        "raeume", "gegenstaende", "monster", "npcs", "fertigkeiten", "zauber", "beschreibungen",
-        "vorlagen", "rassen", "gilden", "berufe", "quests", "befehle",
-    ] {
-        std::fs::create_dir_all(ordner.join(u))?;
-    }
-    std::fs::write(ordner.join("raeume").join("start.toml"), include_str!("leere_welt/start.toml"))?;
-    std::fs::write(ordner.join("welt.toml"), include_str!("leere_welt/welt.toml"))?;
-    Ok(true)
-}
-
 /// Unter Windows schließt sich das Fenster sonst sofort und man kann nichts lesen.
 fn warten_und_beenden(code: i32) -> ! {
     if cfg!(windows) && std::env::var_os("PROMPT").is_none() {
@@ -240,8 +225,8 @@ mod tests {
     fn leere_welt_laedt_fehlerfrei() {
         let ordner = std::env::temp_dir().join(format!("rmengine_leer_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&ordner);
-        assert!(super::leere_welt_anlegen(&ordner).unwrap());
-        assert!(!super::leere_welt_anlegen(&ordner).unwrap(), "vorhandene Welt darf nicht überschrieben werden");
+        assert!(crate::neue_welt::anlegen(&ordner).unwrap());
+        assert!(!crate::neue_welt::anlegen(&ordner).unwrap(), "vorhandene Welt darf nicht überschrieben werden");
         let d = crate::daten::laden(&ordner).unwrap_or_else(|f| panic!("{f:?}"));
         assert!(d.warnungen.is_empty(), "{:?}", d.warnungen);
         assert_eq!(d.raeume.len(), 1);

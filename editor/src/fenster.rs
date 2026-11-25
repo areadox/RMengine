@@ -93,6 +93,12 @@ impl Default for ServerFenster {
 
 impl ServerFenster {
     /// Die Arbeitskopie, in der der Editor gerade arbeitet (falls es eine ist).
+    /// Das Formular für eine neue Verbindung zeigen (auch wenn eine Arbeitskopie offen ist)
+    pub fn anderen_zeigen(&mut self) {
+        self.anderer = true;
+        self.ausgabe = None;
+    }
+
     pub fn verbindung(&self, daten: &Path) -> Option<(PathBuf, Arbeitskopie, String)> {
         let (ordner, kopie) = Arbeitskopie::zu_datenordner(daten)?;
         let schluessel = if self.schluessel.trim().is_empty() { kopie.schluessel.clone().unwrap_or_default() } else { self.schluessel.clone() };

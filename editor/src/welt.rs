@@ -996,6 +996,15 @@ pub(crate) fn wert_setzen(t: &mut Table, k: &str, mut neu: Value) {
 }
 
 pub(crate) fn text_wert(v: &str) -> Value {
+    if v.contains('\n') && v.contains('\\') && !v.contains("'''") {
+        // Mit Backslashes (z.B. Bilder aus Zeichen): wörtlich, ohne Escapes
+        let roh = format!("'''\n{v}'''");
+        if let Ok(val) = roh.parse::<Value>() {
+            if val.as_str() == Some(v) {
+                return val;
+            }
+        }
+    }
     if v.contains('\n') {
         // Mehrzeilig wie in den Beispieldateien: """\n...\"""
         let roh = format!("\"\"\"\n{}\"\"\"", v.replace('\\', "\\\\").replace("\"\"\"", "\\\"\\\"\\\""));

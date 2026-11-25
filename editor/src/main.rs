@@ -1,7 +1,7 @@
 //! RMengine – Welteditor
 //!
 //! Aufruf:
-//!   rmeditor               sucht ./daten oder daten/ neben dem Programm
+//!   rmeditor               zeigt die Weltauswahl (oder sucht ./daten bzw. daten/ neben dem Programm)
 //!   rmeditor <datenordner> öffnet den angegebenen Ordner
 
 #![cfg_attr(windows, windows_subsystem = "windows")]
@@ -27,10 +27,13 @@ mod fernwartung_protokoll;
 #[path = "../../src/update.rs"]
 mod update;
 mod welt;
+mod weltliste;
+#[path = "../../src/neue_welt.rs"]
+mod neue_welt;
 
 fn main() -> eframe::Result {
     update::aufraeumen();
-    let ordner = app::ordner_suchen(std::env::args().nth(1));
+    let ordner = std::env::args().nth(1).map(std::path::PathBuf::from);
     let optionen = eframe::NativeOptions {
         viewport: eframe::egui::ViewportBuilder::default()
             .with_title("RMengine – Welteditor")

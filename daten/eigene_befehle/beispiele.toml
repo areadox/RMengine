@@ -1,0 +1,49 @@
+# =====================================================================
+#  Eigene Befehle
+# =====================================================================
+#  Wie Gesten, aber mit Bedingungen und Wirkungen. Am bequemsten im
+#  Welteditor unter 📚 Inhalte → ⌨ Eigene Befehle. Alle Felder stehen in
+#  der ANLEITUNG (Kapitel "Eigene Befehle").
+# =====================================================================
+
+# Im Tempel beten: heilt ein wenig, einmal pro Minute
+[[befehl]]
+id          = "beten"
+woerter     = ["bete", "beten"]
+hilfe       = "Im Tempel beten (heilt ein wenig)"
+raeume      = ["tempel"]
+nicht_hier  = "Zum Beten solltest du in den Tempel gehen."
+abklingzeit = 60
+nicht_im_kampf = true
+selbst      = "Du kniest nieder und sprichst ein leises Gebet. Wärme durchströmt dich."
+andere      = "{name} kniet nieder und betet leise."
+lp          = 15
+
+# Eine Münze in den Brunnen werfen: kostet 1 Kupfer, klappt nur manchmal
+[[befehl]]
+id          = "muenze_werfen"
+woerter     = ["wirf", "muenzwurf"]
+syntax      = "wirf muenze"
+hilfe       = "Eine Münze in den Dorfbrunnen werfen und sich etwas wünschen"
+raeume      = ["dorfplatz"]
+nicht_hier  = "Hier gibt es keinen Brunnen."
+kosten      = 1
+abklingzeit = 30
+chance      = 20
+selbst      = "Du wirfst eine Münze in den Brunnen und wünschst dir etwas. Ein Glitzern antwortet dir – du fühlst dich gestärkt!"
+andere      = "{name} wirft eine Münze in den Brunnen."
+misserfolg  = "Du wirfst eine Münze in den Brunnen. Sie versinkt plätschernd im dunklen Wasser."
+misserfolg_andere = "{name} wirft eine Münze in den Brunnen."
+mp          = 10
+
+# Segnen: nur Priester (Gilde), mit Ziel, kostet Mana
+# [[befehl]]
+# id          = "segnen"
+# woerter     = ["segne"]
+# syntax      = "segne <spieler>"
+# gilde       = "priester"
+# mana_kosten = 10
+# selbst_ziel = "Du segnest {ziel}."
+# ziel        = "{name} segnet dich. Du fühlst dich beschützt."
+# andere_ziel = "{name} segnet {ziel}."
+# zauber      = "schutzschild"

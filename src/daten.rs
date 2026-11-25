@@ -434,11 +434,57 @@ pub struct DarstellungConfig {
     pub spielerbuch: String,
     /// Rahmen: unicode oder ascii (alte Programme bekommen immer ascii)
     pub rahmen: String,
+    /// Inventar: einfach oder figur
+    pub inventar: String,
+    /// Eigene Figur fürs Inventar (leer = die eingebaute)
+    pub figur: String,
+    /// Wo die angelegten Gegenstände an der Figur stehen (leer bei eingebauter Figur = Standard)
+    pub figur_plaetze: Vec<FigurPlatzDef>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FigurPlatzDef {
+    pub platz: String,
+    pub zeile: usize,
+    pub spalte: usize,
+    /// links: Name beginnt an der Spalte, rechts: Name endet dort
+    #[serde(default = "standard_ausrichtung")]
+    pub ausrichtung: String,
+}
+
+fn standard_ausrichtung() -> String {
+    "links".into()
+}
+
+impl DarstellungConfig {
+    /// Bild und Plätze der Figur (eingebaut, wenn keine eigene angegeben ist)
+    pub fn figur(&self) -> (String, Vec<crate::darstellung::FigurPlatz>) {
+        let eigene: Vec<crate::darstellung::FigurPlatz> = self
+            .figur_plaetze
+            .iter()
+            .map(|p| crate::darstellung::FigurPlatz { platz: p.platz.clone(), zeile: p.zeile, spalte: p.spalte, rechts: p.ausrichtung == "rechts" })
+            .collect();
+        if self.figur.trim().is_empty() {
+            let plaetze = if eigene.is_empty() { crate::darstellung::standard_plaetze() } else { eigene };
+            (crate::darstellung::STANDARD_FIGUR.to_string(), plaetze)
+        } else {
+            (self.figur.trim_matches('\n').to_string(), eigene)
+        }
+    }
 }
 
 impl Default for DarstellungConfig {
     fn default() -> Self {
-        DarstellungConfig { haendler: "einfach".into(), spielstand: "einfach".into(), spielerbuch: "einfach".into(), rahmen: "unicode".into() }
+        DarstellungConfig {
+            haendler: "einfach".into(),
+            spielstand: "einfach".into(),
+            spielerbuch: "einfach".into(),
+            rahmen: "unicode".into(),
+            inventar: "einfach".into(),
+            figur: String::new(),
+            figur_plaetze: Vec::new(),
+        }
     }
 }
 
@@ -942,7 +988,7 @@ fn standard_questart() -> String {
 }
 
 pub const QUEST_ARTEN: &[&str] = &["aufgabe", "quest"];
-pub const SCHRITT_ARTEN: &[&str] = &["toeten", "bringen", "besuchen", "sprechen"];
+pub const SCHRITT_ARTEN: &[&str] = &["toeten", "bringen", "besuchen", "sprechen", "befehl"];
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -1042,6 +1088,122 @@ pub const WIRKUNGEN: &[&str] = &[
 pub const WIRKUNGEN_MIT_DAUER: &[&str] = &["schild", "ruestung", "bonus", "kraft", "tempo"];
 pub const ZAUBER_TYPEN: &[&str] = &["zauber", "technik"];
 
+/// Ein eigener Befehl mit Bedingungen und Wirkungen ([[befehl]] in daten/eigene_befehle/)
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EigenerBefehlDef {
+    pub id: String,
+    pub woerter: Vec<String>,
+    #[serde(default)]
+    pub hilfe: String,
+    #[serde(default)]
+    pub syntax: String,
+    #[serde(default = "standard_rolle_befehl")]
+    pub rolle: String,
+    #[serde(default = "wahr")]
+    pub aktiv: bool,
+    // --- Bedingungen ---
+    /// Nur in diesen Räumen (leer = überall)
+    #[serde(default)]
+    pub raeume: Vec<String>,
+    /// Nur in diesen Gebieten (leer = überall)
+    #[serde(default)]
+    pub gebiete: Vec<String>,
+    /// Diese Gegenstände muss man dabeihaben (Inventar oder angelegt)
+    #[serde(default)]
+    pub braucht: Vec<String>,
+    #[serde(default)]
+    pub mindest_stufe: u32,
+    #[serde(default)]
+    pub gilde: String,
+    #[serde(default)]
+    pub beruf: String,
+    #[serde(default)]
+    pub fertigkeit: String,
+    #[serde(default)]
+    pub fertigkeit_stufe: u32,
+    #[serde(default)]
+    pub mana_kosten: i32,
+    #[serde(default)]
+    pub ausdauer_kosten: i32,
+    /// Kostet Geld (kleinste Einheit)
+    #[serde(default)]
+    pub kosten: u64,
+    /// Sekunden, bis man den Befehl wieder benutzen kann
+    #[serde(default)]
+    pub abklingzeit: u64,
+    #[serde(default)]
+    pub nicht_im_kampf: bool,
+    /// Meldung, wenn Raum/Gebiet nicht passen
+    #[serde(default)]
+    pub nicht_hier: String,
+    // --- Texte (wie bei Gesten) ---
+    #[serde(default)]
+    pub selbst: String,
+    #[serde(default)]
+    pub andere: String,
+    #[serde(default)]
+    pub selbst_ziel: String,
+    #[serde(default)]
+    pub ziel: String,
+    #[serde(default)]
+    pub andere_ziel: String,
+    // --- Zufall ---
+    /// Erfolgschance in Prozent (0 oder 100 = immer)
+    #[serde(default)]
+    pub chance: u32,
+    #[serde(default)]
+    pub misserfolg: String,
+    #[serde(default)]
+    pub misserfolg_andere: String,
+    // --- Wirkungen (nur bei Erfolg) ---
+    #[serde(default)]
+    pub lp: i32,
+    #[serde(default)]
+    pub mp: i32,
+    #[serde(default)]
+    pub ausdauer: i32,
+    #[serde(default)]
+    pub geld: u64,
+    #[serde(default)]
+    pub erfahrung: u64,
+    /// Diese Gegenstände bekommt man
+    #[serde(default)]
+    pub gib: Vec<String>,
+    /// Diese Gegenstände werden verbraucht (müssen dabei sein)
+    #[serde(default)]
+    pub nimm: Vec<String>,
+    /// In diesen Raum versetzen
+    #[serde(default)]
+    pub teleport: String,
+    /// Die Wirkungen dieses Zaubers auf sich legen (ohne Kosten), z.B. ein Schild
+    #[serde(default)]
+    pub zauber: String,
+    /// Danach diese Befehle ausführen ({rest} = was hinter dem Befehl steht)
+    #[serde(default, deserialize_with = "text_oder_liste")]
+    pub befehle: Vec<String>,
+    #[serde(skip)]
+    pub quelle: String,
+}
+
+/// Ein Text oder eine Liste von Texten
+fn text_oder_liste<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Vec<String>, D::Error> {
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum T {
+        Eins(String),
+        Viele(Vec<String>),
+    }
+    Ok(match T::deserialize(d)? {
+        T::Eins(s) => vec![s],
+        T::Viele(v) => v,
+    })
+}
+
+fn standard_rolle_befehl() -> String {
+    "spieler".into()
+}
+
 #[derive(Debug, Clone)]
 pub struct Daten {
     pub welt: WeltConfig,
@@ -1056,6 +1218,7 @@ pub struct Daten {
     pub gilden: BTreeMap<String, GemeinschaftDef>,
     pub berufe: BTreeMap<String, GemeinschaftDef>,
     pub quests: BTreeMap<String, QuestDef>,
+    pub eigene_befehle: BTreeMap<String, EigenerBefehlDef>,
     /// Welcher Raum liegt an welcher Koordinate?
     /// (karte, x, y, z) -> Raum
     pub koordinaten: HashMap<(String, i32, i32, i32), String>,
@@ -1243,6 +1406,7 @@ pub fn laden(ordner: &Path) -> Result<Daten, Vec<String>> {
         gilden: BTreeMap::new(),
         berufe: BTreeMap::new(),
         quests: BTreeMap::new(),
+        eigene_befehle: BTreeMap::new(),
         koordinaten: HashMap::new(),
         deko_farben: wd.deko,
         namen: wd.namen,
@@ -1304,6 +1468,7 @@ pub fn laden(ordner: &Path) -> Result<Daten, Vec<String>> {
     let mut gilden: Vec<(String, GemeinschaftDef)> = Vec::new();
     let mut berufe: Vec<(String, GemeinschaftDef)> = Vec::new();
     let mut quests: Vec<(String, QuestDef)> = Vec::new();
+    let mut eigene: Vec<(String, EigenerBefehlDef)> = Vec::new();
     for (i, t) in fertig {
         let r = &roh[i];
         let id = t.get("id").and_then(|v| v.as_str()).unwrap_or("?").to_string();
@@ -1328,6 +1493,7 @@ pub fn laden(ordner: &Path) -> Result<Daten, Vec<String>> {
             "gilde" => umwandeln!(gilden),
             "beruf" => umwandeln!(berufe),
             "quest" => umwandeln!(quests),
+            "befehl" => umwandeln!(eigene),
             _ => umwandeln!(bibliothek),
         }
     }
@@ -1362,9 +1528,10 @@ pub fn laden(ordner: &Path) -> Result<Daten, Vec<String>> {
     einsortieren!(gilden, d.gilden, "Gilde");
     einsortieren!(berufe, d.berufe, "Beruf");
     einsortieren!(quests, d.quests, "Quest");
+    einsortieren!(eigene, d.eigene_befehle, "Befehl");
 
     d.oberwelt = oberwelt::laden(ordner, &mut fehler);
-    d.befehle = crate::befehlskonfig::laden(ordner, &mut fehler, &mut warnungen);
+    d.befehle = crate::befehlskonfig::laden(ordner, &d.eigene_befehle, &mut fehler, &mut warnungen);
     pruefen(&mut d, &mut fehler, &mut warnungen);
 
     if fehler.is_empty() {
@@ -1451,7 +1618,7 @@ struct Roh {
 }
 
 const ARTEN: &[&str] =
-    &["raum", "gegenstand", "monster", "npc", "fertigkeit", "zauber", "beschreibung", "rasse", "gilde", "beruf", "quest"];
+    &["raum", "gegenstand", "monster", "npc", "fertigkeit", "zauber", "beschreibung", "rasse", "gilde", "beruf", "quest", "befehl"];
 
 fn art_anzeige(art: &str) -> &'static str {
     match art {
@@ -1465,6 +1632,7 @@ fn art_anzeige(art: &str) -> &'static str {
         "gilde" => "Gilde",
         "beruf" => "Beruf",
         "quest" => "Quest",
+        "befehl" => "Befehl",
         _ => "Beschreibung",
     }
 }
@@ -2096,6 +2264,42 @@ fn pruefen(d: &mut Daten, fehler: &mut Vec<String>, warn: &mut Vec<String>) {
     }
 
     // --- Quests ---
+    for b in d.eigene_befehle.values() {
+        let wo = format!("[{}] Befehl '{}'", b.quelle, b.id);
+        if b.woerter.iter().all(|x| x.trim().is_empty()) {
+            fehler.push(format!("{wo}: 'woerter' fehlt – womit ruft man den Befehl auf?"));
+        }
+        if !["spieler", "baumeister", "admin"].contains(&b.rolle.as_str()) {
+            fehler.push(format!("{wo}: Rolle '{}' gibt es nicht. Erlaubt: spieler, baumeister, admin", b.rolle));
+        }
+        for r in &b.raeume {
+            raum_verweis(d, r, &format!("{wo}, raeume"), fehler);
+        }
+        if !b.teleport.is_empty() {
+            raum_verweis(d, &b.teleport, &format!("{wo}, teleport"), fehler);
+        }
+        for g in b.braucht.iter().chain(&b.gib).chain(&b.nimm) {
+            verweis(&d.gegenstaende, g, &format!("{wo}, Gegenstände"), "Gegenstand", fehler);
+        }
+        if !b.gilde.is_empty() {
+            verweis(&d.gilden, &b.gilde, &wo, "Gilde", fehler);
+        }
+        if !b.beruf.is_empty() {
+            verweis(&d.berufe, &b.beruf, &wo, "Beruf", fehler);
+        }
+        if !b.fertigkeit.is_empty() {
+            verweis(&d.fertigkeiten, &b.fertigkeit, &wo, "Fertigkeit", fehler);
+        }
+        if !b.zauber.is_empty() {
+            verweis(&d.zauber, &b.zauber, &wo, "Zauber", fehler);
+        }
+        if b.chance > 100 {
+            fehler.push(format!("{wo}: 'chance' ist in Prozent (0 bis 100)."));
+        }
+        if b.selbst.trim().is_empty() && b.selbst_ziel.trim().is_empty() && b.befehle.is_empty() {
+            warn.push(format!("{wo}: Es gibt keinen Text 'selbst' – der Spieler sieht nicht, dass etwas passiert."));
+        }
+    }
     for q in d.quests.values() {
         let wo = format!("[{}] Quest '{}'", q.quelle, q.id);
         if !QUEST_ARTEN.contains(&q.art.as_str()) {
@@ -2127,6 +2331,7 @@ fn pruefen(d: &mut Daten, fehler: &mut Vec<String>, warn: &mut Vec<String>) {
                 }
                 "besuchen" => raum_verweis(d, &sch.ziel, &wo, fehler),
                 "sprechen" => verweis(&d.monster, &sch.ziel, &wo, "NPC", fehler),
+                "befehl" => verweis(&d.eigene_befehle, &sch.ziel, &wo, "eigenen Befehl", fehler),
                 a => fehler.push(format!("{wo}: Art '{a}' gibt es nicht. Erlaubt: {}", SCHRITT_ARTEN.join(", "))),
             }
             if sch.anzahl == 0 {
@@ -2170,9 +2375,18 @@ fn pruefen(d: &mut Daten, fehler: &mut Vec<String>, warn: &mut Vec<String>) {
             ("spielstand", &ds.spielstand, crate::darstellung::SPIELSTAND_STILE),
             ("spielerbuch", &ds.spielerbuch, crate::darstellung::SPIELERBUCH_STILE),
             ("rahmen", &ds.rahmen, crate::darstellung::RAHMEN_STILE),
+            ("inventar", &ds.inventar, crate::darstellung::INVENTAR_STILE),
         ] {
             if !erlaubt.contains(&wert.as_str()) {
                 fehler.push(format!("welt.toml [darstellung]: {feld} = '{wert}' gibt es nicht. Erlaubt: {}", erlaubt.join(", ")));
+            }
+        }
+        for p in &ds.figur_plaetze {
+            if !PLAETZE.contains(&p.platz.as_str()) {
+                fehler.push(format!("welt.toml [darstellung] figur_plaetze: Platz '{}' gibt es nicht. Bekannt: {}", p.platz, PLAETZE.join(", ")));
+            }
+            if !crate::darstellung::AUSRICHTUNGEN.contains(&p.ausrichtung.as_str()) {
+                fehler.push(format!("welt.toml [darstellung] figur_plaetze: ausrichtung '{}' – erlaubt: links, rechts", p.ausrichtung));
             }
         }
     }

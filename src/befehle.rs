@@ -23,6 +23,18 @@ fn breite(w: &Welt, sid: u64) -> usize {
     w.spieler.get(&sid).map(|s| s.breite()).unwrap_or(78)
 }
 
+thread_local! {
+    /// Während eigene Befehle weitere Befehle ausführen, keinen Prompt zeigen
+    static OHNE_PROMPT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Einen Befehl ausführen, ohne danach den Prompt zu zeigen (für eigene Befehle).
+pub(crate) fn befehl_ohne_prompt(w: &mut Welt, sid: u64, eingabe: &str) {
+    let vorher = OHNE_PROMPT.with(|o| o.replace(true));
+    let _ = ausfuehren(w, sid, eingabe);
+    OHNE_PROMPT.with(|o| o.set(vorher));
+}
+
 pub fn ausfuehren(w: &mut Welt, sid: u64, eingabe: &str) -> Folge {
     if !w.spieler.contains_key(&sid) {
         return Folge::Beenden;
@@ -75,6 +87,15 @@ pub fn ausfuehren(w: &mut Welt, sid: u64, eingabe: &str) -> Folge {
                 w.sende(sid, TOT);
             } else {
                 geste(w, sid, i, rest);
+            }
+            prompt(w, sid);
+            return Folge::Weiter;
+        }
+        Some(Treffer::Eigen(i)) => {
+            if tot {
+                w.sende(sid, TOT);
+            } else {
+                crate::eigene::ausfuehren(w, sid, i, rest);
             }
             prompt(w, sid);
             return Folge::Weiter;
@@ -316,6 +337,9 @@ fn geste(w: &Welt, sid: u64, i: usize, rest: &str) {
 }
 
 pub fn prompt(w: &Welt, sid: u64) {
+    if OHNE_PROMPT.with(|o| o.get()) {
+        return;
+    }
     crate::clientdaten::werte(w, sid);
     prompt_text(w, sid);
     // Ende des Prompts markieren (EOR oder GA), damit Clients ihn erkennen
@@ -407,6 +431,10 @@ fn hilfe(w: &Welt, sid: u64, rolle: Rolle, rest: &str) {
                     if g.selbst_ziel.is_empty() { "" } else { "\n  Auch mit Ziel: z.B. mit dem Namen eines Spielers" }
                 )
             }
+            Some(Treffer::Eigen(i)) => match b.eigene.get(i).and_then(|id| w.d.eigene_befehle.get(id)) {
+                Some(e) if darf(&e.rolle) => crate::eigene::hilfe_text(e),
+                _ => "Diesen Befehl kenne ich nicht.".to_string(),
+            },
             _ => "Diesen Befehl kenne ich nicht.".to_string(),
         };
         w.sende(sid, &t);
@@ -440,6 +468,19 @@ fn hilfe(w: &Welt, sid: u64, rolle: Rolle, rest: &str) {
         .filter(|g| g.aktiv && darf(&g.rolle))
         .filter_map(|g| g.woerter.first().cloned())
         .collect();
+    let eigene: Vec<String> = w
+        .d
+        .eigene_befehle
+        .values()
+        .filter(|e| e.aktiv && darf(&e.rolle))
+        .map(|e| {
+            let kopf = if e.syntax.is_empty() { e.woerter.first().cloned().unwrap_or_default() } else { e.syntax.clone() };
+            format!("  {} {}", text::auffuellen(&format!("{{gelb}}{kopf}{{/}}"), 30), e.hilfe)
+        })
+        .collect();
+    if !eigene.is_empty() {
+        t.push_str(&format!("\n{{fett}}Besondere Befehle{{/}}\n{}\n", eigene.join("\n")));
+    }
     if !gesten.is_empty() {
         t.push_str(&format!("\n{{fett}}Gesten{{/}}\n  {}\n", gesten.join(", ")));
     }
@@ -479,7 +520,7 @@ pub(crate) fn finde_monster(w: &Welt, raum: &str, such: &str) -> Option<u64> {
     })
 }
 
-fn finde_spieler_im_raum(w: &Welt, raum: &str, such: &str) -> Option<u64> {
+pub(crate) fn finde_spieler_im_raum(w: &Welt, raum: &str, such: &str) -> Option<u64> {
     let s = normalisieren(such);
     w.spieler_im_raum(raum)
         .into_iter()
@@ -987,6 +1028,12 @@ fn fallenlassen(w: &mut Welt, sid: u64, such: &str) {
 }
 
 fn inventar(w: &Welt, sid: u64) {
+    if w.d.darstellung.inventar == "figur" {
+        if let Some(t) = inventar_figur(w, sid) {
+            w.sende(sid, &t);
+            return;
+        }
+    }
     let sp = &w.spieler[&sid].sp;
     let mut t = String::from("{fett}Du trägst bei dir:{/}\n");
     if sp.inventar.is_empty() {
@@ -1012,6 +1059,34 @@ fn inventar(w: &Welt, sid: u64) {
     t.push_str(&crate::behaelter::inventar_zeilen(w, sid));
     t.push_str(&format!("{{grau}}{}{{/}}   Geld: {{hellgelb}}{}{{/}}", crate::behaelter::gewicht_text(w, sid), crate::handel::betrag(w, sp.geld)));
     w.sende(sid, &t);
+}
+
+/// Inventar mit Figur: angelegte Dinge an der Figur, der Rest nach Art geordnet daneben.
+fn inventar_figur(w: &Welt, sid: u64) -> Option<String> {
+    use crate::darstellung::{kurzname, Inventar};
+    let sp = &w.spieler[&sid].sp;
+    let angelegt = sp.ausruestung.iter().map(|(p, id)| (p.clone(), w.d.gegenstand_name(id))).collect();
+    let mut gruppen: Vec<(usize, String, Vec<String>)> = Vec::new();
+    for (id, n) in gruppieren(&sp.inventar) {
+        let typ = w.d.gegenstaende.get(&id).map(|g| g.typ.clone()).unwrap_or_default();
+        let (rang, titel) = crate::handel::kategorie(&typ);
+        let name = kurzname(&w.d.gegenstand_name(&id));
+        let eintrag = if n > 1 { format!("{name} ({n})") } else { name };
+        match gruppen.iter_mut().find(|g| g.1 == titel) {
+            Some(g) => g.2.push(eintrag),
+            None => gruppen.push((rang, titel.to_string(), vec![eintrag])),
+        }
+    }
+    gruppen.sort_by_key(|g| g.0);
+    let mut fuss: Vec<String> = Vec::new();
+    let behaelter = crate::behaelter::inventar_zeilen(w, sid);
+    if !behaelter.trim().is_empty() {
+        fuss.push(behaelter.trim_end().to_string());
+    }
+    fuss.push(format!("{{grau}}{}{{/}}   Geld: {{hellgelb}}{}{{/}}", crate::behaelter::gewicht_text(w, sid), crate::handel::betrag(w, sp.geld)));
+    let inv = Inventar { angelegt, gruppen: gruppen.into_iter().map(|g| (g.1, g.2)).collect(), fuss };
+    let (bild, plaetze) = w.d.darstellung.figur();
+    crate::darstellung::inventar_figur(&inv, &bild, &plaetze, breite(w, sid))
 }
 
 fn anlegen(w: &mut Welt, sid: u64, such: &str) {

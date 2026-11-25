@@ -78,7 +78,8 @@ das Update und veröffentlicht alles als Release.
 - **Kampftechniken** (`spezial`) mit Waffenschlag, Mana- und Ausdauerkosten, Betäuben – nur für Gilden
 - **Bereitschaft** (`bereite`): Der Autoangriff setzt einen Zauber (mit Zauberstab) oder eine Technik von selbst ein
 - **Geld** mit eigenen Münzstufen (z.B. Gold/Silber/Kupfer), **Händler** (`waren`, `kaufe`, `verkaufe`) und **Lehrmeister** (`lerne`)
-- **Wählbare Darstellung** für Händlerlisten, Spielstand und Spielerbuch, mit Vorschau im Editor
+- **Wählbare Darstellung** für Händlerlisten, Spielstand, Spielerbuch und Inventar (auch als Figur), mit Vorschau im Editor
+- **Eigene Befehle** mit Bedingungen (Ort, Gegenstände, Gilde, Kosten, Abklingzeit, Zufall) und Wirkungen (Heilen, Geld, Gegenstände, Teleport, Zauber, weitere Befehle) – im Editor bearbeitbar
 - **Rassen** (Wahl bei der Erschaffung), **Gilden** und **Berufe** als Grundlage zum Ausbauen
 - **Aufgaben und Quests** mit Schritten (töten, bringen, besuchen, sprechen) und Belohnungen
 - Karte, die durch eine **Fertigkeit** größer wird
@@ -116,6 +117,8 @@ das Update und veröffentlicht alles als Release.
 | `kampf.rs`   | Kampf, Stufen, Tod und Wiederbelebung                        |
 | `wirkung.rs` | Wirkungen mit Dauer: Schilde, Stärkungen, Gift               |
 | `handel.rs`  | Geld, Händler und Lehrmeister                                |
+| `eigene.rs`  | Eigene Befehle aus `daten/eigene_befehle/`                   |
+| `neue_welt.rs` | Leere Welt anlegen (`--neue-welt`, auch im Editor)         |
 | `darstellung.rs` | Stile für Händlerlisten, Spielstand, Spielerbuch; Geldbeträge (auch im Editor) |
 | `gemeinschaft.rs` | Rassen, Gilden und Berufe                               |
 | `quests.rs`  | Aufgaben und Quests                                          |

@@ -19,6 +19,8 @@ pub enum Ziel {
     Gilde,
     Beruf,
     Quest,
+    /// Eigene Befehle
+    Befehl,
     Beschreibung,
     /// Dieselbe Art wie der Eintrag (für erbt)
     Gleich,
@@ -28,6 +30,8 @@ pub enum Ziel {
 pub enum Typ {
     Text,
     Mehrzeilig,
+    /// Mehrzeiliges Bild aus Zeichen (Festbreitenschrift)
+    Bild,
     /// Ein Text oder eine Liste von Texten (eine Zeile = eine Möglichkeit)
     TextOderListe,
     Zahl,
@@ -119,7 +123,8 @@ pub const ZAUBER_TYPEN: &[&str] = &["zauber", "technik"];
 pub const WIRKUNGEN: &[&str] =
     &["heilen", "mana", "ausdauer", "schaden", "teleport", "schild", "ruestung", "bonus", "kraft", "tempo", "betaeuben"];
 pub const QUEST_ARTEN: &[&str] = &["aufgabe", "quest"];
-pub const SCHRITT_ARTEN: &[&str] = &["toeten", "bringen", "besuchen", "sprechen"];
+pub const SCHRITT_ARTEN: &[&str] = &["toeten", "bringen", "besuchen", "sprechen", "befehl"];
+pub const ROLLEN: &[&str] = &["spieler", "baumeister", "admin"];
 const EIGENSCHAFTEN: &[&str] = &["schaden", "ruestung", "heilung", "mana", "landkarte", "staerke", "geschick", "ausdauer", "intelligenz", "weisheit"];
 const WERTE: &[&str] = &["staerke", "geschick", "ausdauer", "intelligenz", "weisheit"];
 
@@ -343,7 +348,7 @@ const GILDE: &[Feld] = felder![
 
 const SCHRITT: &[Feld] = felder![
     f("art", "Art", Typ::Auswahl(SCHRITT_ARTEN), ""),
-    f("ziel", "Ziel", Typ::SchrittZiel, "Monster (toeten), Gegenstand (bringen), Raum (besuchen) oder NPC (sprechen)."),
+    f("ziel", "Ziel", Typ::SchrittZiel, "Monster (toeten), Gegenstand (bringen), Raum (besuchen), NPC (sprechen) oder eigener Befehl (befehl)."),
     f("anzahl", "Anzahl", Typ::Zahl, "Standard 1."),
     f("an", "Bringen an", Typ::Verweis(Ziel::Npc), "Leer = der Geber."),
     f("text", "Text im Aufgabenbuch", Typ::Text, "Leer = automatisch."),
@@ -356,6 +361,51 @@ const BELOHNUNG: &[Feld] = felder![
     f("zauber", "Zauber", Typ::VerweisListe(Ziel::Zauber), ""),
     f("titel", "Titel", Typ::Text, ""),
 ];
+const BEFEHL: &[Feld] = felder![
+    f("id", "ID", Typ::Text, "Interner Name, z.B. \"beten\"."),
+    f("woerter", "Wörter", Typ::Liste, "Womit man ihn aufruft, z.B. bete, beten. Das erste ist der Hauptname."),
+    f("hilfe", "Hilfe", Typ::Text, "Steht in der Befehlsliste (hilfe)."),
+    f("syntax", "Aufruf", Typ::Text, "z.B. \"segne <spieler>\" – für die Hilfe."),
+    f("rolle", "Rolle", Typ::Auswahl(ROLLEN), "Wer ihn benutzen darf (Standard: spieler)."),
+    f("aktiv", "Aktiv", Typ::Schalter, "Aus = abgeschaltet."),
+    // Bedingungen
+    f("raeume", "Nur in Räumen", Typ::VerweisListe(Ziel::Raum), "Leer = überall."),
+    f("gebiete", "Nur in Gebieten", Typ::Liste, "z.B. wald, dorf. Leer = überall."),
+    f("nicht_hier", "Text: falscher Ort", Typ::Text, "Leer = \"Das geht hier nicht.\""),
+    f("braucht", "Braucht Gegenstände", Typ::VerweisListe(Ziel::Gegenstand), "Muss man dabeihaben (bleiben erhalten)."),
+    f("nimm", "Verbraucht Gegenstände", Typ::VerweisListe(Ziel::Gegenstand), "Werden weggenommen."),
+    f("mindest_stufe", "Ab Stufe", Typ::Zahl, ""),
+    f("gilde", "Nur für Gilde", Typ::Verweis(Ziel::Gilde), ""),
+    f("beruf", "Nur mit Beruf", Typ::Verweis(Ziel::Beruf), ""),
+    f("fertigkeit", "Braucht Fertigkeit", Typ::Verweis(Ziel::Fertigkeit), ""),
+    f("fertigkeit_stufe", "... ab Stufe", Typ::Zahl, ""),
+    f("mana_kosten", "Kostet Mana", Typ::Zahl, ""),
+    f("ausdauer_kosten", "Kostet Ausdauer", Typ::Zahl, ""),
+    f("kosten", "Kostet Geld", Typ::Betrag, ""),
+    f("abklingzeit", "Abklingzeit (s)", Typ::Zahl, "So lange kann man ihn danach nicht wieder benutzen."),
+    f("nicht_im_kampf", "Nicht im Kampf", Typ::Schalter, ""),
+    // Texte
+    f("selbst", "Text für dich", Typ::Mehrzeilig, "Ohne Ziel. {name} = wer den Befehl benutzt, {rest} = was dahinter getippt wurde."),
+    f("andere", "Text für andere", Typ::Mehrzeilig, "Was die anderen im Raum lesen."),
+    f("selbst_ziel", "Mit Ziel: für dich", Typ::Mehrzeilig, "z.B. \"Du segnest {ziel}.\" Leer = kein Ziel möglich. {ziel_dativ} = \"dem Wirt\"."),
+    f("ziel", "Mit Ziel: fürs Ziel", Typ::Mehrzeilig, "Was das Ziel liest (nur Spieler)."),
+    f("andere_ziel", "Mit Ziel: für andere", Typ::Mehrzeilig, ""),
+    // Zufall
+    f("chance", "Erfolgschance %", Typ::Zahl, "0 oder 100 = klappt immer. Kosten werden auch bei Misserfolg fällig."),
+    f("misserfolg", "Text bei Misserfolg", Typ::Mehrzeilig, ""),
+    f("misserfolg_andere", "Misserfolg für andere", Typ::Mehrzeilig, ""),
+    // Wirkungen
+    f("lp", "Lebenspunkte +/-", Typ::Zahl, "Heilt (oder schadet, negativ)."),
+    f("mp", "Mana +/-", Typ::Zahl, ""),
+    f("ausdauer", "Ausdauer +", Typ::Zahl, ""),
+    f("geld", "Gibt Geld", Typ::Betrag, ""),
+    f("erfahrung", "Gibt Erfahrung", Typ::Zahl, ""),
+    f("gib", "Gibt Gegenstände", Typ::VerweisListe(Ziel::Gegenstand), ""),
+    f("teleport", "Versetzt nach", Typ::Verweis(Ziel::Raum), ""),
+    f("zauber", "Wirkung eines Zaubers", Typ::Verweis(Ziel::Zauber), "Legt dessen Wirkungen auf dich, ohne Kosten – z.B. einen Schild."),
+    f("befehle", "Danach ausführen", Typ::TextOderListe, "Weitere Befehle, eine Zeile pro Befehl, z.B. \"sage Hallo {rest}\"."),
+];
+
 const QUEST: &[Feld] = felder![
     f("id", "ID", Typ::Text, ""),
     f("name", "Name", Typ::Text, ""),
@@ -456,6 +506,15 @@ const DARSTELLUNG: &[Feld] = felder![
     f("spielstand", "Spielstand", Typ::Auswahl(crate::darstellung::SPIELSTAND_STILE), "beides: sp = kompakt, sp voll = Bogen."),
     f("spielerbuch", "Spielerbuch", Typ::Auswahl(crate::darstellung::SPIELERBUCH_STILE), ""),
     f("rahmen", "Rahmen", Typ::Auswahl(crate::darstellung::RAHMEN_STILE), "ascii = nur einfache Zeichen (+-|). Alte Programme bekommen das immer."),
+    f("inventar", "Inventar", Typ::Auswahl(crate::darstellung::INVENTAR_STILE), "figur = angelegte Dinge an einer Figur, der Rest nach Art geordnet daneben."),
+    f("figur", "Eigene Figur", Typ::Bild, "Leer = die eingebaute Figur. Tipp: unten in der Vorschau \"Eingebaute Figur übernehmen\"."),
+    f("figur_plaetze", "Plätze an der Figur", Typ::Tabellen { felder: FIGUR_PLATZ, inline: false }, "Wo die Namen der angelegten Dinge stehen. Leer bei eingebauter Figur = Standard."),
+];
+const FIGUR_PLATZ: &[Feld] = felder![
+    f("platz", "Platz", Typ::Auswahl(PLAETZE), ""),
+    f("zeile", "Zeile", Typ::Zahl, "Ab 0 (oberste Zeile der Figur)."),
+    f("spalte", "Spalte", Typ::Zahl, "Ab 0."),
+    f("ausrichtung", "Ausrichtung", Typ::Auswahl(crate::darstellung::AUSRICHTUNGEN), "links: Name beginnt an der Spalte. rechts: Name endet dort (für Plätze links der Figur)."),
 ];
 
 pub const ARTEN: &[Art] = &[
@@ -465,6 +524,7 @@ pub const ARTEN: &[Art] = &[
     Art { schluessel: "fertigkeit", titel: "Fertigkeiten", einzahl: "Fertigkeit", symbol: "📈", ordner: "fertigkeiten", ablage: Ablage::Liste, felder: FERTIGKEIT, hilfe: "" },
     Art { schluessel: "zauber", titel: "Zauber und Techniken", einzahl: "Zauber", symbol: "✨", ordner: "zauber", ablage: Ablage::Liste, felder: ZAUBER, hilfe: "Zauber (zaubere) und Kampftechniken (spezial). Wirkungen mit Dauer sind Schilde und Stärkungen." },
     Art { schluessel: "quest", titel: "Aufgaben und Quests", einzahl: "Quest", symbol: "📜", ordner: "quests", ablage: Ablage::Liste, felder: QUEST, hilfe: "Ein NPC bietet sie an (geber). Die Schritte werden der Reihe nach erledigt." },
+    Art { schluessel: "befehl", titel: "Eigene Befehle", einzahl: "Befehl", symbol: "⌨", ordner: "eigene_befehle", ablage: Ablage::Liste, felder: BEFEHL, hilfe: "Neue Befehle mit Bedingungen (Ort, Gegenstände, Gilde, Kosten) und Wirkungen (Heilen, Geld, Gegenstände, Teleport, Zauber, weitere Befehle). Für reine Texte gibt es Gesten unter ⌨ Befehle." },
     Art { schluessel: "rasse", titel: "Rassen", einzahl: "Rasse", symbol: "👥", ordner: "rassen", ablage: Ablage::Liste, felder: RASSE, hilfe: "Werden bei der Erschaffung einer Figur gewählt." },
     Art { schluessel: "gilde", titel: "Gilden", einzahl: "Gilde", symbol: "🛡", ordner: "gilden", ablage: Ablage::Liste, felder: GILDE, hilfe: "Man ist in höchstens einer Gilde. Beitreten bei einem NPC mit dieser Gilde." },
     Art { schluessel: "beruf", titel: "Berufe und Zünfte", einzahl: "Beruf", symbol: "⚒", ordner: "berufe", ablage: Ablage::Liste, felder: GILDE, hilfe: "Man kann mehrere Berufe haben (Welt → Berufe höchstens)." },
