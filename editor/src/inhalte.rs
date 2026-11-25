@@ -525,6 +525,89 @@ struct Kontext<'a> {
     art: &'static Art,
     ids: HashMap<&'static str, Vec<String>>,
     geerbt: BTreeMap<String, String>,
+    /// Geldeinheiten für die Anzeige von Beträgen
+    geld: (Vec<crate::darstellung::Einheit>, bool),
+}
+
+impl Kontext<'_> {
+    fn betrag(&self, n: i64) -> String {
+        crate::darstellung::betrag(n.max(0) as u64, &self.geld.0, self.geld.1)
+    }
+}
+
+/// Geldeinheiten aus einer [geld]-Tabelle (oder eine Einheit mit dem Namen aus waehrung).
+fn einheiten_aus(geld: Option<&dyn TableLike>, waehrung: &str) -> (Vec<crate::darstellung::Einheit>, bool) {
+    let kurz = geld.and_then(|g| g.get("anzeige")).and_then(|i| i.as_str()) == Some("kurz");
+    let mut v = Vec::new();
+    if let Some(g) = geld.and_then(|g| g.get("einheiten")) {
+        for e in untertabellen(g) {
+            let name = lies_text(e, "name");
+            let mehrzahl = lies_text(e, "mehrzahl");
+            v.push(crate::darstellung::Einheit {
+                mehrzahl: if mehrzahl.is_empty() { name.clone() } else { mehrzahl },
+                name,
+                kurz: lies_text(e, "kurz"),
+                wert: e.get("wert").and_then(|i| i.as_integer()).unwrap_or(0).max(0) as u64,
+            });
+        }
+    }
+    if v.iter().all(|e| e.wert == 0) {
+        let n = if waehrung.is_empty() { "Gold".to_string() } else { waehrung.to_string() };
+        v = vec![crate::darstellung::Einheit { name: n.clone(), mehrzahl: n, kurz: String::new(), wert: 1 }];
+    }
+    (v, kurz)
+}
+
+/// Text mit Farbmarkierungen ({gelb} ... {/}) farbig und in fester Schrift anzeigen.
+fn farbig(ui: &mut egui::Ui, text: &str) {
+    use egui::text::{LayoutJob, TextFormat};
+    let schrift = egui::FontId::monospace(13.0);
+    let standard = Color32::from_rgb(210, 210, 210);
+    let farbe = |name: &str| -> Option<Color32> {
+        Some(match name {
+            "rot" => Color32::from_rgb(205, 49, 49),
+            "gruen" => Color32::from_rgb(13, 188, 121),
+            "gelb" => Color32::from_rgb(229, 229, 16),
+            "blau" => Color32::from_rgb(36, 114, 200),
+            "magenta" => Color32::from_rgb(188, 63, 188),
+            "cyan" => Color32::from_rgb(17, 168, 205),
+            "weiss" => Color32::from_rgb(229, 229, 229),
+            "grau" => Color32::from_rgb(130, 130, 130),
+            "hellrot" => Color32::from_rgb(241, 76, 76),
+            "hellgruen" => Color32::from_rgb(35, 209, 139),
+            "hellgelb" => Color32::from_rgb(245, 245, 67),
+            "hellblau" => Color32::from_rgb(59, 142, 234),
+            "hellmagenta" => Color32::from_rgb(214, 112, 214),
+            "hellcyan" => Color32::from_rgb(41, 184, 219),
+            "hellweiss" | "fett" => Color32::WHITE,
+            "/" => standard,
+            _ => return None,
+        })
+    };
+    let mut job = LayoutJob::default();
+    let mut aktuell = standard;
+    let mut rest = text;
+    while let Some(pos) = rest.find('{') {
+        job.append(&rest[..pos], 0.0, TextFormat::simple(schrift.clone(), aktuell));
+        let danach = &rest[pos + 1..];
+        match danach.find('}').and_then(|e| farbe(&danach[..e]).map(|f| (e, f))) {
+            Some((e, f)) => {
+                // "fett" ändert die Farbe nur, wenn noch keine gesetzt ist
+                if &danach[..e] != "fett" || aktuell == standard {
+                    aktuell = f;
+                }
+                rest = &danach[e + 1..];
+            }
+            None => {
+                job.append("{", 0.0, TextFormat::simple(schrift.clone(), aktuell));
+                rest = danach;
+            }
+        }
+    }
+    job.append(rest, 0.0, TextFormat::simple(schrift, aktuell));
+    egui::Frame::new().fill(Color32::from_rgb(18, 18, 18)).inner_margin(8.0).corner_radius(4.0).show(ui, |ui| {
+        ui.label(job);
+    });
 }
 
 impl Kontext<'_> {
@@ -674,7 +757,7 @@ fn feld_zeigen(ui: &mut egui::Ui, ctx: &mut Kontext, t: &mut dyn TableLike, feld
                 }
             });
         }
-        Typ::Zahl | Typ::Komma => {
+        Typ::Zahl | Typ::Komma | Typ::Betrag => {
             ui.horizontal(|ui| {
                 beschriftung(ui, feld, pflicht);
                 if let Some(neu) = zahl_feld(ui, id, t.get(feld.name), matches!(feld.typ, Typ::Komma), &hinweis) {
@@ -685,6 +768,13 @@ fn feld_zeigen(ui: &mut egui::Ui, ctx: &mut Kontext, t: &mut dyn TableLike, feld
                         }
                     }
                     geaendert = true;
+                }
+                // Beträge lesbar: "= 2 Gold 5 Silber"
+                if matches!(feld.typ, Typ::Betrag) {
+                    let n = t.get(feld.name).and_then(|i| i.as_integer()).or_else(|| geerbt.as_ref().and_then(|g| g.parse().ok()));
+                    if let Some(n) = n {
+                        ui.label(RichText::new(format!("= {}", ctx.betrag(n))).color(GELB));
+                    }
                 }
             });
         }
@@ -817,6 +907,15 @@ fn feld_zeigen(ui: &mut egui::Ui, ctx: &mut Kontext, t: &mut dyn TableLike, feld
                 let a1 = crate::kontext::feld(ui, egui::TextEdit::singleline(&mut v).desired_width(60.0).hint_text(&hinweis));
                 ui.label("bis");
                 let a2 = crate::kontext::feld(ui, egui::TextEdit::singleline(&mut b).desired_width(60.0));
+                match (von, bis) {
+                    (Some(x), Some(y)) if x != y => {
+                        ui.label(RichText::new(format!("= {} bis {}", ctx.betrag(x), ctx.betrag(y))).color(GELB));
+                    }
+                    (Some(x), _) => {
+                        ui.label(RichText::new(format!("= {}", ctx.betrag(x))).color(GELB));
+                    }
+                    _ => {}
+                }
                 if a1.changed() || a2.changed() {
                     match (v.trim().parse::<i64>().ok(), b.trim().parse::<i64>().ok()) {
                         (None, None) => {
@@ -846,6 +945,54 @@ fn feld_zeigen(ui: &mut egui::Ui, ctx: &mut Kontext, t: &mut dyn TableLike, feld
         }
     }
     geaendert
+}
+
+/// Vorschau für Geld und Darstellung – genau so, wie es im Spiel aussieht.
+fn vorschau(ui: &mut egui::Ui, art: &Art, t: &Table, ctx: &Kontext) {
+    use crate::darstellung as d;
+    let geld = |n: u64| d::betrag(n, &ctx.geld.0, ctx.geld.1);
+    let rahmen = |text: String, ascii: bool| if ascii { d::ascii(&text) } else { text };
+    match art.schluessel {
+        "geld" => {
+            ui.add_space(10.0);
+            ui.heading("Vorschau");
+            let mut text = String::new();
+            for n in [1u64, 15, 120, 250, 1475, 100_000] {
+                text.push_str(&format!("{{grau}}{n:>7} ={{/}} {{hellgelb}}{}{{/}}\n", geld(n)));
+            }
+            text.push_str("{grau}(links: Betrag in der kleinsten Einheit, wie er in den Daten steht){/}");
+            farbig(ui, &text);
+        }
+        "darstellung" => {
+            let stil = |k: &str| {
+                let v = lies_text(t, k);
+                if v.is_empty() { "einfach".to_string() } else { v }
+            };
+            let ascii = lies_text(t, "rahmen") == "ascii";
+            let mut breite = ui.data(|m| m.get_temp::<usize>(egui::Id::NULL.with("vorschau_breite"))).unwrap_or(78);
+            ui.add_space(10.0);
+            ui.horizontal(|ui| {
+                ui.heading("Vorschau");
+                ui.label("Fensterbreite des Spielers:");
+                ui.add(egui::Slider::new(&mut breite, 40..=120).suffix(" Zeichen"));
+            });
+            ui.data_mut(|m| m.insert_temp(egui::Id::NULL.with("vorschau_breite"), breite));
+            let haendler = stil("haendler");
+            ui.label(RichText::new(format!("Händler: waren ({haendler})")).strong());
+            farbig(ui, &rahmen(d::laden(&haendler, &d::beispiel_laden(haendler == "kategorien", &geld), breite), ascii));
+            let sp = stil("spielstand");
+            let sp_stile: Vec<&str> = if sp == "beides" { vec!["kompakt", "bogen"] } else { vec![sp.as_str()] };
+            for s in sp_stile {
+                let befehl = if sp == "beides" && s == "bogen" { "sp voll" } else { "sp" };
+                ui.label(RichText::new(format!("Spielstand: {befehl} ({s})")).strong());
+                farbig(ui, &rahmen(d::spielstand(s, &d::beispiel_bogen(&geld), breite), ascii));
+            }
+            let sb = stil("spielerbuch");
+            ui.label(RichText::new(format!("Spielerbuch ({sb})")).strong());
+            farbig(ui, &rahmen(d::spielerbuch(&sb, &d::beispiel_buch(), breite), ascii));
+        }
+        _ => {}
+    }
 }
 
 /// Name -> Zahl (eigenschaften, werte, fertigkeiten ...)
@@ -1333,7 +1480,20 @@ impl Inhalte {
         // Beim Herausnehmen bleiben Kommentare und Position im Table-Objekt selbst
         let mut geaendert = false;
         {
-            let mut ctx = Kontext { inhalte: self, art, ids: HashMap::new(), geerbt };
+            // Geldeinheiten: beim Bearbeiten von [geld] die gerade geänderten Werte
+            let waehrung = self
+                .dateien
+                .iter()
+                .find(|d| d.rel == "welt.toml")
+                .and_then(|d| d.doc.get("welt")?.get("waehrung")?.as_str().map(String::from))
+                .unwrap_or_default();
+            let geld = if art.schluessel == "geld" {
+                einheiten_aus(Some(&tabelle), &waehrung)
+            } else {
+                let g = self.dateien.iter().find(|d| d.rel == "welt.toml").and_then(|d| d.doc.get("geld")).and_then(|i| i.as_table_like());
+                einheiten_aus(g, &waehrung)
+            };
+            let mut ctx = Kontext { inhalte: self, art, ids: HashMap::new(), geerbt, geld };
             egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
                 ui.horizontal(|ui| {
                     let (id, name) = (lies_text(&tabelle, "id"), lies_text(&tabelle, "name"));
@@ -1352,6 +1512,7 @@ impl Inhalte {
                     ui.add_space(8.0);
                     ui.label(RichText::new(format!("Weitere Felder in der Datei (bleiben erhalten): {}", fremd.join(", "))).color(GRAU).small());
                 }
+                vorschau(ui, art, &tabelle, &ctx);
             });
         }
         if let Some(t) = self.tabelle_mut(art, o) {

@@ -264,11 +264,17 @@ Unterwegs
 
 Boni durch angelegte Ausrüstung erscheinen in Klammern hinter dem Wert.
 
+Wie der Spielstand aussieht, legt die Welt in `[darstellung]` fest (Kapitel 18):
+als „Bogen“ mit Rahmen und Balken, „kompakt“ in wenigen Zeilen oder „beides“ –
+dann zeigt `sp` die kompakte Form und `sp voll` den ganzen Bogen.
+
 ### Spielerbuch (`spielerbuch`, `buch` oder `lies spielerbuch`)
 
 Hier stellt jeder Spieler selbst ein, wie das Spiel für ihn aussieht. Geändert
 wird mit `spielerbuch <einstellung> <wert>`, zum Beispiel
-`spielerbuch karte aus`.
+`spielerbuch karte aus`. Die Einstellungen sind nummeriert: `spielerbuch 2`
+schaltet die zweite um (an/aus) oder geht zum nächsten Wert weiter
+(z.B. klein → normal → gross).
 
 | Einstellung      | Werte                 | Wirkung                                      |
 |------------------|-----------------------|----------------------------------------------|
@@ -1439,8 +1445,7 @@ WEBSITE  = "https://..."
 
 ## 18. Geld, Händler und Lehrmeister
 
-Jede Figur hat Geld. Wie es heißt, steht in `welt.toml` (`waehrung = "Gold"`),
-das Startgeld in `[start]` (`geld = 20`). Geld gibt es:
+Jede Figur hat Geld. Geld gibt es:
 
 - von Monstern: `geld = 5` oder `geld = [2, 8]` (zufällig von 2 bis 8). Haben
   mehrere zusammen gekämpft, wird geteilt.
@@ -1448,6 +1453,77 @@ das Startgeld in `[start]` (`geld = 20`). Geld gibt es:
 - beim Verkaufen an Händler
 
 `geld` und `sp` zeigen, wie viel man hat.
+
+### Währung und Münzen (`[geld]` in welt.toml)
+
+Eine Währung kann aus mehreren Münzen bestehen, z.B. Gold, Silber und Kupfer:
+
+```toml
+[geld]
+anzeige = "lang"        # "lang" = 14 Gold 7 Silber 5 Kupfer, "kurz" = 14G 7S 5K
+
+[[geld.einheiten]]
+name     = "Gold"
+mehrzahl = "Gold"       # leer = wie der Name
+kurz     = "G"
+wert     = 100          # 1 Gold = 100 Kupfer
+
+[[geld.einheiten]]
+name = "Silber"
+kurz = "S"
+wert = 10
+
+[[geld.einheiten]]
+name = "Kupfer"
+kurz = "K"
+wert = 1                # die kleinste Münze – genau eine muss den Wert 1 haben
+```
+
+**Wichtig:** Alle Geldbeträge in den Daten (`wert` von Gegenständen, `preis`
+bei Lehrmeistern, Gilden und Berufen, `geld` bei Monstern, Belohnungen und
+Startgeld) stehen in der **kleinsten Münze**. `wert = 1475` wird im Spiel als
+„14 Gold 7 Silber 5 Kupfer“ gezeigt. Beliebig viele Stufen sind möglich
+(z.B. Platin = 1000).
+
+Fehlt `[geld]`, gibt es nur eine Münze mit dem Namen aus `waehrung = "Gold"`
+in `[welt]` – ältere Welten laufen also unverändert weiter. Wer Münzstufen
+einführt, muss seine Preise entsprechend umrechnen (z.B. alles mal 10 oder
+mal 100).
+
+Im Welteditor (📚 Inhalte → 💰 Geld und Währung) zeigt eine Vorschau, wie
+Beträge aussehen, und neben jedem Preisfeld steht der Betrag in Münzen
+(z.B. `250` = 2 Gold 5 Silber).
+
+### Wie die Listen aussehen (`[darstellung]` in welt.toml)
+
+Händlerlisten, Spielstand und Spielerbuch gibt es in mehreren Stilen:
+
+```toml
+[darstellung]
+haendler    = "kategorien"  # einfach | tabelle | pergament | kategorien
+spielstand  = "beides"      # einfach | bogen | kompakt | beides
+spielerbuch = "buch"        # einfach | buch | schalter
+rahmen      = "unicode"     # unicode = ╔═╗-Rahmen, ascii = +-+ (für alte Clients)
+```
+
+| Stil          | Aussehen                                                        |
+|---------------|-----------------------------------------------------------------|
+| `tabelle`     | Waren als Tabelle mit Nummer, Name und Preis                    |
+| `pergament`   | Laden mit Schild und verzierten Kopf- und Fußzeilen             |
+| `kategorien`  | wie Tabelle, aber nach Waffen, Rüstungen, Tränken … geordnet, mit kurzen Angaben (+LP, Schaden …) |
+| `bogen`       | Spielstand mit Rahmen, Balken und allen Abschnitten             |
+| `kompakt`     | Spielstand in wenigen Zeilen                                    |
+| `beides`      | `sp` kompakt, `sp voll` ganzer Bogen                            |
+| `buch`        | Spielerbuch als Buch mit Abschnitten                            |
+| `schalter`    | Spielerbuch als Liste mit [x]-Schaltern                         |
+
+Ist das Fenster des Spielers zu schmal, fällt die Anzeige von selbst auf
+`einfach` zurück. Clients ohne UTF-8 bekommen automatisch ASCII-Rahmen.
+Mit `schau <nr>` sieht man sich eine Ware aus der Händlerliste genauer an.
+
+Im Welteditor (📚 Inhalte → 🎨 Darstellung) kann man die Stile auswählen
+und sieht sofort eine farbige Vorschau, wie im Spiel; ein Schieberegler
+stellt die Fensterbreite ein.
 
 ### Händler
 
@@ -1461,6 +1537,7 @@ ankauf          = true          # kauft er an? (Standard: ja)
 ankauf_typen    = ["waffe"]     # nur diese Typen (leer = alles)
 verkauf_prozent = 100           # Verkaufspreis in % vom Wert
 ankauf_prozent  = 50            # er zahlt die Hälfte des Werts
+laden           = "Gretas Krämerladen"  # Name über der Liste (optional)
 ```
 
 Spieler: `waren` (Angebot zeigen, nummeriert), `kaufe brot` oder `kaufe 2`
@@ -1474,12 +1551,12 @@ Ein NPC lehrt Fertigkeiten und Zauber mit `[[npc.lehrt]]`:
 ```toml
 [[npc.lehrt]]
 id    = "schwertkampf"   # Fertigkeit: jede Lektion +1 Stufe
-preis = 5                # pro Lektion
+preis = 50               # pro Lektion (kleinste Münze)
 bis   = 20               # höchstens bis Stufe 20
 
 [[npc.lehrt]]
 id    = "wuchtschlag"    # Zauber oder Technik: einmal lernen
-preis = 40
+preis = 400
 stufe = 2                # ab Spielerstufe 2
 gilde = ""               # nur für Mitglieder dieser Gilde (optional)
 ```

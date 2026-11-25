@@ -64,7 +64,7 @@ name = "eine Fackel"
 schluesselwoerter = ["fackel"]
 typ  = "werkzeug"
 platz = "licht"
-wert  = 2
+wert  = 20
 beschreibung = "Ein Holzstab, mit Pech getränkt."
 
 [[gegenstand]]
@@ -93,7 +93,7 @@ schluesselwoerter = ["pelz", "fell"]
 platz = "umhang"
 beschreibung = "Ein dichter, warmer Pelz."
 eigenschaften = { ruestung = 2 }
-wert = 40
+wert = 400
 
 [[gegenstand]]
 id   = "landkarte"
@@ -102,7 +102,7 @@ akkusativ = "eine Landkarte"
 schluesselwoerter = ["karte", "landkarte"]
 beschreibung = "Eine abgegriffene Karte des Landes. Mit 'weltkarte' kannst du sie ansehen."
 eigenschaften = { landkarte = 1 }
-wert = 15
+wert = 150
 
 # ---------------------------------------------------------------------
 #  Behälter (Vorlagen in vorlagen/gegenstaende.toml)
@@ -117,7 +117,7 @@ schluesselwoerter = ["beutel", "lederbeutel"]
 beschreibung = "Ein kleiner Beutel aus weichem Leder mit einer Kordel."
 fassungsvermoegen = 8
 max_dinge = 10
-wert = 5
+wert = 50
 
 [[gegenstand]]
 id   = "rucksack"
@@ -126,7 +126,7 @@ name = "ein Rucksack"
 akkusativ = "einen Rucksack"
 schluesselwoerter = ["rucksack"]
 beschreibung = "Ein robuster Rucksack aus gewachstem Segeltuch. Gut gepackt trägt er sich leichter."
-wert = 30
+wert = 300
 
 [[gegenstand]]
 id   = "trankguertel"
@@ -140,7 +140,7 @@ fassungsvermoegen = 6
 max_dinge = 6
 nur_typen = ["trank"]
 gewicht_reduktion = 50
-wert = 20
+wert = 200
 
 [[gegenstand]]
 id   = "zaubertasche"
@@ -152,4 +152,4 @@ schluesselwoerter = ["tasche", "zaubertasche"]
 beschreibung = "Silberne Runen glimmen auf dem Stoff. Was man hineinsteckt, wiegt fast nichts."
 fassungsvermoegen = 30
 gewicht_reduktion = 80
-wert = 150
+wert = 1500

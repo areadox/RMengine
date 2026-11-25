@@ -8,12 +8,76 @@
 use crate::befehle::{finde_gegenstand, gruppieren, passt};
 use crate::daten::{LehrDef, MonsterDef};
 use crate::gemeinschaft::nummer;
-use crate::text::{auffuellen, gross, normalisieren};
+use crate::text::{gross, normalisieren};
 use crate::welt::Welt;
 
-/// "12 Gold"
+/// "2 Gold 5 Silber" – Beträge stehen immer in der kleinsten Einheit ([geld] in welt.toml).
 pub fn betrag(w: &Welt, n: u64) -> String {
-    format!("{n} {}", w.d.welt.waehrung)
+    crate::darstellung::betrag(n, &w.d.geld_einheiten, w.d.geld.anzeige == "kurz")
+}
+
+/// Gerahmte Ausgaben: bei rahmen = "ascii" nur einfache Zeichen.
+pub fn rahmen(w: &Welt, t: String) -> String {
+    if w.d.darstellung.rahmen == "ascii" {
+        crate::darstellung::ascii(&t)
+    } else {
+        t
+    }
+}
+
+/// Typen in der Reihenfolge der Anzeige (Stil "kategorien")
+const KATEGORIEN: &[(&str, &str)] = &[
+    ("nahrung", "Essen"),
+    ("trank", "Tränke"),
+    ("waffe", "Waffen"),
+    ("ruestung", "Rüstung"),
+    ("behaelter", "Taschen und Behälter"),
+    ("werkzeug", "Werkzeug"),
+    ("schmuck", "Schmuck"),
+    ("schluessel", "Schlüssel"),
+];
+
+fn kategorie(typ: &str) -> (usize, &'static str) {
+    KATEGORIEN.iter().position(|(t, _)| *t == typ).map(|i| (i, KATEGORIEN[i].1)).unwrap_or((KATEGORIEN.len(), "Sonstiges"))
+}
+
+/// Kurzinfo zu einer Ware, z.B. "+40 LP" oder "fasst 40, -25 %"
+fn ware_info(g: &crate::daten::GegenstandDef) -> String {
+    let mut v = Vec::new();
+    let e = |k: &str| g.eigenschaften.get(k).copied().unwrap_or(0);
+    if e("heilung") > 0 {
+        v.push(format!("+{} LP", e("heilung")));
+    }
+    if e("mana") > 0 {
+        v.push(format!("+{} MP", e("mana")));
+    }
+    if e("schaden") > 0 {
+        v.push(format!("Schaden {}", e("schaden")));
+    }
+    if e("ruestung") > 0 {
+        v.push(format!("Rüstung {}", e("ruestung")));
+    }
+    if g.fassungsvermoegen > 0 {
+        v.push(format!("fasst {}", g.fassungsvermoegen));
+        if g.gewicht_reduktion > 0 {
+            v.push(format!("-{} %", g.gewicht_reduktion));
+        }
+    }
+    v.join(", ")
+}
+
+fn nach_kategorien(w: &Welt) -> bool {
+    w.d.darstellung.haendler == "kategorien"
+}
+
+/// Die Waren eines Händlers in der Reihenfolge der Anzeige.
+fn waren_von(w: &Welt, d: &MonsterDef) -> Vec<crate::daten::GegenstandDef> {
+    let mut v: Vec<_> =
+        d.haendler.as_ref().map(|h| h.waren.iter().filter_map(|id| w.d.gegenstaende.get(id).cloned()).collect()).unwrap_or_default();
+    if nach_kategorien(w) {
+        v.sort_by_key(|g| kategorie(&g.typ).0);
+    }
+    v
 }
 
 /// NPCs im Raum des Spielers, auf die `pruefen` zutrifft.
@@ -46,10 +110,8 @@ fn npc_sagt(w: &Welt, sid: u64, npc: &MonsterDef, text: &str) {
 fn alle_waren(w: &Welt, sid: u64) -> Vec<(MonsterDef, crate::daten::GegenstandDef)> {
     let mut v = Vec::new();
     for (_, d) in npcs_im_raum(w, sid, |d| d.haendler.is_some()) {
-        for id in &d.haendler.as_ref().expect("Händler").waren {
-            if let Some(g) = w.d.gegenstaende.get(id) {
-                v.push((d.clone(), g.clone()));
-            }
+        for g in waren_von(w, d) {
+            v.push((d.clone(), g));
         }
     }
     v
@@ -69,73 +131,90 @@ fn alle_lehren(w: &Welt, sid: u64) -> Vec<(MonsterDef, LehrDef)> {
 }
 
 pub fn waren(w: &Welt, sid: u64, rest: &str) {
+    use crate::darstellung::{Gruppe, Laden, Zeile};
     let liste = npcs_im_raum(w, sid, |d| d.haendler.is_some() || !d.lehrt.is_empty());
     if liste.iter().all(|(_, d)| !rest.is_empty() && !passt(rest, &d.name, &d.id, &d.schluesselwoerter)) {
         w.sende(sid, "Hier verkauft und lehrt niemand etwas.");
         return;
     }
-    let sp = &w.spieler[&sid].sp;
+    let s = &w.spieler[&sid];
+    let sp = &s.sp;
+    let stil = w.d.darstellung.haendler.as_str();
     let mut t = String::new();
     // Nummern laufen über alle Händler im Raum, damit "kaufe 3" eindeutig ist
     let (mut nr_ware, mut nr_lehre) = (0, 0);
     for (_, d) in liste {
         let zeigen = rest.is_empty() || passt(rest, &d.name, &d.id, &d.schluesselwoerter);
+        let waren = waren_von(w, d);
+        let lehren: Vec<&LehrDef> = d.lehrt.iter().filter(|l| w.d.fertigkeiten.contains_key(&l.id) || w.d.zauber.contains_key(&l.id)).collect();
         if !zeigen {
-            nr_ware += d.haendler.as_ref().map(|h| h.waren.iter().filter(|g| w.d.gegenstaende.contains_key(*g)).count()).unwrap_or(0);
-            nr_lehre += d.lehrt.iter().filter(|l| w.d.fertigkeiten.contains_key(&l.id) || w.d.zauber.contains_key(&l.id)).count();
+            nr_ware += waren.len();
+            nr_lehre += lehren.len();
             continue;
         }
-        if let Some(h) = &d.haendler {
-            t.push_str(&format!("{{fett}}{} verkauft:{{/}}\n", gross(&d.name)));
-            if h.waren.is_empty() {
-                t.push_str("  (nichts – kauft aber an)\n");
+        let titel = d.haendler.as_ref().map(|h| h.laden.clone()).filter(|l| !l.is_empty()).unwrap_or_else(|| gross(&d.name));
+        // Waren, nach Typen gruppiert (nur im Stil "kategorien" mit Überschriften)
+        let mut gruppen: Vec<Gruppe> = Vec::new();
+        for g in &waren {
+            nr_ware += 1;
+            let gtitel = if nach_kategorien(w) { kategorie(&g.typ).1.to_string() } else { String::new() };
+            if gruppen.last().is_none_or(|gr| gr.titel != gtitel) {
+                gruppen.push(Gruppe { titel: gtitel, zeilen: Vec::new() });
             }
-            for id in &h.waren {
-                let Some(g) = w.d.gegenstaende.get(id) else { continue };
-                nr_ware += 1;
-                t.push_str(&format!(
-                    "  {{gelb}}{nr_ware:>2}.{{/}} {} {{hellgelb}}{}{{/}}\n",
-                    auffuellen(&gross(&g.name), 32),
-                    betrag(w, verkaufspreis(d, g.wert))
-                ));
-            }
-            if h.ankauf {
+            let z = Zeile { nr: nr_ware, name: gross(&g.name), preis: betrag(w, verkaufspreis(d, g.wert)), info: ware_info(g) };
+            gruppen.last_mut().expect("Gruppe").zeilen.push(z);
+        }
+        let ankauf = match &d.haendler {
+            Some(h) if h.ankauf => {
                 let was = if h.ankauf_typen.is_empty() { "alles".to_string() } else { h.ankauf_typen.join(", ") };
-                t.push_str(&format!("  {{grau}}Kauft an: {was} (für {} % des Werts){{/}}\n", h.ankauf_prozent));
+                format!("Kauft an: {was} ({} % des Werts)", h.ankauf_prozent)
+            }
+            Some(_) if waren.is_empty() => "(verkauft gerade nichts)".into(),
+            _ => String::new(),
+        };
+        let mut zeilen = Vec::new();
+        for l in lehren {
+            nr_lehre += 1;
+            if let Some(f) = w.d.fertigkeiten.get(&l.id) {
+                let bis = l.bis.unwrap_or(f.max_stufe);
+                let hat = sp.fertigkeiten.get(&f.id).copied().unwrap_or(0);
+                zeilen.push(Zeile {
+                    nr: nr_lehre,
+                    name: f.name.clone(),
+                    preis: format!("{} je Stufe", betrag(w, l.preis)),
+                    info: format!("bis {bis}, du: {hat}{}", bedingung(w, l)),
+                });
+            } else if let Some(z) = w.d.zauber.get(&l.id) {
+                let art = if z.ist_technik() { "Technik" } else { "Zauber" };
+                let kann = if sp.zauber.contains(&z.id) { ", kannst du schon" } else { "" };
+                zeilen.push(Zeile { nr: nr_lehre, name: z.name.clone(), preis: betrag(w, l.preis), info: format!("{art}{kann}{}", bedingung(w, l)) });
             }
         }
-        if !d.lehrt.is_empty() {
-            t.push_str(&format!("{{fett}}{} lehrt:{{/}}\n", gross(&d.name)));
-            for l in &d.lehrt {
-                if let Some(f) = w.d.fertigkeiten.get(&l.id) {
-                    let bis = l.bis.unwrap_or(f.max_stufe);
-                    let hat = sp.fertigkeiten.get(&f.id).copied().unwrap_or(0);
-                    nr_lehre += 1;
-                    t.push_str(&format!(
-                        "  {{gelb}}{nr_lehre:>2}.{{/}} {} {{hellgelb}}{}{{/}} je Lektion {{grau}}(bis Stufe {bis}, du: {hat}){}{{/}}\n",
-                        auffuellen(&f.name, 24),
-                        betrag(w, l.preis),
-                        bedingung(w, l)
-                    ));
-                } else if let Some(z) = w.d.zauber.get(&l.id) {
-                    let art = if z.ist_technik() { "Technik" } else { "Zauber" };
-                    let kann = if sp.zauber.contains(&z.id) { ", kannst du schon" } else { "" };
-                    nr_lehre += 1;
-                    t.push_str(&format!(
-                        "  {{gelb}}{nr_lehre:>2}.{{/}} {} {{hellgelb}}{}{{/}} {{grau}}({art}{kann}){}{{/}}\n",
-                        auffuellen(&z.name, 24),
-                        betrag(w, l.preis),
-                        bedingung(w, l)
-                    ));
-                }
-            }
-        }
+        let laden = Laden { titel, waren: gruppen, ankauf, lehren: zeilen, lehren_titel: "lehrt".into() };
+        t.push_str(&crate::darstellung::laden(stil, &laden, s.breite()));
     }
     t.push_str(&format!(
-        "\nDu hast {{hellgelb}}{}{{/}}. Befehle: {{gelb}}kaufe <nr|ware>{{/}}, {{gelb}}verkaufe <ding>{{/}}, {{gelb}}lerne <nr|was>{{/}}",
+        "\nDu hast {{hellgelb}}{}{{/}}. {{gelb}}kaufe <nr>{{/}} · {{gelb}}verkaufe <ding>{{/}} · {{gelb}}lerne <nr>{{/}} · {{gelb}}schau <nr>{{/}} für Details",
         betrag(w, sp.geld)
     ));
+    w.sende(sid, &rahmen(w, t));
+}
+
+/// "schau 3" bei einem Händler: Einzelheiten zur Ware Nummer 3. false = keine Ware.
+pub fn ware_zeigen(w: &Welt, sid: u64, n: usize) -> bool {
+    let Some((d, g)) = alle_waren(w, sid).into_iter().nth(n) else { return false };
+    let mut t = format!("{{fett}}{}{{/}} – {{hellgelb}}{}{{/}}\n", gross(&g.name), betrag(w, verkaufspreis(&d, g.wert)));
+    if !g.beschreibung.is_empty() {
+        t.push_str(&crate::text::umbrechen(&g.beschreibung, w.spieler[&sid].breite()));
+        t.push('\n');
+    }
+    let info = ware_info(&g);
+    if !info.is_empty() {
+        t.push_str(&format!("{{grau}}{info}{{/}}\n"));
+    }
+    t.push_str(&format!("{{grau}}Gewicht {}{}{{/}}", g.gewicht, if g.platz.is_empty() { String::new() } else { format!(", anlegen: {}", w.d.anzeigename(&g.platz)) }));
     w.sende(sid, &t);
+    true
 }
 
 fn bedingung(w: &Welt, l: &LehrDef) -> String {

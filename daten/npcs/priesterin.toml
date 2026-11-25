@@ -28,10 +28,10 @@ unbekannt   = "*lächelt nur still."
 
 [[npc.lehrt]]
 id    = "baerenkraft"
-preis = 50
+preis = 500
 stufe = 3
 
 [[npc.lehrt]]
 id    = "heilkunde"
-preis = 6
+preis = 60
 bis   = 25

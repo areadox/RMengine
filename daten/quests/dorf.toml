@@ -42,7 +42,7 @@ text   = "Besiege 3 Ratten"
 
 [quest.belohnung]
 erfahrung    = 60
-geld         = 25
+geld         = 250
 gegenstaende = ["heiltrank"]
 
 [[quest]]
@@ -62,7 +62,7 @@ anzahl = 2
 
 [quest.belohnung]
 erfahrung = 15
-geld      = 12
+geld      = 120
 
 [[quest]]
 id     = "bote_zum_schmied"

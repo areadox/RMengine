@@ -38,7 +38,7 @@ vorlage = true
 name    = "ein Trank"
 typ     = "trank"
 gewicht = 1
-wert    = 25
+wert    = 250
 
 [[gegenstand]]
 id      = "vorlage_essen"
@@ -46,7 +46,7 @@ vorlage = true
 name    = "etwas zu essen"
 typ     = "nahrung"
 gewicht = 1
-wert    = 2
+wert    = 20
 
 # ---------------------------------------------------------------------
 #  Behälter: Taschen, Beutel, Rucksäcke

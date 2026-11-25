@@ -33,19 +33,20 @@ woerter = ["zauberstab", "stab", "bereite", "bereit"]
 antwort = "Mit einem Zauberstab in der Hand kannst du einen Kampfzauber bereithalten: bereite feuerpfeil. Dann wirkst du ihn im Kampf ganz von selbst, solange dein Mana reicht."
 
 [npc.haendler]
+laden           = "Arkane Vorräte"   # Name in der Liste (leer = Name des NPCs)
 waren  = ["zauberstab"]
 ankauf = false
 
 [[npc.lehrt]]
 id    = "magie"
-preis = 6
+preis = 60
 bis   = 40
 
 [[npc.lehrt]]
 id    = "schutzschild"
-preis = 25
+preis = 250
 
 [[npc.lehrt]]
 id    = "eissplitter"
-preis = 45
+preis = 450
 stufe = 3

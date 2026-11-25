@@ -28,19 +28,19 @@ unbekannt   = "Davon verstehe ich nichts. Ich verstehe was vom Kämpfen."
 
 [[npc.lehrt]]
 id    = "wuchtschlag"
-preis = 40
+preis = 400
 
 [[npc.lehrt]]
 id    = "schildstoss"
-preis = 30
+preis = 300
 stufe = 3
 
 [[npc.lehrt]]
 id    = "giftklinge"
-preis = 60
+preis = 600
 stufe = 4
 
 [[npc.lehrt]]
 id    = "schwertkampf"
-preis = 8
+preis = 80
 bis   = 40

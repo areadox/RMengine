@@ -140,7 +140,10 @@ impl Protokolle {
                 '–' | '—' => aus.push(b'-'),
                 '…' => aus.extend(b"..."),
                 '€' => aus.extend(b"EUR"),
-                _ => aus.push(b'?'),
+                c => match crate::darstellung::ascii_zeichen(c) {
+                    Some(e) => aus.extend(e.bytes()),
+                    None => aus.push(b'?'),
+                },
             }
         }
         aus

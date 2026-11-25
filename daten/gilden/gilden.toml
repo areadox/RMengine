@@ -17,7 +17,7 @@ id   = "lichtorden"
 name = "Orden des Lichts"
 beschreibung = "Heiler und Hüter, die dem Licht dienen. Sie lernen Schutz- und Heilzauber."
 aufnahme_stufe = 2
-preis = 10
+preis = 100
 titel = "vom Orden des Lichts"
 mana  = 15
 fertigkeiten = { heilkunde = 5 }
@@ -39,7 +39,7 @@ id   = "magier"
 name = "Gilde der Magier"
 beschreibung = "Wer die Elemente beherrschen will, lernt hier. Nur Mitglieder sprechen die Kampfzauber der Gilde. Mit einem Zauberstab kann man einen Kampfzauber bereithalten (bereite). Gildenmeister: Magister Orelius im Magierturm."
 aufnahme_stufe = 1
-preis = 15
+preis = 150
 titel = "der Zauberlehrling"
 mana  = 25
 fertigkeiten = { magie = 5 }

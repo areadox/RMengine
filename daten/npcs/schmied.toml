@@ -44,16 +44,17 @@ antwort = "Finger weg vom Amboss. Der gehörte schon meinem Großvater."
 
 # Harald verkauft Waffen und Rüstungen und kauft nur solche an
 [npc.haendler]
+laden           = "Haralds Schmiede"   # Name in der Liste (leer = Name des NPCs)
 waren        = ["dolch", "kurzschwert", "streitaxt", "holzschild", "lederhelm"]
 ankauf_typen = ["waffe", "ruestung"]
 
 # Er lehrt die Grundlagen (Kampftechniken gibt es beim Kriegerbund am Nordtor)
 [[npc.lehrt]]
 id    = "schwertkampf"
-preis = 5
+preis = 50
 bis   = 20
 
 [[npc.lehrt]]
 id    = "schildblock"
-preis = 10
+preis = 100
 bis   = 10

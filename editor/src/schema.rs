@@ -44,6 +44,8 @@ pub enum Typ {
     VerweisWerte(Ziel),
     /// Eine Zahl oder [von, bis]
     Geld,
+    /// Ein Geldbetrag in der kleinsten Einheit (zeigt z.B. "= 2 Gold 5 Silber")
+    Betrag,
     /// Liste von Untereinträgen; `inline` = als [ { ... } ] statt [[a.b]]
     Tabellen { felder: &'static [Feld], inline: bool },
     /// Eine Untertabelle, z.B. [npc.haendler]
@@ -170,7 +172,7 @@ const GEGENSTAND: &[Feld] = felder![
     f("schluesselwoerter", "Schlüsselwörter", Typ::Liste, "Wörter, mit denen man ihn anspricht."),
     f("typ", "Typ", Typ::Auswahl(GEGENSTAND_TYPEN), ""),
     f("platz", "Platz", Typ::Auswahl(PLAETZE), "Wo man ihn anlegt (Waffen, Rüstung)."),
-    f("wert", "Wert (Preis)", Typ::Zahl, "Händler verkaufen und kaufen nach diesem Wert."),
+    f("wert", "Wert (Preis)", Typ::Betrag, "In der kleinsten Geldeinheit. Händler verkaufen und kaufen nach diesem Wert."),
     f("gewicht", "Gewicht", Typ::Zahl, ""),
     f("tragbar", "Tragbar", Typ::Schalter, "Kann man ihn aufheben?"),
     f("erholung", "Erholung (s)", Typ::Komma, "Waffe: Sekunden zwischen zwei Angriffen."),
@@ -250,6 +252,7 @@ const THEMA: &[Feld] = felder![
     f("antwort", "Antwort", Typ::TextOderListe, ""),
 ];
 const HAENDLER: &[Feld] = felder![
+    f("laden", "Ladenname", Typ::Text, "Überschrift der Liste, z.B. \"Gretas Krämerladen\" (leer = Name des NPCs)."),
     f("waren", "Waren", Typ::VerweisListe(Ziel::Gegenstand), "Was er verkauft (unbegrenzt)."),
     f("ankauf", "Kauft an", Typ::Schalter, "Standard: ja"),
     f("ankauf_typen", "Kauft nur", Typ::Liste, "Typen, z.B. waffe, ruestung (leer = alles)"),
@@ -258,7 +261,7 @@ const HAENDLER: &[Feld] = felder![
 ];
 const LEHRT: &[Feld] = felder![
     f("id", "Fertigkeit/Zauber", Typ::Verweis(Ziel::Lehrbar), ""),
-    f("preis", "Preis", Typ::Zahl, "Fertigkeit: pro Stufe. Zauber: einmal."),
+    f("preis", "Preis", Typ::Betrag, "Fertigkeit: pro Stufe. Zauber: einmal."),
     f("bis", "Bis Stufe", Typ::Zahl, "Fertigkeit: höchstens bis hier."),
     f("stufe", "Ab Spielerstufe", Typ::Zahl, ""),
     f("gilde", "Nur für Gilde", Typ::Verweis(Ziel::Gilde), ""),
@@ -331,7 +334,7 @@ const RASSE: &[Feld] = felder![
 const GILDE: &[Feld] = felder![
     GEMEINSCHAFT[0], GEMEINSCHAFT[1], GEMEINSCHAFT[2],
     f("aufnahme_stufe", "Ab Stufe", Typ::Zahl, ""),
-    f("preis", "Aufnahmegebühr", Typ::Zahl, ""),
+    f("preis", "Aufnahmegebühr", Typ::Betrag, ""),
     f("rassen", "Nur für Rassen", Typ::VerweisListe(Ziel::Rasse), "Leer = alle."),
     f("titel", "Titel", Typ::Text, "Wird bei der Aufnahme gesetzt, z.B. \"der Krieger\"."),
     f("aufnahme_text", "Text bei Aufnahme", Typ::Text, ""),
@@ -347,7 +350,7 @@ const SCHRITT: &[Feld] = felder![
 ];
 const BELOHNUNG: &[Feld] = felder![
     f("erfahrung", "Erfahrung", Typ::Zahl, ""),
-    f("geld", "Geld", Typ::Zahl, ""),
+    f("geld", "Geld", Typ::Betrag, ""),
     f("gegenstaende", "Gegenstände", Typ::VerweisListe(Ziel::Gegenstand), ""),
     f("fertigkeiten", "Fertigkeiten +", Typ::VerweisWerte(Ziel::Fertigkeit), "Steigen um so viele Stufen."),
     f("zauber", "Zauber", Typ::VerweisListe(Ziel::Zauber), ""),
@@ -386,7 +389,7 @@ const WELT: &[Feld] = felder![
     f("willkommen", "Willkommenstext", Typ::Mehrzeilig, ""),
     f("admins", "Admins", Typ::Liste, "Figurennamen, die immer Admin sind."),
     f("baumeister", "Baumeister", Typ::Liste, ""),
-    f("waehrung", "Name des Geldes", Typ::Text, "z.B. Gold, Taler"),
+    f("waehrung", "Name des Geldes", Typ::Text, "z.B. Taler – nur, wenn es unter 💰 Geld keine Einheiten gibt."),
     f("max_berufe", "Berufe höchstens", Typ::Zahl, ""),
     f("techniken_nur_gilden", "Techniken nur für Gilden", Typ::Schalter, "Standard: ja. Jede Kampftechnik braucht dann gilde = \"...\"."),
     f("tragkraft_basis", "Tragkraft", Typ::Zahl, "So viel Gewicht trägt jeder (beide 0 = unbegrenzt)."),
@@ -410,7 +413,7 @@ const WELT: &[Feld] = felder![
 const START: &[Feld] = felder![
     f("lebenspunkte", "Lebenspunkte", Typ::Zahl, ""),
     f("mana", "Mana", Typ::Zahl, ""),
-    f("geld", "Startgeld", Typ::Zahl, ""),
+    f("geld", "Startgeld", Typ::Betrag, "In der kleinsten Geldeinheit."),
     f("gegenstaende", "Gegenstände", Typ::VerweisListe(Ziel::Gegenstand), ""),
     f("zauber", "Zauber", Typ::VerweisListe(Ziel::Zauber), ""),
     f("fertigkeiten", "Fertigkeiten", Typ::VerweisWerte(Ziel::Fertigkeit), ""),
@@ -438,6 +441,23 @@ const KAMPF: &[Feld] = felder![
     f("monster_erholung_prozent", "Monster-Erholung %/Takt", Typ::Zahl, ""),
 ];
 
+const EINHEIT: &[Feld] = felder![
+    f("name", "Name", Typ::Text, "z.B. Gold"),
+    f("mehrzahl", "Mehrzahl", Typ::Text, "z.B. Taler, Münzen (leer = wie der Name)"),
+    f("kurz", "Kurzform", Typ::Text, "z.B. G – für die Anzeige \"kurz\""),
+    f("wert", "Wert", Typ::Zahl, "So viele der kleinsten Einheit. Die kleinste hat 1, z.B. Kupfer 1, Silber 10, Gold 100."),
+];
+const GELD: &[Feld] = felder![
+    f("anzeige", "Anzeige", Typ::Auswahl(crate::darstellung::GELD_ANZEIGEN), "lang = 2 Gold 5 Silber, kurz = 2G 5S"),
+    f("einheiten", "Einheiten", Typ::Tabellen { felder: EINHEIT, inline: false }, "Ohne Einheiten gibt es nur eine Währung (Welt → Name des Geldes)."),
+];
+const DARSTELLUNG: &[Feld] = felder![
+    f("haendler", "Händler und Lehrer", Typ::Auswahl(crate::darstellung::HAENDLER_STILE), "Wie 'waren' aussieht."),
+    f("spielstand", "Spielstand", Typ::Auswahl(crate::darstellung::SPIELSTAND_STILE), "beides: sp = kompakt, sp voll = Bogen."),
+    f("spielerbuch", "Spielerbuch", Typ::Auswahl(crate::darstellung::SPIELERBUCH_STILE), ""),
+    f("rahmen", "Rahmen", Typ::Auswahl(crate::darstellung::RAHMEN_STILE), "ascii = nur einfache Zeichen (+-|). Alte Programme bekommen das immer."),
+];
+
 pub const ARTEN: &[Art] = &[
     Art { schluessel: "gegenstand", titel: "Gegenstände", einzahl: "Gegenstand", symbol: "🎒", ordner: "gegenstaende", ablage: Ablage::Liste, felder: GEGENSTAND, hilfe: "Waffen, Rüstungen, Tränke, Essen und alles andere." },
     Art { schluessel: "monster", titel: "Monster", einzahl: "Monster", symbol: "🐺", ordner: "monster", ablage: Ablage::Liste, felder: MONSTER, hilfe: "Wesen, gegen die man kämpft. In Räume setzt man sie unter 🗺 Räume." },
@@ -451,6 +471,8 @@ pub const ARTEN: &[Art] = &[
     Art { schluessel: "beschreibung", titel: "Allgemeine Beschreibungen", einzahl: "Beschreibung", symbol: "📖", ordner: "beschreibungen", ablage: Ablage::Liste, felder: BESCHREIBUNG, hilfe: "Bäume, Himmel, Wasser ... – Räume und Dinge verweisen darauf mit 'nutzt'." },
     Art { schluessel: "welt", titel: "Welt", einzahl: "Welt", symbol: "🌍", ordner: "", ablage: Ablage::Fest { datei: "welt.toml" }, felder: WELT, hilfe: "Grundeinstellungen. Den Startraum wählt man unter 🗺 Räume." },
     Art { schluessel: "start", titel: "Start neuer Figuren", einzahl: "Start", symbol: "🐣", ordner: "", ablage: Ablage::Fest { datei: "welt.toml" }, felder: START, hilfe: "Womit neue Figuren beginnen." },
+    Art { schluessel: "geld", titel: "Geld und Währung", einzahl: "Geld", symbol: "💰", ordner: "", ablage: Ablage::Fest { datei: "welt.toml" }, felder: GELD, hilfe: "Einheiten wie Gold, Silber, Kupfer. Alle Preise in den Daten stehen in der kleinsten Einheit." },
+    Art { schluessel: "darstellung", titel: "Darstellung", einzahl: "Darstellung", symbol: "🎨", ordner: "", ablage: Ablage::Fest { datei: "welt.toml" }, felder: DARSTELLUNG, hilfe: "Wie Handelslisten, Spielstand und Spielerbuch im Spiel aussehen – mit Vorschau." },
     Art { schluessel: "kampf", titel: "Kampfregeln", einzahl: "Kampf", symbol: "⚔", ordner: "", ablage: Ablage::Fest { datei: "welt.toml" }, felder: KAMPF, hilfe: "Den Raum für Wiederbelebungen wählt man unter 🗺 Räume." },
 ];
 

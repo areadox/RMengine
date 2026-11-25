@@ -99,6 +99,8 @@ pub fn ausfuehren(w: &mut Welt, sid: u64, eingabe: &str) -> Folge {
         "schau" | "schaue" | "l" | "look" | "umsehen" | "betrachte" | "untersuche" | "unt" | "x" => {
             if rest.is_empty() {
                 raum_anzeigen(w, sid);
+            } else if crate::gemeinschaft::nummer(rest).is_some_and(|n| crate::handel::ware_zeigen(w, sid, n)) {
+                // "schau 3" beim Händler: Ware Nummer 3
             } else if !crate::behaelter::ansehen(w, sid, rest) {
                 untersuchen(w, sid, rest);
             }
@@ -190,7 +192,7 @@ pub fn ausfuehren(w: &mut Welt, sid: u64, eingabe: &str) -> Folge {
         "emote" | "me" | "/me" => emote(w, sid, rest),
         "rufe" | "ruf" | "shout" => rufen(w, sid, rest),
         "wer" | "who" => wer(w, sid),
-        "spielstand" | "sp" | "werte" | "score" | "status" => spielstand(w, sid),
+        "spielstand" | "sp" | "werte" | "score" | "status" => spielstand(w, sid, rest),
         "spielerbuch" | "buch" | "sb" | "einstellungen" | "optionen" => spielerbuch(w, sid, rest),
         "lies" | "lese" | "read" => match normalisieren(rest).as_str() {
             "spielerbuch" | "buch" | "" => spielerbuch(w, sid, ""),
@@ -1846,11 +1848,6 @@ fn admin_befehl(w: &mut Welt, sid: u64, befehl: &str, rest: &str) -> bool {
 // ---------------------------------------------------------------------------
 
 /// [##########----------]
-fn balken(wert: i32, max: i32, breite: usize, farbe: &str) -> String {
-    let anteil = if max > 0 { (wert.max(0) as f64 / max as f64).min(1.0) } else { 0.0 };
-    let voll = (anteil * breite as f64).round() as usize;
-    format!("[{{{farbe}}}{}{{/}}{{grau}}{}{{/}}]", "#".repeat(voll), "-".repeat(breite - voll))
-}
 
 fn dauer(sekunden: u64) -> String {
     let (std, min) = (sekunden / 3600, (sekunden % 3600) / 60);
@@ -1874,138 +1871,128 @@ fn datum(sekunden: u64) -> String {
     format!("{tag:02}.{monat:02}.{jahr}")
 }
 
-fn spielstand(w: &Welt, sid: u64) {
-    let sp = &w.spieler[&sid].sp;
-    let mut t = format!("{{fett}}Spielstand von {}{{/}}{}\n\n", sp.voller_name(), w.spieler[&sid].rolle.marke());
-
-    t.push_str(&format!(
-        "  Lebenspunkte {} {:>4}/{}\n",
-        balken(sp.lebenspunkte, sp.max_lebenspunkte, 20, "gruen"),
-        sp.lebenspunkte,
-        sp.max_lebenspunkte
-    ));
-    t.push_str(&format!(
-        "  Mana         {} {:>4}/{}\n",
-        balken(sp.mana, sp.max_mana, 20, "cyan"),
-        sp.mana,
-        sp.max_mana
-    ));
-    t.push_str(&format!(
-        "  Ausdauer     {} {:>4}/{}\n",
-        balken(sp.ausdauer, sp.max_ausdauer, 20, "gelb"),
-        sp.ausdauer,
-        sp.max_ausdauer
-    ));
+/// Befehl "spielstand" / "sp" (mit "voll" bei Stil "beides" der ganze Bogen).
+fn spielstand(w: &Welt, sid: u64, rest: &str) {
+    use crate::darstellung::{Balken, Bogen};
+    let s = &w.spieler[&sid];
+    let sp = &s.sp;
+    let bk = |name: &str, kurz: &str, akt: i64, max: i64, farbe: &str, zusatz: String| Balken {
+        name: name.into(),
+        kurz: kurz.into(),
+        akt,
+        max,
+        farbe: farbe.into(),
+        zusatz,
+    };
     let naechste = kampf::ep_fuer_naechste(w, sp.stufe);
-    t.push_str(&format!(
-        "\n  {{fett}}Stufe {}{{/}}      {} {:>4}/{} EP\n",
-        sp.stufe,
-        balken(sp.erfahrung as i32, naechste as i32, 20, "hellmagenta"),
-        sp.erfahrung,
-        naechste
-    ));
-    if sp.freie_punkte > 0 {
-        t.push_str(&format!(
-            "  {{hellgelb}}{} {} zu verteilen{{/}} {{grau}}(steigere <wert>){{/}}\n",
-            sp.freie_punkte,
-            if sp.freie_punkte == 1 { "Punkt" } else { "Punkte" }
-        ));
-    }
-    t.push_str(&format!("  {{grau}}Siege: {}   Tode: {}{{/}}\n", sp.siege, sp.tode));
-    t.push_str(&format!("  Geld: {{hellgelb}}{}{{/}}\n", crate::handel::betrag(w, sp.geld)));
-    let mut herkunft = Vec::new();
+
+    // Herkunft: "Elfe · Gilde der Magier · Stufe 3"
+    let mut kopf = Vec::new();
     if let Some(r) = w.d.rassen.get(&sp.rasse) {
-        herkunft.push(format!("Rasse: {}", r.name));
+        kopf.push(r.name.clone());
     }
     if let Some(g) = w.d.gilden.get(&sp.gilde) {
-        herkunft.push(format!("Gilde: {}", g.name));
+        kopf.push(g.name.clone());
     }
     let berufe: Vec<String> = sp.berufe.iter().filter_map(|b| w.d.berufe.get(b).map(|b| b.name.clone())).collect();
     if !berufe.is_empty() {
-        herkunft.push(format!("Beruf: {}", berufe.join(", ")));
+        kopf.push(berufe.join(", "));
     }
-    if !herkunft.is_empty() {
-        t.push_str(&format!("  {}\n", herkunft.join("   ")));
-    }
-    let effekte: Vec<String> = w.spieler[&sid].effekte.iter().map(|e| e.name.clone()).collect();
-    if !effekte.is_empty() {
-        t.push_str(&format!("  {{hellcyan}}Es wirkt: {}{{/}} {{grau}}(wirkungen){{/}}\n", effekte.join(", ")));
+    kopf.push(format!("Stufe {}", sp.stufe));
+
+    let mut hinweise = Vec::new();
+    if sp.freie_punkte > 0 {
+        let p = if sp.freie_punkte == 1 { "Punkt" } else { "Punkte" };
+        hinweise.push(format!("{} {p} zu verteilen (steigere <wert>)", sp.freie_punkte));
     }
 
-    // Boni durch angelegte Ausrüstung
-    let mut boni: std::collections::BTreeMap<String, i32> = Default::default();
-    for id in sp.ausruestung.values() {
-        if let Some(g) = w.d.gegenstaende.get(id) {
-            for (k, v) in &g.eigenschaften {
-                *boni.entry(k.clone()).or_default() += v;
-            }
-        }
-    }
-    if !sp.werte.is_empty() {
-        t.push_str("\n{gelb}Werte{/}\n");
-        for (k, v) in &sp.werte {
-            boni.remove(k);
-            // Ausrüstung, Rasse und Zauber zusammen
-            let bonus = kampf::wert(w, sid, k) - v;
-            let extra = match bonus {
-                0 => String::new(),
-                b if b > 0 => format!(" {{hellgruen}}(+{b}){{/}}"),
-                b => format!(" {{hellrot}}({b}){{/}}"),
-            };
-            t.push_str(&format!("  {:<14}{:>4}{extra}\n", w.d.anzeigename(k), v + bonus));
-        }
-    }
-
-    t.push_str("\n{gelb}Ausrüstung{/}\n");
-    if sp.ausruestung.is_empty() {
-        t.push_str("  nichts angelegt\n");
-    }
-    for (platz, id) in &sp.ausruestung {
-        t.push_str(&format!("  {:<14}{}\n", w.d.anzeigename(platz), w.d.gegenstand_name(id)));
-    }
-    if !boni.is_empty() {
-        let teile: Vec<String> = boni.iter().map(|(k, v)| format!("{} {v}", w.d.anzeigename(k))).collect();
-        t.push_str(&format!("  {{grau}}Zusammen: {}{{/}}\n", teile.join(", ")));
-    }
-
-    t.push_str("\n{gelb}Können{/}\n");
-    let mut fert: Vec<(&String, &u32)> = sp.fertigkeiten.iter().collect();
-    fert.sort_by(|a, b| b.1.cmp(a.1));
-    let beste: Vec<String> = fert
+    // Werte mit allen Boni (Ausrüstung, Rasse, Zauber)
+    let werte: Vec<(String, i32, i32)> = sp
+        .werte
         .iter()
-        .take(3)
-        .filter_map(|(id, stufe)| w.d.fertigkeiten.get(*id).map(|f| format!("{} {stufe}", f.name)))
+        .map(|(k, v)| {
+            let gesamt = kampf::wert(w, sid, k);
+            (w.d.anzeigename(k), gesamt, gesamt - v)
+        })
         .collect();
-    t.push_str(&format!(
-        "  Fertigkeiten  {}{}\n",
-        sp.fertigkeiten.len(),
-        if beste.is_empty() { String::new() } else { format!("  {{grau}}(beste: {}){{/}}", beste.join(", ")) }
-    ));
-    let zauber: Vec<String> = sp.zauber.iter().filter_map(|z| w.d.zauber.get(z).map(|z| z.name.clone())).collect();
-    t.push_str(&format!(
-        "  Zauber        {}{}\n",
-        zauber.len(),
-        if zauber.is_empty() { String::new() } else { format!("  {{grau}}({}){{/}}", zauber.join(", ")) }
-    ));
+    let ausruestung: Vec<(String, String)> =
+        sp.ausruestung.iter().map(|(platz, id)| (w.d.anzeigename(platz), w.d.gegenstand_name(id))).collect();
 
-    let gewicht = crate::behaelter::gewicht_text(w, sid);
     let raeume = w.d.raeume.len().max(1);
     let besucht = sp.besucht.iter().filter(|r| w.d.raeume.contains_key(*r)).count();
-    let ort = w.d.raum(&sp.raum).map(|r| r.name.clone()).unwrap_or_default();
-    t.push_str("\n{gelb}Unterwegs{/}\n");
-    t.push_str(&format!("  Aufenthalt    {ort}\n"));
-    let n = sp.inventar.len();
-    t.push_str(&format!("  Gepäck        {n} {}, {gewicht}\n", if n == 1 { "Gegenstand" } else { "Gegenstände" }));
-    t.push_str(&format!(
-        "  Erkundet      {besucht} von {} Räumen ({}%)\n",
+    let statistik = format!(
+        "Siege {} · Tode {} · Erkundet {besucht}/{} ({}%) · Spielzeit {}",
+        sp.siege,
+        sp.tode,
         w.d.raeume.len(),
-        besucht * 100 / raeume
-    ));
-    t.push_str(&format!("  Spielzeit     {}", dauer(sp.spielzeit)));
+        besucht * 100 / raeume,
+        dauer(sp.spielzeit)
+    );
+    let wirkungen: Vec<String> = s.effekte.iter().map(|e| e.name.clone()).collect();
+
+    // Weitere Abschnitte (einfache Ansicht)
+    let mut fert: Vec<(&String, &u32)> = sp.fertigkeiten.iter().collect();
+    fert.sort_by(|a, b| b.1.cmp(a.1));
+    let beste: Vec<String> =
+        fert.iter().take(3).filter_map(|(id, stufe)| w.d.fertigkeiten.get(*id).map(|f| format!("{} {stufe}", f.name))).collect();
+    let zauber: Vec<String> = sp.zauber.iter().filter_map(|z| w.d.zauber.get(z).map(|z| z.name.clone())).collect();
+    let ort = w.d.raum(&sp.raum).map(|r| r.name.clone()).unwrap_or_default();
+    let n = sp.inventar.len();
+    let mut unterwegs = vec![
+        ("Aufenthalt".to_string(), ort),
+        ("Gepäck".to_string(), format!("{n} {}, {}", if n == 1 { "Gegenstand" } else { "Gegenstände" }, crate::behaelter::gewicht_text(w, sid))),
+    ];
     if sp.erstellt > 0 {
-        t.push_str(&format!(", dabei seit {}", datum(sp.erstellt)));
+        unterwegs.push(("Dabei seit".into(), datum(sp.erstellt)));
     }
-    w.sende(sid, &t);
+    let gewicht = match crate::behaelter::tragkraft(w, sid) {
+        Some(max) => format!("{}/{max}", crate::behaelter::tragegewicht(&w.d, sp)),
+        None => crate::behaelter::tragegewicht(&w.d, sp).to_string(),
+    };
+
+    let bogen = Bogen {
+        name: sp.voller_name(),
+        marke: s.rolle.marke().trim().to_string(),
+        untertitel: kopf.join(" · "),
+        stufe: sp.stufe,
+        balken: vec![
+            bk("Leben", "LP", sp.lebenspunkte as i64, sp.max_lebenspunkte as i64, "gruen", String::new()),
+            bk("Mana", "MP", sp.mana as i64, sp.max_mana as i64, "cyan", String::new()),
+            bk("Ausdauer", "AP", sp.ausdauer as i64, sp.max_ausdauer as i64, "gelb", String::new()),
+        ],
+        erfahrung: bk("Erfahrung", "EP", sp.erfahrung as i64, naechste as i64, "hellmagenta", format!("bis Stufe {}", sp.stufe + 1)),
+        hinweise,
+        werte,
+        ausruestung,
+        geld: crate::handel::betrag(w, sp.geld),
+        gewicht,
+        statistik,
+        wirkungen: wirkungen.join(", "),
+        abschnitte: vec![
+            (
+                "Können".into(),
+                vec![
+                    (
+                        "Fertigkeiten".into(),
+                        format!("{}{}", sp.fertigkeiten.len(), if beste.is_empty() { String::new() } else { format!(" {{grau}}(beste: {}){{/}}", beste.join(", ")) }),
+                    ),
+                    ("Zauber".into(), format!("{}{}", zauber.len(), if zauber.is_empty() { String::new() } else { format!(" {{grau}}({}){{/}}", zauber.join(", ")) })),
+                ],
+            ),
+            ("Unterwegs".into(), unterwegs),
+        ],
+    };
+    // Stil "beides": sp = kompakt, sp voll = Bogen
+    let stil = match (w.d.darstellung.spielstand.as_str(), normalisieren(rest).as_str()) {
+        ("beides", "voll" | "bogen" | "alles") => "bogen",
+        ("beides", _) => "kompakt",
+        (s, _) => s,
+    };
+    let mut t = crate::darstellung::spielstand(stil, &bogen, s.breite());
+    if w.d.darstellung.spielstand == "beides" && stil == "kompakt" {
+        t.push_str("\n{grau}(sp voll zeigt alles){/}");
+    }
+    w.sende(sid, &crate::handel::rahmen(w, t));
 }
 
 // ---------------------------------------------------------------------------
@@ -2033,60 +2020,118 @@ const EINSTELLUNGEN: &[&str] = &[
     "titel", "beschreibung", "passwort",
 ];
 
-fn spielerbuch_zeigen(w: &Welt, sid: u64) {
-    let sp = &w.spieler[&sid].sp;
+/// Alle Einstellungen in fester Reihenfolge (die Nummern gelten für "spielerbuch <nr>").
+fn einstellungen(w: &Welt, sid: u64) -> Vec<(String, Vec<crate::darstellung::Einstellung>)> {
+    use crate::darstellung::Einstellung;
+    let s = &w.spieler[&sid];
+    let sp = &s.sp;
     let e = &sp.einstellungen;
+    let mut nr = 0;
+    let mut schalter = |name: &str, an: bool, hilfe: &str| {
+        nr += 1;
+        Einstellung { nr, name: name.into(), wert: String::new(), schalter: Some(an), auswahl: Vec::new(), hilfe: hilfe.into() }
+    };
+    let anzeige_a = vec![schalter("farben", sp.farben, "farbige Texte"), schalter("karte", e.karte, "Karte beim Umsehen")];
     let groesse = match e.kartengroesse {
         i32::MIN..=-1 => "klein",
         0 => "normal",
         _ => "gross",
     };
-    let zeile = |name: &str, wert: &str, beschreibung: &str| {
-        format!("  {{gelb}}{name:<15}{{/}} {} {{grau}}{beschreibung}{{/}}\n", text::auffuellen(wert, 6))
+    let lage = if e.karte_daneben.unwrap_or(w.d.welt.karte_daneben) { "daneben" } else { "oben" };
+    let breite = if e.breite_auto { format!("auto ({})", s.breite()) } else { e.breite.to_string() };
+    let mut auswahl = |name: &str, wert: &str, moeglich: &[&str], hilfe: &str| {
+        nr += 1;
+        Einstellung {
+            nr,
+            name: name.into(),
+            wert: wert.into(),
+            schalter: None,
+            auswahl: moeglich.iter().map(|m| m.to_string()).collect(),
+            hilfe: hilfe.into(),
+        }
     };
-    let mut t = format!("{{fett}}Spielerbuch von {}{{/}}\n\n", sp.voller_name());
-    t.push_str("{fett}Anzeige{/}\n");
-    t.push_str(&zeile("farben", an_aus(sp.farben), "farbige Texte"));
-    t.push_str(&zeile("karte", an_aus(e.karte), "Karte beim Umsehen zeigen"));
-    t.push_str(&zeile("kartengroesse", groesse, "klein, normal oder gross"));
-    let lage = match e.karte_daneben.unwrap_or(w.d.welt.karte_daneben) {
-        true => "daneben",
-        false => "oben",
+    let anzeige_b = vec![
+        auswahl("kartengroesse", groesse, &["klein", "normal", "gross"], "Größe der Karte"),
+        auswahl("kartenlage", lage, &["daneben", "oben"], "Text neben/unter der Karte"),
+        auswahl("breite", &breite, &[], "auto oder 40 bis 200"),
+    ];
+    let mut schalter = |name: &str, an: bool, hilfe: &str| {
+        nr += 1;
+        Einstellung { nr, name: name.into(), wert: String::new(), schalter: Some(an), auswahl: Vec::new(), hilfe: hilfe.into() }
     };
-    t.push_str(&zeile("kartenlage", lage, "Raumtext neben der Karte (daneben) oder darunter (oben)"));
-    t.push_str(&zeile("kurz", an_aus(e.kurz), "beim Gehen keine Raumbeschreibung (schau zeigt sie)"));
-    let breite = if e.breite_auto { format!("auto ({})", w.spieler[&sid].breite()) } else { e.breite.to_string() };
-    t.push_str(&zeile("breite", &breite, "Zeilenbreite: auto (passt sich dem Fenster an) oder 40 bis 200"));
-    t.push_str(&zeile("prompt", an_aus(e.prompt), "Eingabezeile mit Lebenspunkten und Mana"));
-    t.push_str("\n{fett}Mitteilungen{/}\n");
-    t.push_str(&zeile("ankuendigungen", an_aus(e.ankuendigungen), "melden, wenn Spieler kommen und gehen"));
-    t.push_str(&zeile("npc", an_aus(e.npc_sprueche), "Sprüche von Bewohnern und Tieren"));
-    t.push_str("\n{fett}Kampf{/}\n");
-    t.push_str(&zeile("autoangriff", an_aus(e.autoangriff), "automatisch weiter angreifen, sobald du bereit bist"));
-    t.push_str(&zeile("kampfzahlen", an_aus(e.kampfzahlen), "Schaden als Zahl anzeigen"));
-    t.push_str("\n{fett}Deine Figur{/}\n");
+    let anzeige_c = vec![
+        schalter("kurz", e.kurz, "ohne Raumbeschreibung"),
+        schalter("prompt", e.prompt, "Zeile mit LP, MP, AP"),
+    ];
+    let mitteilungen = vec![
+        schalter("ankuendigungen", e.ankuendigungen, "Spieler kommen/gehen"),
+        schalter("npc", e.npc_sprueche, "Sprüche der Bewohner"),
+    ];
+    let kampf = vec![
+        schalter("autoangriff", e.autoangriff, "weiter angreifen"),
+        schalter("kampfzahlen", e.kampfzahlen, "Schaden als Zahl"),
+    ];
+    let mut anzeige = anzeige_a;
+    anzeige.extend(anzeige_b);
+    anzeige.extend(anzeige_c);
+    vec![("Anzeige".into(), anzeige), ("Mitteilungen".into(), mitteilungen), ("Kampf".into(), kampf)]
+}
+
+fn spielerbuch_zeigen(w: &Welt, sid: u64) {
+    let s = &w.spieler[&sid];
+    let sp = &s.sp;
     let titel = if sp.titel.is_empty() { "(keiner)".to_string() } else { sp.titel.clone() };
-    t.push_str(&format!("  {{gelb}}{:<15}{{/}} {titel}\n", "titel"));
-    let besch = if sp.beschreibung.is_empty() { "(keine)".to_string() } else { sp.beschreibung.clone() };
-    t.push_str(&format!("  {{gelb}}{:<15}{{/}} {besch}\n", "beschreibung"));
-    t.push_str(&format!("  {{gelb}}{:<15}{{/}} {{grau}}ändern mit: spielerbuch passwort <alt> <neu>{{/}}\n", "passwort"));
-    {
-        let p = crate::telnet::sperren(&w.spieler[&sid].proto);
-        t.push_str(&format!(
-            "\n{{fett}}Dein Programm{{/}}\n  {{gelb}}{:<15}{{/}} {}\n  {{gelb}}{:<15}{{/}} {}\n",
-            "client",
-            p.client_name(),
-            "protokolle",
-            p.aktiv()
-        ));
-    }
-    t.push_str("\nÄndern: {gelb}spielerbuch <einstellung> <wert>{/}, z.B. {gelb}spielerbuch karte aus{/}");
-    w.sende(sid, &t);
+    let besch = if sp.beschreibung.is_empty() { "(keine)".to_string() } else { sp.beschreibung.chars().take(40).collect() };
+    let (client, protokolle) = {
+        let p = crate::telnet::sperren(&s.proto);
+        (p.client_name(), p.aktiv())
+    };
+    let buch = crate::darstellung::Buch {
+        titel: format!("Spielerbuch von {}", sp.voller_name()),
+        abschnitte: einstellungen(w, sid),
+        info: vec![
+            (
+                "Deine Figur".into(),
+                vec![
+                    ("titel".into(), titel),
+                    ("beschreibung".into(), besch),
+                    ("passwort".into(), "{grau}spielerbuch passwort <alt> <neu>{/}".into()),
+                ],
+            ),
+            ("Dein Programm".into(), vec![("client".into(), client), ("protokolle".into(), protokolle)]),
+        ],
+        fuss: "Ändern: {gelb}spielerbuch <nr|einstellung> [wert]{/}, z.B. {gelb}spielerbuch 2{/}".into(),
+    };
+    let t = crate::darstellung::spielerbuch(&w.d.darstellung.spielerbuch, &buch, s.breite());
+    w.sende(sid, &crate::handel::rahmen(w, t));
 }
 
 fn spielerbuch(w: &mut Welt, sid: u64, rest: &str) {
     if rest.is_empty() {
         spielerbuch_zeigen(w, sid);
+        return;
+    }
+    // "spielerbuch 3" schaltet Nummer 3 um (oder nimmt die nächste Möglichkeit),
+    // "spielerbuch 3 gross" setzt den Wert
+    let (erstes, wert) = rest.split_once(char::is_whitespace).unwrap_or((rest, ""));
+    if let Some(n) = crate::gemeinschaft::nummer(erstes) {
+        let alle: Vec<crate::darstellung::Einstellung> = einstellungen(w, sid).into_iter().flat_map(|(_, l)| l).collect();
+        let Some(e) = alle.into_iter().nth(n) else {
+            w.sende(sid, "Diese Nummer gibt es nicht. (spielerbuch zeigt die Liste)");
+            return;
+        };
+        let neu = if !wert.trim().is_empty() {
+            wert.trim().to_string()
+        } else if let Some(an) = e.schalter {
+            if an { "aus".into() } else { "an".into() }
+        } else if e.name == "breite" {
+            let auto = w.spieler[&sid].sp.einstellungen.breite_auto;
+            if auto { "78".into() } else { "auto".into() }
+        } else {
+            let i = e.auswahl.iter().position(|a| *a == e.wert).map(|i| (i + 1) % e.auswahl.len()).unwrap_or(0);
+            e.auswahl.get(i).cloned().unwrap_or_default()
+        };
+        spielerbuch(w, sid, &format!("{} {neu}", e.name));
         return;
     }
     let (was, wert) = match rest.split_once(char::is_whitespace) {

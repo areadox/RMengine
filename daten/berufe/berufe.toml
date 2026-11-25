@@ -9,7 +9,7 @@
 id   = "schmied"
 name = "Zunft der Schmiede"
 beschreibung = "Schmiede bearbeiten Eisen und Stahl."
-preis = 5
+preis = 50
 fertigkeiten = { schmieden = 5 }
 aufnahme_text = "Willkommen in der Zunft. Hau ordentlich drauf, aber nicht auf die Finger!"
 

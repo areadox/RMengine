@@ -29,7 +29,7 @@ lebenspunkte = 8
 wander_chance = 15
 sprueche = ["*fiept.", "*nagt an einem Fass."]
 beute = [ { gegenstand = "rattenschwanz", chance = 50 } ]
-geld  = [1, 3]          # Gold beim Sieg: eine Zahl oder [von, bis]
+geld  = [10, 30]          # Geld beim Sieg (in Kupfer): eine Zahl oder [von, bis]
 erholung  = 2.5
 angriffe  = ["beißt", "kratzt"]
 todestext = "*fiept ein letztes Mal und bleibt reglos liegen."

@@ -616,7 +616,6 @@ pub(crate) fn monster_stirbt(w: &mut Welt, mid: u64) {
     if geld > 0 && !sieger.is_empty() {
         let anteil = geld / sieger.len() as u64;
         let rest = geld % sieger.len() as u64;
-        let waehrung = w.d.welt.waehrung.clone();
         for (i, sid) in sieger.iter().enumerate() {
             let betrag = anteil + if i == 0 { rest } else { 0 };
             if betrag == 0 {
@@ -626,7 +625,8 @@ pub(crate) fn monster_stirbt(w: &mut Welt, mid: u64) {
                 s.sp.geld += betrag;
             }
             let bei = if def.dativ.is_empty() { String::new() } else { format!(" bei {}", def.dativ) };
-            w.sende(*sid, &format!("{{hellgelb}}Du findest {betrag} {waehrung}{bei}.{{/}}"));
+            let summe = crate::handel::betrag(w, betrag);
+            w.sende(*sid, &format!("{{hellgelb}}Du findest {summe}{bei}.{{/}}"));
         }
     }
     for sid in &sieger {

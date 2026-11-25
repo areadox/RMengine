@@ -386,6 +386,60 @@ struct WeltDatei {
     /// Zusätzliche Angaben für MUD-Verzeichnisse (MSSP), z.B. GENRE = "Fantasy"
     #[serde(default)]
     mssp: BTreeMap<String, String>,
+    #[serde(default)]
+    geld: GeldConfig,
+    #[serde(default)]
+    darstellung: DarstellungConfig,
+}
+
+/// [geld]: Geldeinheiten, z.B. Gold = 100, Silber = 10, Kupfer = 1.
+/// Alle Beträge (wert, preis, geld ...) stehen in der kleinsten Einheit.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields, default)]
+pub struct GeldConfig {
+    pub einheiten: Vec<EinheitDef>,
+    /// "lang" (2 Gold 5 Silber) oder "kurz" (2G 5S)
+    pub anzeige: String,
+}
+
+impl Default for GeldConfig {
+    fn default() -> Self {
+        GeldConfig { einheiten: Vec::new(), anzeige: "lang".into() }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EinheitDef {
+    pub name: String,
+    /// Mehrzahl, z.B. "Taler" oder "Münzen" (leer = wie name)
+    #[serde(default)]
+    pub mehrzahl: String,
+    /// Kurzform für die Anzeige "kurz", z.B. "G"
+    #[serde(default)]
+    pub kurz: String,
+    /// So viele der kleinsten Einheit ist sie wert (die kleinste hat 1)
+    pub wert: u64,
+}
+
+/// [darstellung]: wie Listen im Spiel aussehen.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields, default)]
+pub struct DarstellungConfig {
+    /// Händler und Lehrmeister: einfach, tabelle, pergament, kategorien
+    pub haendler: String,
+    /// Spielstand: einfach, bogen, kompakt, beides (sp = kompakt, sp voll = bogen)
+    pub spielstand: String,
+    /// Spielerbuch: einfach, buch, schalter
+    pub spielerbuch: String,
+    /// Rahmen: unicode oder ascii (alte Programme bekommen immer ascii)
+    pub rahmen: String,
+}
+
+impl Default for DarstellungConfig {
+    fn default() -> Self {
+        DarstellungConfig { haendler: "einfach".into(), spielstand: "einfach".into(), spielerbuch: "einfach".into(), rahmen: "unicode".into() }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -754,6 +808,9 @@ impl GeldDef {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct HaendlerDef {
+    /// Name des Ladens für die Liste, z.B. "Gretas Krämerladen" (leer = Name des NPCs)
+    #[serde(default)]
+    pub laden: String,
     /// Was der Händler verkauft (Gegenstand-IDs, unbegrenzter Vorrat)
     #[serde(default)]
     pub waren: Vec<String>,
@@ -1009,6 +1066,10 @@ pub struct Daten {
     pub kampf: KampfConfig,
     /// Zusätzliche Serverinfos für MUD-Verzeichnisse ([mssp] in welt.toml)
     pub mssp: BTreeMap<String, String>,
+    pub geld: GeldConfig,
+    /// Die Geldeinheiten für die Anzeige (aus [geld] oder waehrung)
+    pub geld_einheiten: Vec<crate::darstellung::Einheit>,
+    pub darstellung: DarstellungConfig,
     /// Befehle und Gesten aus befehle.toml / befehle/*.toml
     pub befehle: crate::befehlskonfig::Befehle,
     pub oberwelt: Option<Oberwelt>,
@@ -1187,11 +1248,15 @@ pub fn laden(ordner: &Path) -> Result<Daten, Vec<String>> {
         namen: wd.namen,
         kampf: wd.kampf,
         mssp: wd.mssp,
+        geld_einheiten: Vec::new(),
+        geld: wd.geld,
+        darstellung: wd.darstellung,
         befehle: Default::default(),
         oberwelt: None,
         bibliothek: BTreeMap::new(),
         warnungen: Vec::new(),
     };
+    d.geld_einheiten = geld_einheiten(&d.geld, &d.welt.waehrung);
     let mut fehler = Vec::new();
     let mut warnungen = Vec::new();
 
@@ -1308,6 +1373,27 @@ pub fn laden(ordner: &Path) -> Result<Daten, Vec<String>> {
     } else {
         Err(fehler)
     }
+}
+
+/// Die Einheiten aus [geld] – ohne Angabe eine einzige Einheit mit dem Namen aus `waehrung`.
+fn geld_einheiten(g: &GeldConfig, waehrung: &str) -> Vec<crate::darstellung::Einheit> {
+    if g.einheiten.is_empty() {
+        return vec![crate::darstellung::Einheit {
+            name: waehrung.to_string(),
+            mehrzahl: waehrung.to_string(),
+            kurz: String::new(),
+            wert: 1,
+        }];
+    }
+    g.einheiten
+        .iter()
+        .map(|e| crate::darstellung::Einheit {
+            name: e.name.clone(),
+            mehrzahl: if e.mehrzahl.is_empty() { e.name.clone() } else { e.mehrzahl.clone() },
+            kurz: e.kurz.clone(),
+            wert: e.wert,
+        })
+        .collect()
 }
 
 /// Macht die englischen Meldungen des TOML-Lesers verständlicher.
@@ -2059,6 +2145,38 @@ fn pruefen(d: &mut Daten, fehler: &mut Vec<String>, warn: &mut Vec<String>) {
         }
     }
 
+    // --- welt.toml: Geld und Darstellung ---
+    {
+        let g = &d.geld;
+        if !crate::darstellung::GELD_ANZEIGEN.contains(&g.anzeige.as_str()) {
+            fehler.push(format!("welt.toml [geld]: anzeige '{}' gibt es nicht. Erlaubt: lang, kurz", g.anzeige));
+        }
+        if !g.einheiten.is_empty() {
+            if !g.einheiten.iter().any(|e| e.wert == 1) {
+                fehler.push("welt.toml [geld]: Eine Einheit muss wert = 1 haben (die kleinste, z.B. Kupfer).".into());
+            }
+            let mut werte: Vec<u64> = g.einheiten.iter().map(|e| e.wert).collect();
+            werte.sort();
+            if werte.windows(2).any(|w| w[0] == w[1]) || werte.contains(&0) {
+                fehler.push("welt.toml [geld]: Jede Einheit braucht einen eigenen wert größer als 0.".into());
+            }
+            if g.einheiten.iter().any(|e| e.name.trim().is_empty()) {
+                fehler.push("welt.toml [geld]: Jede Einheit braucht einen name.".into());
+            }
+        }
+        let ds = &d.darstellung;
+        for (feld, wert, erlaubt) in [
+            ("haendler", &ds.haendler, crate::darstellung::HAENDLER_STILE),
+            ("spielstand", &ds.spielstand, crate::darstellung::SPIELSTAND_STILE),
+            ("spielerbuch", &ds.spielerbuch, crate::darstellung::SPIELERBUCH_STILE),
+            ("rahmen", &ds.rahmen, crate::darstellung::RAHMEN_STILE),
+        ] {
+            if !erlaubt.contains(&wert.as_str()) {
+                fehler.push(format!("welt.toml [darstellung]: {feld} = '{wert}' gibt es nicht. Erlaubt: {}", erlaubt.join(", ")));
+            }
+        }
+    }
+
     // --- welt.toml: Karte und Start ---
     if !d.welt.karten_fertigkeit.is_empty() {
         verweis(&d.fertigkeiten, &d.welt.karten_fertigkeit, "welt.toml (karten_fertigkeit)", "Fertigkeit", fehler);
@@ -2100,7 +2218,7 @@ mod tests {
         let d = beispiel();
         assert!(d.rassen.contains_key("zwerg") && d.gilden.contains_key("lichtorden") && d.berufe.contains_key("schmied"));
         let q = &d.quests["rattenplage"];
-        assert_eq!((q.geber.as_str(), q.schritte.len(), q.belohnung.geld), ("wirt", 2, 25));
+        assert_eq!((q.geber.as_str(), q.schritte.len(), q.belohnung.geld), ("wirt", 2, 250));
         let schmied = &d.monster["schmied"];
         assert_eq!(schmied.beruf, "schmied");
         assert!(schmied.haendler.as_ref().is_some_and(|h| h.waren.contains(&"dolch".to_string())));
@@ -2111,6 +2229,7 @@ mod tests {
         assert!(d.zauber["wuchtschlag"].ist_technik());
         assert_eq!(d.zauber["schutzschild"].wirkungen[0].dauer, 90.0);
         assert!(matches!(d.monster["ratte"].geld, GeldDef::Bereich(_)));
-        assert_eq!(d.start.geld, 20);
+        assert_eq!(d.start.geld, 200);
+        assert_eq!(crate::darstellung::betrag(1475, &d.geld_einheiten, false), "14 Gold 7 Silber 5 Kupfer");
     }
 }

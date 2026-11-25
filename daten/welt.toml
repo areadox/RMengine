@@ -24,7 +24,7 @@ karte_daneben       = true        # Raumbeschreibung rechts neben der Karte (fal
 karten_fertigkeit        = "orientierung"  # Diese Fertigkeit macht die Karte größer ("" = aus)
 karten_fertigkeit_stufen = 10              # ... alle 10 Stufen um ein Feld
 karten_fertigkeit_max    = 3               # ... höchstens um 3 Felder
-waehrung   = "Gold"           # So heißt das Geld
+waehrung   = "Gold"           # Name des Geldes, wenn es unten keine [geld]-Einheiten gibt
 max_berufe = 2                # So viele Berufe darf man gleichzeitig haben
 techniken_nur_gilden = true   # Kampftechniken (spezial) gibt es nur für Gilden
 tragkraft_basis       = 40    # So viel Gewicht trägt jeder ...
@@ -48,7 +48,7 @@ lebenspunkte = 100
 mana         = 50
 gegenstaende = ["brot", "fackel", "landkarte"]
 zauber       = ["kleine_heilung", "heimkehr"]   # Kampfzauber gibt es bei der Magiergilde
-geld         = 20             # Startgeld
+geld         = 200            # Startgeld (in der kleinsten Einheit: 200 Kupfer = 2 Gold)
 
 [start.fertigkeiten]       # Fertigkeit = Stufe
 magie        = 1
@@ -244,3 +244,38 @@ STATUS   = "Alpha"
 # WEBSITE  = "https://..."
 # CONTACT  = "du@example.de"
 # DISCORD  = "https://discord.gg/..."
+
+# ---------------------------------------------------------------------
+# Geld: Einheiten und Umrechnung
+# ---------------------------------------------------------------------
+# Alle Beträge in den Daten (wert, preis, geld ...) stehen in der KLEINSTEN
+# Einheit. Mit diesen Einheiten wird z.B. 1475 als "14 Gold 7 Silber 5 Kupfer"
+# angezeigt. Ohne Einheiten gibt es nur eine Währung mit dem Namen aus 'waehrung'.
+[geld]
+anzeige = "lang"        # "lang" = 2 Gold 5 Silber, "kurz" = 2G 5S
+
+[[geld.einheiten]]
+name     = "Gold"
+mehrzahl = "Gold"       # z.B. "Taler" / "Münzen" für die Mehrzahl
+kurz     = "G"
+wert     = 100          # 1 Gold = 100 Kupfer
+
+[[geld.einheiten]]
+name     = "Silber"
+kurz     = "S"
+wert     = 10
+
+[[geld.einheiten]]
+name     = "Kupfer"
+kurz     = "K"
+wert     = 1            # die kleinste Einheit hat immer wert = 1
+
+# ---------------------------------------------------------------------
+# Darstellung: wie Listen im Spiel aussehen (Vorschau im Welteditor)
+# ---------------------------------------------------------------------
+[darstellung]
+haendler    = "kategorien"   # einfach, tabelle, pergament, kategorien
+spielstand  = "beides"       # einfach, bogen, kompakt, beides (sp = kompakt, sp voll = bogen)
+spielerbuch = "buch"         # einfach, buch, schalter
+rahmen      = "unicode"      # unicode oder ascii (alte Programme bekommen immer ascii)
+
