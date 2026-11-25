@@ -69,6 +69,7 @@ pub const EINGEBAUT: &[Eingebaut] = &[
     b("gehe", &["gehe", "geh", "go"], "spieler", UMSEHEN, "gehe <richtung>", "Gehen; kurz: n o s w no nw so sw, h(och), r(unter), rein, raus", false),
     b("karte", &["karte", "map", "k"], "spieler", UMSEHEN, "karte [größe]", "Die Karte der Umgebung zeigen", true),
     b("weltkarte", &["weltkarte", "landkarte", "worldmap"], "spieler", UMSEHEN, "weltkarte", "Die ganze Oberwelt (mit einer Landkarte)", false),
+    b("zeit", &["zeit", "uhr", "uhrzeit", "datum", "wetter", "time"], "spieler", UMSEHEN, "zeit", "Uhrzeit, Jahreszeit und Wetter", true),
     // Gegenstände
     b("nimm", &["nimm", "nehme", "take", "get"], "spieler", DINGE, "nimm <ding|alles>", "Etwas aufheben", false),
     b("lege", &["lege", "leg", "ablegen", "drop", "fallenlassen"], "spieler", DINGE, "lege <ding|alles>", "Etwas fallen lassen", false),

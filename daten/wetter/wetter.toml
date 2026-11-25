@@ -1,0 +1,54 @@
+# =====================================================================
+#  Wetter: das Wetter wechselt von selbst (siehe [zeit] in welt.toml)
+# =====================================================================
+#  text    = steht draußen unter der Raumbeschreibung
+#  beginn  = Meldung an alle draußen, wenn es anfängt
+#  gewicht = wie oft es vorkommt (höher = häufiger)
+#  jahreszeiten = nur dann (leer = immer): fruehling, sommer, herbst, winter
+# =====================================================================
+
+[[wetter]]
+id      = "klar"
+name    = "klar"
+text    = "Der Himmel ist klar."
+beginn  = "Die Wolken verziehen sich, der Himmel wird klar."
+gewicht = 5
+
+[[wetter]]
+id      = "bewoelkt"
+name    = "bewölkt"
+text    = "Graue Wolken ziehen über den Himmel."
+beginn  = "Wolken schieben sich vor die Sonne."
+gewicht = 4
+
+[[wetter]]
+id      = "regen"
+name    = "Regen"
+text    = "Es regnet."
+beginn  = "Es beginnt zu regnen."
+gewicht = 3
+jahreszeiten = ["fruehling", "sommer", "herbst"]
+
+[[wetter]]
+id      = "gewitter"
+name    = "Gewitter"
+text    = "Ein Gewitter tobt, Blitze zucken über den Himmel."
+beginn  = "Donner grollt in der Ferne – ein Gewitter zieht auf."
+gewicht = 1
+jahreszeiten = ["sommer"]
+
+[[wetter]]
+id      = "nebel"
+name    = "Nebel"
+text    = "Dichter Nebel liegt über allem."
+beginn  = "Nebel steigt auf und verschluckt die Umgebung."
+gewicht = 2
+jahreszeiten = ["herbst", "winter"]
+
+[[wetter]]
+id      = "schnee"
+name    = "Schnee"
+text    = "Schneeflocken tanzen durch die Luft."
+beginn  = "Es fängt an zu schneien."
+gewicht = 4
+jahreszeiten = ["winter"]

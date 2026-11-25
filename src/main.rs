@@ -30,6 +30,7 @@ mod text;
 mod update;
 mod gemeinschaft;
 mod handel;
+mod zeit;
 mod koerper;
 mod leichen;
 mod ernaehrung;

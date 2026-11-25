@@ -94,6 +94,10 @@ pub struct Raum {
     pub geruch: String,
     pub geraeusch: String,
     pub gefuehl: String,
+    /// Beschreibung bei Nacht (Tag und Nacht in welt.toml [zeit])
+    pub beschreibung_nacht: String,
+    /// Drinnen/draußen (None = wie das Gelände)
+    pub drinnen: Option<bool>,
     pub nutzt: Vec<String>,
     pub gegenstaende: Vec<String>,
     pub monster: Vec<String>,
@@ -338,6 +342,8 @@ impl Welt {
                         geruch: s(t, "geruch"),
                         geraeusch: s(t, "geraeusch"),
                         gefuehl: s(t, "gefuehl"),
+                        beschreibung_nacht: s(t, "beschreibung_nacht"),
+                        drinnen: t.get("drinnen").and_then(|i| i.as_bool()),
                         nutzt: liste(t, "nutzt"),
                         gegenstaende: liste(t, "gegenstaende"),
                         monster: liste(t, "monster"),
@@ -1118,6 +1124,14 @@ fn raum_schreiben(t: &mut Table, r: &Raum) {
     setze_text(t, "geruch", &r.geruch, false);
     setze_text(t, "geraeusch", &r.geraeusch, false);
     setze_text(t, "gefuehl", &r.gefuehl, false);
+    setze_text(t, "beschreibung_nacht", &r.beschreibung_nacht, false);
+    match r.drinnen {
+        Some(b) if t.get("drinnen").and_then(|i| i.as_bool()) != Some(b) => wert_setzen(t, "drinnen", Value::from(b)),
+        None => {
+            t.remove("drinnen");
+        }
+        _ => {}
+    }
 }
 
 #[cfg(test)]

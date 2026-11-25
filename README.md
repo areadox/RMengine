@@ -79,6 +79,7 @@ das Update und veröffentlicht alles als Release.
 - **Bereitschaft** (`bereite`): Der Autoangriff setzt einen Zauber (mit Zauberstab) oder eine Technik von selbst ein
 - **Geld** mit eigenen Münzstufen (z.B. Gold/Silber/Kupfer), **Händler** (`waren`, `kaufe`, `verkaufe`) und **Lehrmeister** (`lerne`)
 - **Wählbare Darstellung** für Händlerlisten, Spielstand, Spielerbuch und Inventar (auch als Figur), mit Vorschau im Editor
+- **Tag und Nacht, Jahreszeiten und Wetter** (Nacht-Beschreibungen, drinnen/draußen)
 - **Hunger und Durst**, **Leichen** besiegter Gegner (beschreibbar, Beute darin) und **Körperbau** (Hände zum Halten, Maul und Pfoten zum Angreifen – alles mit Details)
 - **Eigene Befehle** mit Bedingungen (Ort, Gegenstände, Gilde, Kosten, Abklingzeit, Zufall) und Wirkungen (Heilen, Geld, Gegenstände, Teleport, Zauber, weitere Befehle) – im Editor bearbeitbar
 - **Rassen** (Wahl bei der Erschaffung), **Gilden** und **Berufe** als Grundlage zum Ausbauen
@@ -122,6 +123,7 @@ das Update und veröffentlicht alles als Release.
 | `ernaehrung.rs` | Hunger und Durst                                          |
 | `leichen.rs` | Leichen besiegter Gegner                                     |
 | `koerper.rs` | Körperbau: Hände, Angriffe mit Körperteilen                  |
+| `zeit.rs`    | Tag und Nacht, Jahreszeiten, Wetter                          |
 | `neue_welt.rs` | Leere Welt anlegen (`--neue-welt`, auch im Editor)         |
 | `darstellung.rs` | Stile für Händlerlisten, Spielstand, Spielerbuch; Geldbeträge (auch im Editor) |
 | `gemeinschaft.rs` | Rassen, Gilden und Berufe                               |

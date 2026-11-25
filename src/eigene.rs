@@ -73,7 +73,7 @@ fn ziel_finden(w: &Welt, raum: &str, such: &str) -> Option<Ziel> {
         .and_then(|m| w.d.monster.get(&m.def))
         .map(|d| d.dativ.clone())
         .filter(|d| !d.is_empty())
-        .unwrap_or_else(|| w.monster_name(mid));
+        .unwrap_or_else(|| w.monster_dativ(mid));
     Some((w.monster_akk(mid), dativ, None))
 }
 
@@ -87,6 +87,12 @@ fn bedingungen(w: &Welt, sid: u64, b: &EigenerBefehlDef) -> Result<(), String> {
     }
     if !b.gebiete.is_empty() && !b.gebiete.contains(&w.d.gebiet(&sp.raum)) {
         return Err(nicht_hier());
+    }
+    if b.nur_draussen && crate::zeit::drinnen(w, &sp.raum) {
+        return Err(nicht_hier());
+    }
+    if !crate::zeit::passt(w, &b.tageszeiten, &b.jahreszeiten, &b.wetter) {
+        return Err(if b.nicht_jetzt.trim().is_empty() { "Das geht jetzt nicht.".into() } else { b.nicht_jetzt.clone() });
     }
     if b.nicht_im_kampf && s.kampf_ziel.is_some() {
         return Err("Nicht mitten im Kampf!".into());
@@ -311,6 +317,7 @@ fn ding_pruefen(w: &Welt, sid: u64, was: &str, id: &str) -> Result<(), String> {
             if let Some(alt) = s.sp.ausruestung.get(&g.platz) {
                 return Err(format!("Du musst erst {} ausziehen.", w.d.gegenstand_akk(alt)));
             }
+            crate::koerper::platz_pruefen(w, sid, g)?;
             crate::koerper::haende_pruefen(w, sid, g)?;
         }
         "ausziehen" if !s.sp.ausruestung.values().any(|x| x == id) => {

@@ -149,6 +149,7 @@ name   = "Gebäude"
 symbol = "#"
 farbe  = "hellweiss"
 klammern = "[]"
+drinnen  = true          # kein Wetter, keine Sonne
 nutzt    = ["wand", "dielen", "decke", "tuer", "fenster", "balken"]
 
 [gelaende.tempel]
@@ -156,6 +157,7 @@ name   = "Tempel"
 symbol = "T"
 farbe  = "hellcyan"
 klammern = "[]"
+drinnen  = true          # kein Wetter, keine Sonne
 nutzt    = ["mauer", "fenster", "kerze"]
 geruch   = "Ein Hauch von Weihrauch hängt in der Luft."
 geraeusch = "Es ist so still, dass du deinen eigenen Atem hörst."
@@ -215,6 +217,7 @@ name   = "Höhle"
 symbol = "o"
 farbe  = "grau"
 klammern = "<>"
+drinnen  = true          # kein Wetter, keine Sonne
 nutzt    = ["fels", "steine", "spinnweben"]
 geruch   = "Es riecht feucht und muffig."
 geraeusch = "Wasser tropft irgendwo von der Decke."
@@ -272,6 +275,35 @@ kurz     = "K"
 wert     = 1            # die kleinste Einheit hat immer wert = 1
 
 # ---------------------------------------------------------------------
+# Tag und Nacht, Jahreszeiten, Wetter
+# ---------------------------------------------------------------------
+# Die Spielzeit läuft aus der echten Uhr – für alle gleich, auch wenn der
+# Server aus ist. "zeit" zeigt sie im Spiel. Wetterarten: daten/wetter/
+# Räume können eine eigene Nacht-Beschreibung haben (beschreibung_nacht),
+# Gelände und Räume mit drinnen = true bekommen kein Wetter.
+[zeit]
+aktiv               = true
+minuten_pro_stunde  = 2.0    # echte Minuten pro Spielstunde: ein Tag dauert 48 Minuten
+tage_pro_jahreszeit = 7      # ein Jahr hat 28 Spieltage
+morgen = 6                   # ab diesen Stunden beginnen die Tageszeiten
+tag    = 9
+abend  = 18
+nacht  = 21
+text_morgen = "Im Osten färbt sich der Himmel rot – die Sonne geht auf."
+text_tag    = "Die Sonne steht nun hoch am Himmel."
+text_abend  = "Die Sonne sinkt, und die Schatten werden länger."
+text_nacht  = "Es wird dunkel. Die ersten Sterne erscheinen."
+zusatz_morgen = "Es ist früher Morgen, Tau glitzert überall."
+zusatz_tag    = ""           # steht draußen unter der Raumbeschreibung
+zusatz_abend  = "Es ist Abend, das Licht wird golden."
+zusatz_nacht  = "Es ist Nacht."
+text_fruehling = "Der Frühling ist gekommen – überall sprießt frisches Grün."
+text_sommer    = "Der Sommer beginnt."
+text_herbst    = "Es wird Herbst, die Blätter färben sich."
+text_winter    = "Der Winter hält Einzug."
+wetter_minuten = 15          # ungefähr so oft (echte Minuten) wechselt das Wetter
+
+# ---------------------------------------------------------------------
 # Hunger und Durst
 # ---------------------------------------------------------------------
 # Essen (typ "nahrung") sättigt, Getränke (typ "getraenk") löschen den Durst.
@@ -290,6 +322,7 @@ schaden_pro_minute = 2       # LP-Verlust pro Minute bei 0
 ohne_erholung      = true    # bei 0 keine Erholung von LP und Mana
 nahrung_standard   = 25      # Essen ohne Angabe
 getraenk_standard  = 30      # Getränke ohne Angabe
+nur_spieler        = true    # Baumeister und Admins werden nicht hungrig
 
 # ---------------------------------------------------------------------
 # Darstellung: wie Listen im Spiel aussehen (Vorschau im Welteditor)

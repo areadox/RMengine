@@ -118,6 +118,11 @@ pub struct Welt {
     pub spieler: BTreeMap<u64, Sitzung>,
     /// Leichen besiegter Gegner (der Gegenstand dazu liegt in `boden`)
     pub leichen: Vec<crate::leichen::Leiche>,
+    /// Aktuelles Wetter (ID aus daten/wetter) und bis wann es mindestens bleibt
+    pub wetter: String,
+    pub wetter_bis: Instant,
+    /// Zuletzt gesehene Tages- und Jahreszeit (für die Meldungen beim Wechsel)
+    pub zeit_stand: Option<(usize, usize)>,
     naechste_id: u64,
     takte: u64,
 }
@@ -131,10 +136,15 @@ impl Welt {
             monster: BTreeMap::new(),
             spieler: BTreeMap::new(),
             leichen: Vec::new(),
+            wetter: String::new(),
+            wetter_bis: Instant::now(),
+            zeit_stand: None,
             naechste_id: 1,
             takte: 0,
         };
         w.bevoelkern();
+        crate::leichen::laden(&mut w);
+        crate::zeit::takt(&mut w);
         w
     }
 
@@ -156,6 +166,11 @@ impl Welt {
         }
         for (m, raum) in monster {
             self.monster_erschaffen(&m, &raum);
+        }
+        // Leichen bleiben liegen (auch nach neuladen)
+        self.leichen.retain(|l| self.d.gegenstaende.contains_key(&l.id));
+        for l in &self.leichen {
+            self.boden.entry(l.raum.clone()).or_default().push(l.id.clone());
         }
     }
 
@@ -182,6 +197,14 @@ impl Welt {
             .and_then(|m| self.d.monster.get(&m.def))
             .map(|d| d.name.clone())
             .unwrap_or_else(|| "etwas".into())
+    }
+
+    /// Dativ: angegeben oder aus dem Namen geraten ("einer fetten Ratte")
+    pub fn monster_dativ(&self, id: u64) -> String {
+        match self.monster.get(&id).and_then(|m| self.d.monster.get(&m.def)) {
+            Some(d) if !d.dativ.is_empty() => d.dativ.clone(),
+            _ => text::dativ_raten(&self.monster_name(id)),
+        }
     }
 
     pub fn monster_akk(&self, id: u64) -> String {
@@ -372,6 +395,7 @@ impl Welt {
         for s in self.spieler.values() {
             self.speichern(&s.sp);
         }
+        crate::leichen::speichern(self);
     }
 
     // ------------------------------------------------------------------
@@ -402,6 +426,7 @@ impl Welt {
         }
         crate::ernaehrung::takt(self, self.takte % pro_minute == 0);
         crate::leichen::takt(self);
+        crate::zeit::takt(self);
 
         // Monster erholen sich, wenn sie nicht kämpfen
         let prozent = self.d.kampf.monster_erholung_prozent;

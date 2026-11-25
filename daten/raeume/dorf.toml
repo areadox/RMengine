@@ -18,6 +18,10 @@ Du stehst auf dem kopfsteingepflasterten Dorfplatz von Eichenhain. In der
 Mitte plätschert ein alter {hellblau}Brunnen{/}. Im Osten hängt das Schild
 einer Taverne, im Westen hörst du Hammerschläge. Eine Straße führt nach
 Norden, im Süden erhebt sich ein kleiner Tempel."""
+beschreibung_nacht = """
+Der Dorfplatz liegt still im Mondlicht. Der {hellblau}Brunnen{/} plätschert leise,
+aus den Fenstern der Taverne im Osten fällt warmes Licht. Die Straße nach
+Norden und der Tempel im Süden sind nur als dunkle Umrisse zu erkennen."""
 ausgaenge = { nord = "hauptstrasse", ost = "taverne", west = "schmiede", sued = "tempel", nordost = "marktstand" }
 gegenstaende = ["apfel"]
 

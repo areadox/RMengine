@@ -71,3 +71,18 @@ nicht_hier  = "Hier gibt es kein Wasser zum Schöpfen."
 selbst      = "Du schöpfst mit den Händen kühles Wasser aus dem Brunnen und trinkst."
 andere      = "{name} schöpft Wasser aus dem Brunnen und trinkt."
 trinken     = 40
+
+# Nachts bei klarem Himmel die Sterne betrachten (nur draußen)
+[[befehl]]
+id           = "sterne"
+woerter      = ["sterne", "sternbilder"]
+hilfe        = "Nachts die Sterne betrachten (stärkt das Mana)"
+nur_draussen = true
+nicht_hier   = "Von hier aus siehst du den Himmel nicht."
+tageszeiten  = ["nacht"]
+wetter       = ["klar"]
+nicht_jetzt  = "Gerade sind keine Sterne zu sehen."
+abklingzeit  = 300
+selbst       = "Du legst den Kopf in den Nacken und betrachtest die funkelnden Sternbilder. Eine stille Kraft erfüllt dich."
+andere       = "{name} blickt versonnen zu den Sternen hinauf."
+mp           = 10

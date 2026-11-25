@@ -27,6 +27,7 @@ fertigkeiten = { magie = 3, orientierung = 5 }
 [[rasse]]
 id   = "zwerg"
 name = "Zwerge"
+koerper = "zwerg"
 beschreibung = "Klein, zäh und stur. Zwerge halten viel aus und schwingen ihre Äxte mit Kraft."
 lebenspunkte = 20
 mana = -10

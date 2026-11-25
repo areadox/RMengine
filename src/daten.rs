@@ -287,6 +287,8 @@ pub struct GelaendeDef {
     pub geruch: String,
     pub geraeusch: String,
     pub gefuehl: String,
+    /// Drinnen (Haus, Höhle): kein Wetter, keine Meldungen zu Sonne und Mond
+    pub drinnen: bool,
 }
 
 impl Default for GelaendeDef {
@@ -302,6 +304,7 @@ impl Default for GelaendeDef {
             geruch: String::new(),
             geraeusch: String::new(),
             gefuehl: String::new(),
+            drinnen: false,
         }
     }
 }
@@ -347,6 +350,8 @@ pub struct KampfConfig {
     pub leichen_minuten: u64,
     /// Beute liegt in der Leiche ("nimm alles aus leiche") statt am Boden
     pub beute_in_leiche: bool,
+    /// So viele Sekunden darf nur plündern, wer den Gegner besiegt hat (0 = jeder sofort)
+    pub pluendern_sekunden: u64,
 }
 
 impl Default for KampfConfig {
@@ -374,6 +379,7 @@ impl Default for KampfConfig {
             monster_erholung_prozent: 5,
             leichen_minuten: 5,
             beute_in_leiche: true,
+            pluendern_sekunden: 60,
         }
     }
 }
@@ -401,7 +407,95 @@ struct WeltDatei {
     darstellung: DarstellungConfig,
     #[serde(default)]
     ernaehrung: ErnaehrungConfig,
+    #[serde(default)]
+    zeit: ZeitConfig,
 }
+
+/// [zeit]: Tageszeiten und Jahreszeiten (aus der echten Uhrzeit berechnet)
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields, default)]
+pub struct ZeitConfig {
+    pub aktiv: bool,
+    /// Echte Minuten pro Spielstunde (2 = ein Spieltag dauert 48 Minuten)
+    pub minuten_pro_stunde: f64,
+    /// Spieltage pro Jahreszeit
+    pub tage_pro_jahreszeit: u32,
+    /// Ab welcher Stunde Morgen, Tag, Abend und Nacht beginnen
+    pub morgen: u32,
+    pub tag: u32,
+    pub abend: u32,
+    pub nacht: u32,
+    /// Meldungen beim Wechsel (draußen)
+    pub text_morgen: String,
+    pub text_tag: String,
+    pub text_abend: String,
+    pub text_nacht: String,
+    /// Wie es draußen aussieht (steht unter der Raumbeschreibung)
+    pub zusatz_morgen: String,
+    pub zusatz_tag: String,
+    pub zusatz_abend: String,
+    pub zusatz_nacht: String,
+    /// Meldungen, wenn eine Jahreszeit beginnt (an alle)
+    pub text_fruehling: String,
+    pub text_sommer: String,
+    pub text_herbst: String,
+    pub text_winter: String,
+    /// Nach so vielen echten Minuten kann das Wetter wechseln
+    pub wetter_minuten: u64,
+}
+
+impl Default for ZeitConfig {
+    fn default() -> Self {
+        ZeitConfig {
+            aktiv: false,
+            minuten_pro_stunde: 2.0,
+            tage_pro_jahreszeit: 7,
+            morgen: 6,
+            tag: 9,
+            abend: 18,
+            nacht: 21,
+            text_morgen: "Im Osten färbt sich der Himmel rot – die Sonne geht auf.".into(),
+            text_tag: "Die Sonne steht nun hoch am Himmel.".into(),
+            text_abend: "Die Sonne sinkt, und die Schatten werden länger.".into(),
+            text_nacht: "Es wird dunkel. Die ersten Sterne erscheinen.".into(),
+            zusatz_morgen: "Es ist früher Morgen.".into(),
+            zusatz_tag: String::new(),
+            zusatz_abend: "Es ist Abend.".into(),
+            zusatz_nacht: "Es ist Nacht.".into(),
+            text_fruehling: "Der Frühling ist gekommen.".into(),
+            text_sommer: "Der Sommer beginnt.".into(),
+            text_herbst: "Es wird Herbst.".into(),
+            text_winter: "Der Winter hält Einzug.".into(),
+            wetter_minuten: 15,
+        }
+    }
+}
+
+/// Eine Wetterlage ([[wetter]] in daten/wetter/)
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WetterDef {
+    pub id: String,
+    /// z.B. "Regen"
+    pub name: String,
+    /// Steht draußen unter der Raumbeschreibung, z.B. "Es regnet."
+    #[serde(default)]
+    pub text: String,
+    /// Meldung, wenn es beginnt, z.B. "Es beginnt zu regnen."
+    #[serde(default)]
+    pub beginn: String,
+    /// Wie oft es vorkommt (Gewicht, Standard 1)
+    #[serde(default = "eins_u")]
+    pub gewicht: u32,
+    /// Nur in diesen Jahreszeiten (leer = immer): fruehling, sommer, herbst, winter
+    #[serde(default)]
+    pub jahreszeiten: Vec<String>,
+    #[serde(skip)]
+    pub quelle: String,
+}
+
+pub const TAGESZEITEN: &[&str] = &["morgen", "tag", "abend", "nacht"];
+pub const JAHRESZEITEN: &[&str] = &["fruehling", "sommer", "herbst", "winter"];
 
 /// [ernaehrung]: Hunger und Durst
 #[derive(Debug, Clone, Deserialize)]
@@ -426,6 +520,8 @@ pub struct ErnaehrungConfig {
     pub nahrung_standard: i32,
     /// Wie viel ein Getränk ohne Angabe den Durst löscht (eigenschaften: trinken = ...)
     pub getraenk_standard: i32,
+    /// Nur Spieler werden hungrig – Baumeister und Admins nicht (Standard: ja)
+    pub nur_spieler: bool,
 }
 
 impl Default for ErnaehrungConfig {
@@ -442,6 +538,7 @@ impl Default for ErnaehrungConfig {
             ohne_erholung: true,
             nahrung_standard: 25,
             getraenk_standard: 30,
+            nur_spieler: true,
         }
     }
 }
@@ -512,6 +609,20 @@ fn standard_ausrichtung() -> String {
 }
 
 impl DarstellungConfig {
+    /// Figur für einen Körperbau: dessen eigene, sonst die aus [darstellung]
+    pub fn figur_fuer(&self, koerper: Option<&KoerperDef>) -> (String, Vec<crate::darstellung::FigurPlatz>) {
+        match koerper {
+            Some(k) if !k.figur.trim().is_empty() => (
+                k.figur.trim_matches('\n').to_string(),
+                k.figur_plaetze
+                    .iter()
+                    .map(|p| crate::darstellung::FigurPlatz { platz: p.platz.clone(), zeile: p.zeile, spalte: p.spalte, rechts: p.ausrichtung == "rechts" })
+                    .collect(),
+            ),
+            _ => self.figur(),
+        }
+    }
+
     /// Bild und Plätze der Figur (eingebaut, wenn keine eigene angegeben ist)
     pub fn figur(&self) -> (String, Vec<crate::darstellung::FigurPlatz>) {
         let eigene: Vec<crate::darstellung::FigurPlatz> = self
@@ -591,6 +702,12 @@ pub struct RaumDef {
     /// Allgemeine Beschreibungen aus der Bibliothek (daten/beschreibungen)
     #[serde(default)]
     pub nutzt: Vec<String>,
+    /// Beschreibung bei Nacht (leer = die normale)
+    #[serde(default)]
+    pub beschreibung_nacht: String,
+    /// Drinnen oder draußen (leer = wie das Gelände)
+    #[serde(default)]
+    pub drinnen: Option<bool>,
     #[serde(default)]
     pub gegenstaende: Vec<String>,
     #[serde(default)]
@@ -679,6 +796,11 @@ pub struct GegenstandDef {
 #[serde(deny_unknown_fields)]
 pub struct KoerperDef {
     pub id: String,
+    /// Eigene Figur fürs Inventar (leer = die aus [darstellung])
+    #[serde(default)]
+    pub figur: String,
+    #[serde(default)]
+    pub figur_plaetze: Vec<FigurPlatzDef>,
     /// Anzeigename, z.B. "Menschengestalt" (für den Editor und die Prüfung)
     #[allow(dead_code)]
     pub name: String,
@@ -708,11 +830,30 @@ pub struct TeilDef {
     pub halten: bool,
     /// Angriff mit diesem Teil, z.B. "beißt" oder "schlägt mit der Pfote nach {ziel_dativ}"
     pub angriff: String,
+    /// Dasselbe für den Spieler selbst (ohne Waffe), z.B. "schlägst {ziel} mit der Faust"
+    pub angriff_du: String,
+    /// So sehen andere dieses Teil ("schau bert hand"); leer = Text
+    pub text_andere: String,
+    /// Diese Ausrüstungsplätze trägt das Teil, z.B. ["kopf"] (Waffe/Schild/Licht: über halten)
+    pub plaetze: Vec<String>,
     /// Schaden dieses Angriffs (0 = der normale Schaden des Wesens)
     pub schaden: i32,
 }
 
 impl TeilDef {
+    /// Als Detail für andere ("schau bert hand"): text_andere, sonst text
+    pub fn als_detail_fuer(&self, besitzer: &str) -> (String, Detail) {
+        let (id, mut d) = self.als_detail();
+        if let Detail::Voll(v) = &mut d {
+            v.text = if !self.text_andere.is_empty() {
+                self.text_andere.replace("{name}", besitzer)
+            } else {
+                format!("{} von {besitzer}.", text::gross(&self.name))
+            };
+        }
+        (id, d)
+    }
+
     /// Als Detail zum Ansehen (Name, Wörter, Text, Sinne, Unter-Details)
     pub fn als_detail(&self) -> (String, Detail) {
         let mut woerter = self.woerter.clone();
@@ -1288,6 +1429,19 @@ pub struct EigenerBefehlDef {
     pub abklingzeit: u64,
     #[serde(default)]
     pub nicht_im_kampf: bool,
+    /// Nur zu diesen Tageszeiten (morgen, tag, abend, nacht), Jahreszeiten oder bei diesem Wetter
+    #[serde(default)]
+    pub tageszeiten: Vec<String>,
+    #[serde(default)]
+    pub jahreszeiten: Vec<String>,
+    #[serde(default)]
+    pub wetter: Vec<String>,
+    /// Meldung, wenn Zeit oder Wetter nicht passen
+    #[serde(default)]
+    pub nicht_jetzt: String,
+    /// Nur draußen (nicht in Häusern und Höhlen)
+    #[serde(default)]
+    pub nur_draussen: bool,
     /// Meldung, wenn Raum/Gebiet nicht passen
     #[serde(default)]
     pub nicht_hier: String,
@@ -1402,6 +1556,7 @@ pub struct Daten {
     pub quests: BTreeMap<String, QuestDef>,
     pub eigene_befehle: BTreeMap<String, EigenerBefehlDef>,
     pub koerper: BTreeMap<String, KoerperDef>,
+    pub wetter: BTreeMap<String, WetterDef>,
     /// Welcher Raum liegt an welcher Koordinate?
     /// (karte, x, y, z) -> Raum
     pub koordinaten: HashMap<(String, i32, i32, i32), String>,
@@ -1417,6 +1572,7 @@ pub struct Daten {
     pub geld_einheiten: Vec<crate::darstellung::Einheit>,
     pub darstellung: DarstellungConfig,
     pub ernaehrung: ErnaehrungConfig,
+    pub zeit: ZeitConfig,
     /// Befehle und Gesten aus befehle.toml / befehle/*.toml
     pub befehle: crate::befehlskonfig::Befehle,
     pub oberwelt: Option<Oberwelt>,
@@ -1606,6 +1762,7 @@ pub fn laden(ordner: &Path) -> Result<Daten, Vec<String>> {
         quests: BTreeMap::new(),
         eigene_befehle: BTreeMap::new(),
         koerper: BTreeMap::new(),
+        wetter: BTreeMap::new(),
         koordinaten: HashMap::new(),
         deko_farben: wd.deko,
         namen: wd.namen,
@@ -1615,6 +1772,7 @@ pub fn laden(ordner: &Path) -> Result<Daten, Vec<String>> {
         geld: wd.geld,
         darstellung: wd.darstellung,
         ernaehrung: wd.ernaehrung,
+        zeit: wd.zeit,
         befehle: Default::default(),
         oberwelt: None,
         bibliothek: BTreeMap::new(),
@@ -1670,6 +1828,7 @@ pub fn laden(ordner: &Path) -> Result<Daten, Vec<String>> {
     let mut quests: Vec<(String, QuestDef)> = Vec::new();
     let mut eigene: Vec<(String, EigenerBefehlDef)> = Vec::new();
     let mut koerper: Vec<(String, KoerperDef)> = Vec::new();
+    let mut wetter: Vec<(String, WetterDef)> = Vec::new();
     for (i, t) in fertig {
         let r = &roh[i];
         let id = t.get("id").and_then(|v| v.as_str()).unwrap_or("?").to_string();
@@ -1696,6 +1855,7 @@ pub fn laden(ordner: &Path) -> Result<Daten, Vec<String>> {
             "quest" => umwandeln!(quests),
             "befehl" => umwandeln!(eigene),
             "koerper" => umwandeln!(koerper),
+            "wetter" => umwandeln!(wetter),
             _ => umwandeln!(bibliothek),
         }
     }
@@ -1732,6 +1892,7 @@ pub fn laden(ordner: &Path) -> Result<Daten, Vec<String>> {
     einsortieren!(quests, d.quests, "Quest");
     einsortieren!(eigene, d.eigene_befehle, "Befehl");
     einsortieren!(koerper, d.koerper, "Körper");
+    einsortieren!(wetter, d.wetter, "Wetter");
     leichen_anlegen(&mut d);
 
     d.oberwelt = oberwelt::laden(ordner, &mut fehler);
@@ -1879,7 +2040,7 @@ struct Roh {
 }
 
 const ARTEN: &[&str] =
-    &["raum", "gegenstand", "monster", "npc", "fertigkeit", "zauber", "beschreibung", "rasse", "gilde", "beruf", "quest", "befehl", "koerper"];
+    &["raum", "gegenstand", "monster", "npc", "fertigkeit", "zauber", "beschreibung", "rasse", "gilde", "beruf", "quest", "befehl", "koerper", "wetter"];
 
 fn art_anzeige(art: &str) -> &'static str {
     match art {
@@ -1895,6 +2056,7 @@ fn art_anzeige(art: &str) -> &'static str {
         "quest" => "Quest",
         "befehl" => "Befehl",
         "koerper" => "Körper",
+        "wetter" => "Wetter",
         _ => "Beschreibung",
     }
 }
@@ -2536,6 +2698,11 @@ fn pruefen(d: &mut Daten, fehler: &mut Vec<String>, warn: &mut Vec<String>) {
             } else if !ids.insert(t.id.clone()) {
                 fehler.push(format!("{wo}: Das Körperteil '{}' gibt es doppelt.", t.id));
             }
+            for p in &t.plaetze {
+                if !PLAETZE.contains(&p.as_str()) {
+                    fehler.push(format!("{wo}, Teil '{}': Platz '{p}' gibt es nicht. Bekannt: {}", t.id, PLAETZE.join(", ")));
+                }
+            }
         }
     }
     if !d.welt.koerper.is_empty() {
@@ -2590,6 +2757,19 @@ fn pruefen(d: &mut Daten, fehler: &mut Vec<String>, warn: &mut Vec<String>) {
         }
         if !b.mit_gegenstand.is_empty() && !MIT_GEGENSTAND.contains(&b.mit_gegenstand.as_str()) {
             fehler.push(format!("{wo}: mit_gegenstand '{}' gibt es nicht. Erlaubt: {}", b.mit_gegenstand, MIT_GEGENSTAND.join(", ")));
+        }
+        for t in &b.tageszeiten {
+            if !TAGESZEITEN.contains(&t.as_str()) {
+                fehler.push(format!("{wo}: Tageszeit '{t}' gibt es nicht. Erlaubt: {}", TAGESZEITEN.join(", ")));
+            }
+        }
+        for j in &b.jahreszeiten {
+            if !JAHRESZEITEN.contains(&j.as_str()) {
+                fehler.push(format!("{wo}: Jahreszeit '{j}' gibt es nicht. Erlaubt: {}", JAHRESZEITEN.join(", ")));
+            }
+        }
+        for x in &b.wetter {
+            verweis(&d.wetter, x, &wo, "Wetter", fehler);
         }
         if b.chance > 100 {
             fehler.push(format!("{wo}: 'chance' ist in Prozent (0 bis 100)."));

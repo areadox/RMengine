@@ -371,11 +371,19 @@ fn schlag(w: &mut Welt, sid: u64, mid: u64, technik: Option<&Technik>) -> bool {
     let (name, raum, haltung, zahlen) =
         (s.sp.name.clone(), s.sp.raum.clone(), s.haltung, s.sp.einstellungen.kampfzahlen);
     let spieler_stufe = s.sp.stufe as i32;
-    let (waffen_schaden, erholung, fert_id) = waffe(w, sid);
+    let (mut waffen_schaden, erholung, fert_id) = waffe(w, sid);
     let fert = s.sp.fertigkeiten.get(&fert_id).copied().unwrap_or(0) as i32;
     let (staerke, geschick) = (wert(w, sid, "staerke"), wert(w, sid, "geschick"));
     let akk = w.monster_akk(mid);
     let monster_name = gross(&w.monster_name(mid));
+    // Ohne Waffe: mit einem Körperteil (Faust, Tritt ...)
+    let dativ = w.monster_dativ(mid);
+    let koerper_angriff = if technik.is_none() { crate::koerper::spieler_angriff(w, sid, &akk, &dativ) } else { None };
+    if let Some((_, _, sch)) = &koerper_angriff {
+        if *sch > 0 {
+            waffen_schaden = *sch;
+        }
+    }
 
     let mut rng = rand::thread_rng();
     let chance = (75 + (geschick - 10) * 2 + fert / 4 - (def.stufe as i32 - spieler_stufe) * 5).clamp(10, 95);
@@ -406,8 +414,16 @@ fn schlag(w: &mut Welt, sid: u64, mid: u64, technik: Option<&Technik>) -> bool {
         w.sende_raum(&raum, &format!("{{hellmagenta}}{andere}{{/}}"), &[sid]);
     }
     if !getroffen {
-        w.sende(sid, &format!("Du verfehlst {akk}."));
-        w.sende_raum(&raum, &format!("{name} verfehlt {akk}."), &[sid]);
+        match &koerper_angriff {
+            Some((du, er, _)) => {
+                w.sende(sid, &format!("Du {du}, verfehlst aber."));
+                w.sende_raum(&raum, &format!("{name} {er}, verfehlt aber."), &[sid]);
+            }
+            None => {
+                w.sende(sid, &format!("Du verfehlst {akk}."));
+                w.sende_raum(&raum, &format!("{name} verfehlt {akk}."), &[sid]);
+            }
+        }
         return true;
     }
 
@@ -429,8 +445,16 @@ fn schlag(w: &mut Welt, sid: u64, mid: u64, technik: Option<&Technik>) -> bool {
     };
     let zahl = if zahlen { format!(" {{grau}}({schaden}){{/}}") } else { String::new() };
     let wie = if erschoepft { " erschöpft" } else { "" };
-    w.sende(sid, &format!("Du triffst {akk}{wie}.{zahl}"));
-    w.sende_raum(&raum, &format!("{name} trifft {akk}."), &[sid]);
+    match &koerper_angriff {
+        Some((du, er, _)) => {
+            w.sende(sid, &format!("Du {du}{wie}.{zahl}"));
+            w.sende_raum(&raum, &format!("{name} {er}."), &[sid]);
+        }
+        None => {
+            w.sende(sid, &format!("Du triffst {akk}{wie}.{zahl}"));
+            w.sende_raum(&raum, &format!("{name} trifft {akk}."), &[sid]);
+        }
+    }
 
     // Übung macht den Meister
     if let Some(f) = w.d.fertigkeiten.get(&fert_id).cloned() {
@@ -603,7 +627,9 @@ pub(crate) fn monster_stirbt(w: &mut Welt, mid: u64) {
     // Beute: in die Leiche oder (ohne Leiche) auf den Boden
     let mut rng = rand::thread_rng();
     let beute: Vec<String> = def.beute.iter().filter(|b| rng.gen_range(0..100) < b.chance).map(|b| b.gegenstand.clone()).collect();
-    for g in crate::leichen::hinlegen(w, &def.id, &m.raum, beute) {
+    let sieger_namen: Vec<String> =
+        m.ziele.iter().filter_map(|sid| w.spieler.get(sid)).filter(|s| s.sp.raum == m.raum).map(|s| s.sp.name.clone()).collect();
+    for g in crate::leichen::hinlegen(w, &def.id, &m.raum, beute, sieger_namen) {
         w.boden.entry(m.raum.clone()).or_default().push(g.clone());
         let g = gross(&w.d.gegenstand_name(&g));
         w.sende_raum(&m.raum, &format!("{g} fällt zu Boden."), &[]);

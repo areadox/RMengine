@@ -199,6 +199,35 @@ pub fn normalisieren(t: &str) -> String {
         .replace('ß', "ss")
 }
 
+/// Dativ aus dem Namen raten, wenn keiner angegeben ist:
+/// "eine fette Ratte" -> "einer fetten Ratte", "ein grauer Wolf" -> "einem grauen Wolf",
+/// "der Wirt" -> "dem Wirt", "die Spinne" -> "der Spinne", "das Pferd" -> "dem Pferd".
+pub fn dativ_raten(name: &str) -> String {
+    let woerter: Vec<&str> = name.split_whitespace().collect();
+    let Some((erstes, rest)) = woerter.split_first() else { return name.to_string() };
+    let artikel = match erstes.to_lowercase().as_str() {
+        "ein" => "einem",
+        "eine" => "einer",
+        "der" | "das" => "dem",
+        "die" => "der",
+        _ => return name.to_string(),
+    };
+    let gross_anfang = erstes.chars().next().is_some_and(|c| c.is_uppercase());
+    let mut aus = vec![if gross_anfang { gross(artikel) } else { artikel.to_string() }];
+    // Adjektive (klein geschrieben, vor dem Hauptwort) bekommen -en
+    let n = rest.len();
+    for (i, w) in rest.iter().enumerate() {
+        let adjektiv = i + 1 < n && w.chars().next().is_some_and(|c| c.is_lowercase());
+        if adjektiv {
+            let stamm = w.strip_suffix("er").or_else(|| w.strip_suffix("es")).or_else(|| w.strip_suffix('e')).unwrap_or(w);
+            aus.push(format!("{stamm}en"));
+        } else {
+            aus.push(w.to_string());
+        }
+    }
+    aus.join(" ")
+}
+
 /// Erster Buchstabe groß: "eine Ratte" -> "Eine Ratte".
 pub fn gross(t: &str) -> String {
     let mut c = t.chars();
@@ -261,5 +290,13 @@ mod tests {
         assert_eq!(offene_farben("{rot}a{/} b"), "");
         let t = nebeneinander(&["{gruen}#{/}".into(), "##".into()], &["{rot}x".into(), "y".into()], 1);
         assert_eq!(t, "{gruen}#{/}  {/}{rot}x{/}\n## {/}{rot}y{/}\n");
+    }
+
+    #[test]
+    fn dativ() {
+        assert_eq!(super::dativ_raten("eine fette Ratte"), "einer fetten Ratte");
+        assert_eq!(super::dativ_raten("ein grauer Wolf"), "einem grauen Wolf");
+        assert_eq!(super::dativ_raten("der Wirt"), "dem Wirt");
+        assert_eq!(super::dativ_raten("Schwester Alwine"), "Schwester Alwine");
     }
 }

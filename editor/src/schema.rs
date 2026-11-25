@@ -23,6 +23,8 @@ pub enum Ziel {
     Befehl,
     /// Körperbau
     Koerper,
+    /// Wetterarten
+    Wetter,
     Beschreibung,
     /// Dieselbe Art wie der Eintrag (für erbt)
     Gleich,
@@ -417,6 +419,11 @@ const BEFEHL: &[Feld] = felder![
     f("kosten", "Kostet Geld", Typ::Betrag, ""),
     f("abklingzeit", "Abklingzeit (s)", Typ::Zahl, "So lange kann man ihn danach nicht wieder benutzen."),
     f("nicht_im_kampf", "Nicht im Kampf", Typ::Schalter, ""),
+    f("nur_draussen", "Nur draußen", Typ::Schalter, "Nicht in Häusern und Höhlen (drinnen)."),
+    f("tageszeiten", "Nur zu Tageszeiten", Typ::AuswahlListe(&["morgen", "tag", "abend", "nacht"]), "Leer = immer (Tag und Nacht in Welt → Zeit)."),
+    f("jahreszeiten", "Nur in Jahreszeiten", Typ::AuswahlListe(&["fruehling", "sommer", "herbst", "winter"]), "Leer = immer."),
+    f("wetter", "Nur bei Wetter", Typ::VerweisListe(Ziel::Wetter), "Leer = bei jedem Wetter."),
+    f("nicht_jetzt", "Text: falsche Zeit", Typ::Text, "Wenn Tageszeit, Jahreszeit oder Wetter nicht passen. Leer = \"Das geht jetzt nicht.\""),
     // Texte
     f("selbst", "Text für dich", Typ::Mehrzeilig, "Ohne Ziel. {name} = wer den Befehl benutzt, {ding} / {ding_akk} / {ding_dativ} = der Gegenstand (\"ein Schwert\" / \"ein Schwert\" / \"einem Schwert\"), {rest} = was dahinter getippt wurde."),
     f("andere", "Text für andere", Typ::Mehrzeilig, "Was die anderen im Raum lesen."),
@@ -474,7 +481,10 @@ const TEIL: &[Feld] = felder![
     f("woerter", "Weitere Wörter", Typ::Liste, "Zum Ansehen, z.B. hand, pfote."),
     f("text", "Beschreibung", Typ::Mehrzeilig, ""),
     f("halten", "Kann halten", Typ::Schalter, "Waffe, Schild, Fackel. So viele Teile, so viele Hände."),
-    f("angriff", "Angriff", Typ::Text, "Monster greifen damit an, z.B. \"beißt\" oder \"schlägt mit der Pfote nach {ziel_dativ}\"."),
+    f("angriff", "Angriff", Typ::Text, "Monster greifen damit an, z.B. \"beißt\" oder \"schlägt mit der Pfote nach {ziel_dativ}\". Bei Spielern: was die anderen sehen."),
+    f("angriff_du", "Angriff (Spieler)", Typ::Text, "Spieler ohne Waffe, z.B. \"schlägst {ziel} mit der Faust\" (\"Du ...\")."),
+    f("plaetze", "Trägt Ausrüstung", Typ::AuswahlListe(PLAETZE), "z.B. kopf, hals. Waffe, Schild und Licht hält man (Kann halten)."),
+    f("text_andere", "Text für andere", Typ::Mehrzeilig, "So sehen andere dieses Teil (\"schau bert hand\"). {name} = der Besitzer."),
     f("schaden", "Schaden", Typ::Zahl, "0 = der normale Schaden des Monsters."),
     f("geruch", "Geruch", Typ::Text, ""),
     f("geraeusch", "Geräusch", Typ::Text, ""),
@@ -482,10 +492,42 @@ const TEIL: &[Feld] = felder![
     f("nutzt", "Nutzt Beschreibungen", Typ::VerweisListe(Ziel::Beschreibung), ""),
     f("details", "Details", Typ::Details, "Noch genauer: z.B. finger, krallen."),
 ];
+const ZEIT: &[Feld] = felder![
+    f("aktiv", "Tag und Nacht", Typ::Schalter, "Standard: aus. Die Zeit läuft aus der echten Uhr."),
+    f("minuten_pro_stunde", "Echte Minuten pro Stunde", Typ::Komma, "2 = ein Spieltag dauert 48 Minuten."),
+    f("tage_pro_jahreszeit", "Tage pro Jahreszeit", Typ::Zahl, "Standard 7 (ein Jahr = 28 Tage)."),
+    f("morgen", "Morgen ab", Typ::Zahl, "Stunde, Standard 6."),
+    f("tag", "Tag ab", Typ::Zahl, "Standard 9."),
+    f("abend", "Abend ab", Typ::Zahl, "Standard 18."),
+    f("nacht", "Nacht ab", Typ::Zahl, "Standard 21."),
+    f("text_morgen", "Meldung: Morgen", Typ::Text, "An alle draußen, wenn der Morgen beginnt."),
+    f("text_tag", "Meldung: Tag", Typ::Text, ""),
+    f("text_abend", "Meldung: Abend", Typ::Text, ""),
+    f("text_nacht", "Meldung: Nacht", Typ::Text, ""),
+    f("zusatz_morgen", "Draußen am Morgen", Typ::Text, "Steht unter der Raumbeschreibung."),
+    f("zusatz_tag", "Draußen am Tag", Typ::Text, ""),
+    f("zusatz_abend", "Draußen am Abend", Typ::Text, ""),
+    f("zusatz_nacht", "Draußen in der Nacht", Typ::Text, ""),
+    f("text_fruehling", "Meldung: Frühling", Typ::Text, "An alle, wenn die Jahreszeit beginnt."),
+    f("text_sommer", "Meldung: Sommer", Typ::Text, ""),
+    f("text_herbst", "Meldung: Herbst", Typ::Text, ""),
+    f("text_winter", "Meldung: Winter", Typ::Text, ""),
+    f("wetter_minuten", "Wetterwechsel (Minuten)", Typ::Zahl, "Ungefähr so oft (echte Minuten) wechselt das Wetter. Wetterarten: ☁ Wetter."),
+];
+const WETTER: &[Feld] = felder![
+    f("id", "ID", Typ::Text, ""),
+    f("name", "Name", Typ::Text, "z.B. \"Regen\" (für den Befehl zeit)"),
+    f("text", "Text draußen", Typ::Text, "Steht unter der Raumbeschreibung, z.B. \"Es regnet.\""),
+    f("beginn", "Meldung beim Beginn", Typ::Text, "z.B. \"Es beginnt zu regnen.\""),
+    f("gewicht", "Häufigkeit", Typ::Zahl, "Höher = häufiger (Standard 1)."),
+    f("jahreszeiten", "Nur in Jahreszeiten", Typ::AuswahlListe(&["fruehling", "sommer", "herbst", "winter"]), "Leer = immer."),
+];
 const KOERPER: &[Feld] = felder![
     f("id", "ID", Typ::Text, "z.B. humanoid, wolf"),
     f("name", "Name", Typ::Text, "z.B. \"Menschengestalt\""),
     f("teile", "Körperteile", Typ::Tabellen { felder: TEIL, inline: false }, ""),
+    f("figur", "Figur fürs Inventar", Typ::Bild, "Leer = die Figur aus 🎨 Darstellung. Vorschau unten."),
+    f("figur_plaetze", "Plätze an der Figur", Typ::Tabellen { felder: FIGUR_PLATZ, inline: false }, ""),
 ];
 
 const WELT: &[Feld] = felder![
@@ -537,6 +579,7 @@ const ERNAEHRUNG: &[Feld] = felder![
     f("ohne_erholung", "Keine Erholung bei 0", Typ::Schalter, "LP und Mana erholen sich nicht, solange Essen oder Trinken leer ist. Standard: ja."),
     f("nahrung_standard", "Essen ohne Angabe", Typ::Zahl, "So viel sättigt Nahrung ohne eigenschaften.essen (Standard 25)."),
     f("getraenk_standard", "Getränk ohne Angabe", Typ::Zahl, "So viel löscht ein Getränk ohne eigenschaften.trinken (Standard 30)."),
+    f("nur_spieler", "Nur für Spieler", Typ::Schalter, "Baumeister und Admins werden nicht hungrig (Standard: ja)."),
 ];
 
 const KAMPF: &[Feld] = felder![
@@ -560,6 +603,7 @@ const KAMPF: &[Feld] = felder![
     f("tod_gegenstaende", "Gegenstände beim Tod", Typ::Auswahl(&["behalten", "fallen_lassen"]), ""),
     f("monster_erholung_prozent", "Monster-Erholung %/Takt", Typ::Zahl, ""),
     f("leichen_minuten", "Leichen-Minuten", Typ::Zahl, "So lange bleiben Leichen liegen (0 = keine Leichen). Standard 5."),
+    f("pluendern_sekunden", "Nur Sieger plündern (s)", Typ::Zahl, "So lange darf nur plündern, wer den Gegner besiegt hat (0 = jeder sofort). Standard 60."),
     f("beute_in_leiche", "Beute in der Leiche", Typ::Schalter, "ja = \"nimm alles aus leiche\", nein = Beute fällt zu Boden. Standard: ja."),
 ];
 
@@ -598,6 +642,7 @@ pub const ARTEN: &[Art] = &[
     Art { schluessel: "quest", titel: "Aufgaben und Quests", einzahl: "Quest", symbol: "📜", ordner: "quests", ablage: Ablage::Liste, felder: QUEST, hilfe: "Ein NPC bietet sie an (geber). Die Schritte werden der Reihe nach erledigt." },
     Art { schluessel: "befehl", titel: "Eigene Befehle", einzahl: "Befehl", symbol: "⌨", ordner: "eigene_befehle", ablage: Ablage::Liste, felder: BEFEHL, hilfe: "Neue Befehle mit Bedingungen (Ort, Gegenstände, Gilde, Kosten) und Wirkungen (Heilen, Geld, Gegenstände, Teleport, Zauber, weitere Befehle). Für reine Texte gibt es Gesten unter ⌨ Befehle." },
     Art { schluessel: "koerper", titel: "Körperbau", einzahl: "Körper", symbol: "✋", ordner: "koerper", ablage: Ablage::Liste, felder: KOERPER, hilfe: "Körperteile für Rassen und Monster: Hände zum Halten, Maul und Pfoten zum Angreifen – alles mit Beschreibung und Details." },
+    Art { schluessel: "wetter", titel: "Wetter", einzahl: "Wetter", symbol: "☁", ordner: "wetter", ablage: Ablage::Liste, felder: WETTER, hilfe: "Wetterarten. Das Wetter wechselt von selbst, wenn unter Welt → Tag, Nacht und Jahreszeiten die Zeit an ist." },
     Art { schluessel: "rasse", titel: "Rassen", einzahl: "Rasse", symbol: "👥", ordner: "rassen", ablage: Ablage::Liste, felder: RASSE, hilfe: "Werden bei der Erschaffung einer Figur gewählt." },
     Art { schluessel: "gilde", titel: "Gilden", einzahl: "Gilde", symbol: "🛡", ordner: "gilden", ablage: Ablage::Liste, felder: GILDE, hilfe: "Man ist in höchstens einer Gilde. Beitreten bei einem NPC mit dieser Gilde." },
     Art { schluessel: "beruf", titel: "Berufe und Zünfte", einzahl: "Beruf", symbol: "⚒", ordner: "berufe", ablage: Ablage::Liste, felder: GILDE, hilfe: "Man kann mehrere Berufe haben (Welt → Berufe höchstens)." },
@@ -607,6 +652,7 @@ pub const ARTEN: &[Art] = &[
     Art { schluessel: "geld", titel: "Geld und Währung", einzahl: "Geld", symbol: "💰", ordner: "", ablage: Ablage::Fest { datei: "welt.toml" }, felder: GELD, hilfe: "Einheiten wie Gold, Silber, Kupfer. Alle Preise in den Daten stehen in der kleinsten Einheit." },
     Art { schluessel: "darstellung", titel: "Darstellung", einzahl: "Darstellung", symbol: "🎨", ordner: "", ablage: Ablage::Fest { datei: "welt.toml" }, felder: DARSTELLUNG, hilfe: "Wie Handelslisten, Spielstand und Spielerbuch im Spiel aussehen – mit Vorschau." },
     Art { schluessel: "ernaehrung", titel: "Hunger und Durst", einzahl: "Hunger und Durst", symbol: "🍞", ordner: "", ablage: Ablage::Fest { datei: "welt.toml" }, felder: ERNAEHRUNG, hilfe: "Essen (Typ nahrung) sättigt, Getränke (Typ getraenk) löschen den Durst. Wie viel, steht bei den Gegenständen unter Eigenschaften: essen, trinken." },
+    Art { schluessel: "zeit", titel: "Tag, Nacht und Jahreszeiten", einzahl: "Zeit", symbol: "🌙", ordner: "", ablage: Ablage::Fest { datei: "welt.toml" }, felder: ZEIT, hilfe: "Die Spielzeit läuft aus der echten Uhr – für alle gleich. Räume können eine Beschreibung für die Nacht haben (unter 🗺 Räume)." },
     Art { schluessel: "kampf", titel: "Kampfregeln", einzahl: "Kampf", symbol: "⚔", ordner: "", ablage: Ablage::Fest { datei: "welt.toml" }, felder: KAMPF, hilfe: "Den Raum für Wiederbelebungen wählt man unter 🗺 Räume." },
 ];
 

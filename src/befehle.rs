@@ -230,6 +230,7 @@ pub fn ausfuehren(w: &mut Welt, sid: u64, eingabe: &str) -> Folge {
         "verkaufe" => crate::handel::verkaufen(w, sid, rest),
         "lerne" => crate::handel::lernen(w, sid, rest),
         "geld" => crate::handel::geld(w, sid),
+        "zeit" => crate::zeit::befehl(w, sid),
         "aufgaben" => crate::quests::anzeigen(w, sid, rest),
         "annehmen" => crate::quests::annehmen(w, sid, rest),
         "abgeben" => crate::quests::abgeben(w, sid),
@@ -317,7 +318,7 @@ fn geste(w: &Welt, sid: u64, i: usize, rest: &str) {
             .and_then(|m| w.d.monster.get(&m.def))
             .map(|d| d.dativ.clone())
             .filter(|d| !d.is_empty())
-            .unwrap_or_else(|| w.monster_name(mid));
+            .unwrap_or_else(|| w.monster_dativ(mid));
         (w.monster_akk(mid), dativ, None)
     } else {
         w.sende(sid, "So jemanden siehst du hier nicht.");
@@ -592,10 +593,19 @@ fn raum_zeigen(w: &Welt, sid: u64, voll: bool) {
     };
     let mut absaetze: Vec<(String, bool)> = vec![(kopf, false)];
     if voll || !e.kurz {
-        for (i, a) in raum.beschreibung.trim().split("\n\n").enumerate() {
+        let beschreibung = if !raum.beschreibung_nacht.trim().is_empty() && crate::zeit::ist_nacht(w) {
+            &raum.beschreibung_nacht
+        } else {
+            &raum.beschreibung
+        };
+        for (i, a) in beschreibung.trim().split("\n\n").enumerate() {
             if !a.trim().is_empty() {
                 absaetze.push((a.to_string(), i > 0));
             }
+        }
+        // Tageszeit und Wetter (nur draußen)
+        if let Some(z) = crate::zeit::raum_zusatz(w, &raum.id) {
+            absaetze.push((format!("{{hellcyan}}{z}{{/}}"), false));
         }
     }
     absaetze.push((ausgaenge, false));
@@ -750,6 +760,31 @@ fn finde(w: &Welt, sid: u64, such: &str) -> Option<Ziel> {
     let monster = w.monster_im_raum(&raum.id);
     let kontext = w.d.raum_kontext(&raum);
 
+    // "schau bert hand" / "schau wolf maul": ein Körperteil eines anderen
+    if let Some((wer, teil)) = such.trim().split_once(char::is_whitespace) {
+        let teil = teil.trim();
+        if let Some(pid) = finde_spieler_im_raum(w, &raum.id, wer).filter(|p| *p != sid) {
+            let o = &w.spieler[&pid].sp;
+            if let Some(k) = w.d.koerper_von(&o.rasse) {
+                let teile: std::collections::BTreeMap<String, Detail> = k.teile.iter().map(|t| t.als_detail_fuer(&o.name)).collect();
+                for wort in suchwoerter(teil) {
+                    if let Some((n, d)) = beschreibung::suchen(&teile, &wort) {
+                        return Some(Ziel::Detail(n.to_string(), d.clone()));
+                    }
+                }
+            }
+        }
+        if let Some(def) = finde_monster(w, &raum.id, wer).and_then(|m| w.monster.get(&m)).and_then(|m| w.d.monster.get(&m.def)) {
+            let mut k = crate::koerper::details(w, &def.koerper);
+            k.extend(def.details.clone());
+            for wort in suchwoerter(teil) {
+                if let Some((n, d)) = beschreibung::suchen(&k, &wort) {
+                    return Some(Ziel::Detail(n.to_string(), d.clone()));
+                }
+            }
+        }
+    }
+
     for wort in suchwoerter(such) {
         // 1. Eigene Details des Raums
         if let Some((n, d)) = beschreibung::suchen(&raum.details, &wort) {
@@ -882,6 +917,13 @@ fn untersuchen(w: &Welt, sid: u64, such: &str) {
                 t.push_str(&format!("{} trägt nichts Besonderes.", o.name));
             } else {
                 t.push_str(&format!("{} trägt {}.", o.name, aufzaehlen(&teile)));
+            }
+            if let Some(k) = w.d.koerper_von(&o.rasse) {
+                let namen: Vec<String> = k.teile.iter().map(|t| t.name.clone()).collect();
+                if !namen.is_empty() {
+                    let erstes = k.teile[0].name.split_whitespace().last().unwrap_or_default().to_lowercase();
+                    t.push_str(&format!("\n{{grau}}Genauer ansehen: {} (z.B. schau {} {erstes}){{/}}", aufzaehlen(&namen), o.name.to_lowercase()));
+                }
             }
             w.sende(sid, &t);
         }
@@ -1121,7 +1163,7 @@ fn inventar_figur(w: &Welt, sid: u64) -> Option<String> {
     }
     fuss.push(format!("{{grau}}{}{{/}}   Geld: {{hellgelb}}{}{{/}}", crate::behaelter::gewicht_text(w, sid), crate::handel::betrag(w, sp.geld)));
     let inv = Inventar { angelegt, gruppen: gruppen.into_iter().map(|g| (g.1, g.2)).collect(), fuss };
-    let (bild, plaetze) = w.d.darstellung.figur();
+    let (bild, plaetze) = w.d.darstellung.figur_fuer(crate::koerper::von_spieler(w, sid));
     crate::darstellung::inventar_figur(&inv, &bild, &plaetze, breite(w, sid))
 }
 
@@ -1142,8 +1184,8 @@ pub(crate) fn anlegen(w: &mut Welt, sid: u64, such: &str) {
         w.sende(sid, &format!("Du musst erst {alt} ausziehen."));
         return;
     }
-    // Nur so viel in den Händen, wie man Hände hat
-    if let Err(m) = crate::koerper::haende_pruefen(w, sid, g) {
+    // Nur so viel in den Händen, wie man Hände hat – und nur, was an den Körper passt
+    if let Err(m) = crate::koerper::platz_pruefen(w, sid, g).and_then(|_| crate::koerper::haende_pruefen(w, sid, g)) {
         w.sende(sid, &m);
         return;
     }

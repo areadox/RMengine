@@ -16,30 +16,150 @@ id   = "humanoid"
 name = "Menschengestalt"
 
 [[koerper.teile]]
-id   = "kopf"
-name = "Kopf"
-text = "Dein Kopf – mit allem, was dazugehört."
+id      = "kopf"
+name    = "Kopf"
+text    = "Dein Kopf – mit allem, was dazugehört."
+text_andere = "{name} hat ein wachsames Gesicht."
 woerter = ["gesicht"]
+plaetze = ["kopf", "hals"]
 
 [[koerper.teile]]
-id     = "rechte_hand"
-name   = "rechte Hand"
-text   = "Deine rechte Hand. Mit ihr führst du meist die Waffe."
-halten = true
-woerter = ["haende", "rechte"]
+id      = "rumpf"
+name    = "Rumpf"
+text    = "Brust, Bauch und Rücken."
+woerter = ["brust", "bauch", "ruecken"]
+plaetze = ["koerper", "umhang", "ruecken", "guertel"]
 
 [[koerper.teile]]
-id     = "linke_hand"
-name   = "linke Hand"
-text   = "Deine linke Hand – gut für einen Schild oder eine Fackel."
-halten = true
-woerter = ["linke"]
+id         = "rechte_hand"
+name       = "rechte Hand"
+text       = "Deine rechte Hand. Mit ihr führst du meist die Waffe."
+text_andere = "Die rechte Hand von {name}."
+woerter    = ["haende", "rechte", "faust"]
+halten     = true
+plaetze    = ["haende", "ring"]
+angriff    = "schlägt {ziel} mit der Faust"
+angriff_du = "schlägst {ziel} mit der Faust"
 
 [[koerper.teile]]
-id   = "beine"
-name = "Beine"
-text = "Zwei Beine, die dich schon weit getragen haben."
-woerter = ["bein", "fuesse", "fuss"]
+id         = "linke_hand"
+name       = "linke Hand"
+text       = "Deine linke Hand – gut für einen Schild oder eine Fackel."
+text_andere = "Die linke Hand von {name}."
+woerter    = ["linke"]
+halten     = true
+plaetze    = ["haende", "ring"]
+angriff    = "verpasst {ziel_dativ} einen Haken"
+angriff_du = "verpasst {ziel_dativ} einen Haken"
+
+[[koerper.teile]]
+id         = "beine"
+name       = "Beine"
+text       = "Zwei Beine, die dich schon weit getragen haben."
+text_andere = "{name} steht fest auf beiden Beinen."
+woerter    = ["bein", "fuesse", "fuss"]
+plaetze    = ["beine", "fuesse"]
+angriff    = "tritt nach {ziel_dativ}"
+angriff_du = "trittst nach {ziel_dativ}"
+
+# Zwerge: dieselben Körperteile, aber eine eigene Figur fürs Inventar
+[[koerper]]
+id   = "zwerg"
+erbt = "humanoid"
+name = "Zwergengestalt"
+figur = '''
+               _____
+              /     \
+             | o   o |
+             |  ___  |
+             \\\\\|/////
+            __\\\|///__
+           /    \|/    \
+          / /|       |\ \
+         / / |       | \ \
+        (_)  |_______|  (_)
+             |   |   |
+             |   |   |
+            _|   |   |_
+           (___/   \___)'''
+
+[[koerper.figur_plaetze]]
+platz = "kopf"
+zeile = 1
+spalte = 23
+ausrichtung = "links"
+
+[[koerper.figur_plaetze]]
+platz = "hals"
+zeile = 4
+spalte = 26
+ausrichtung = "links"
+
+[[koerper.figur_plaetze]]
+platz = "umhang"
+zeile = 5
+spalte = 25
+ausrichtung = "links"
+
+[[koerper.figur_plaetze]]
+platz = "koerper"
+zeile = 6
+spalte = 26
+ausrichtung = "links"
+
+[[koerper.figur_plaetze]]
+platz = "ruecken"
+zeile = 7
+spalte = 27
+ausrichtung = "links"
+
+[[koerper.figur_plaetze]]
+platz = "schild"
+zeile = 8
+spalte = 28
+ausrichtung = "links"
+
+[[koerper.figur_plaetze]]
+platz = "haende"
+zeile = 9
+spalte = 29
+ausrichtung = "links"
+
+[[koerper.figur_plaetze]]
+platz = "beine"
+zeile = 11
+spalte = 24
+ausrichtung = "links"
+
+[[koerper.figur_plaetze]]
+platz = "fuesse"
+zeile = 13
+spalte = 26
+ausrichtung = "links"
+
+[[koerper.figur_plaetze]]
+platz = "licht"
+zeile = 6
+spalte = 9
+ausrichtung = "rechts"
+
+[[koerper.figur_plaetze]]
+platz = "waffe"
+zeile = 8
+spalte = 7
+ausrichtung = "rechts"
+
+[[koerper.figur_plaetze]]
+platz = "ring"
+zeile = 9
+spalte = 6
+ausrichtung = "rechts"
+
+[[koerper.figur_plaetze]]
+platz = "guertel"
+zeile = 10
+spalte = 24
+ausrichtung = "links"
 
 # ---------------------------------------------------------------------
 

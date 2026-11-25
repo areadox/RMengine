@@ -266,6 +266,7 @@ impl Inhalte {
             Ziel::Quest => self.ids_von(&["quest"], false),
             Ziel::Befehl => self.ids_von(&["befehl"], false),
             Ziel::Koerper => self.ids_von(&["koerper"], false),
+            Ziel::Wetter => self.ids_von(&["wetter"], false),
             Ziel::Beschreibung => self.ids_von(&["beschreibung"], false),
             Ziel::Gleich => {
                 if art.gruppe() == "monster" {
@@ -436,6 +437,7 @@ fn ziel_name(z: Ziel, art: &Art) -> &'static str {
         Ziel::Quest => "quest",
         Ziel::Befehl => "befehl",
         Ziel::Koerper => "koerper",
+        Ziel::Wetter => "wetter",
         Ziel::Beschreibung => "beschreibung",
         Ziel::Gleich => match art.gruppe() {
             "monster" => "gleich:monster",
@@ -992,6 +994,28 @@ fn vorschau(ui: &mut egui::Ui, art: &Art, t: &mut Table, ctx: &Kontext) {
                 text.push_str(&format!("{{grau}}{n:>7} ={{/}} {{hellgelb}}{}{{/}}\n", geld(n)));
             }
             text.push_str("{grau}(links: Betrag in der kleinsten Einheit, wie er in den Daten steht){/}");
+            farbig(ui, &text);
+        }
+        "koerper" if !lies_text(t, "figur").trim().is_empty() => {
+            ui.add_space(10.0);
+            ui.heading("Vorschau: Inventar mit dieser Figur");
+            let plaetze: Vec<d::FigurPlatz> = t
+                .get("figur_plaetze")
+                .map(|i| {
+                    untertabellen(i)
+                        .into_iter()
+                        .map(|e| d::FigurPlatz {
+                            platz: lies_text(e, "platz"),
+                            zeile: e.get("zeile").and_then(|i| i.as_integer()).unwrap_or(0).max(0) as usize,
+                            spalte: e.get("spalte").and_then(|i| i.as_integer()).unwrap_or(0).max(0) as usize,
+                            rechts: lies_text(e, "ausrichtung") == "rechts",
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+            let bild = lies_text(t, "figur");
+            let text = d::inventar_figur(&d::beispiel_inventar(&geld(4530)), bild.trim_matches('\n'), &plaetze, 100)
+                .unwrap_or_else(|| "{grau}(Zu breit für die Vorschau){/}".into());
             farbig(ui, &text);
         }
         "darstellung" => {

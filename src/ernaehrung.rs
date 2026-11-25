@@ -41,6 +41,12 @@ pub fn takt(w: &mut Welt, minute_um: bool) {
         if sp.trinken < 0.0 || sp.trinken > e.max_trinken as f64 {
             sp.trinken = e.max_trinken as f64;
         }
+        // Baumeister und Admins bleiben satt
+        if e.nur_spieler && s.rolle >= crate::spieler::Rolle::Baumeister {
+            sp.essen = e.max_essen as f64;
+            sp.trinken = e.max_trinken as f64;
+            continue;
+        }
         if s.tot_bis.is_some() {
             continue;
         }

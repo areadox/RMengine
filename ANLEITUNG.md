@@ -352,6 +352,7 @@ daten/
   eigene_befehle/      eigene Befehle mit Bedingungen und Wirkungen (Kapitel 12)
   quests/, rassen/, gilden/, berufe/   Aufgaben, Rassen, Gilden, Berufe
   koerper/             Körperbau: Hände, Maul, Pfoten ... (Kapitel 22)
+  wetter/              Wetterarten (Kapitel 23)
   vorlagen/            Vorlagen, von denen andere Einträge erben
   fertigkeiten/*.toml  Fertigkeiten
   zauber/*.toml        Zaubersprüche
@@ -1201,8 +1202,15 @@ text = "Eine tiefe Wunde – hier hat dein letzter Hieb getroffen."
 ```
 
 Die Körperteile des Monsters (Maul, Pfoten …) kann man auch an der Leiche
-ansehen. In `[kampf]` gibt es `leichen_minuten = 5` (0 = keine Leichen) und
-`beute_in_leiche = true` (false = die Beute fällt wie früher zu Boden).
+ansehen. In `[kampf]` gibt es:
+
+- `leichen_minuten = 5`: so lange bleibt eine Leiche liegen (0 = keine Leichen)
+- `beute_in_leiche = true`: false = die Beute fällt wie früher zu Boden
+- `pluendern_sekunden = 60`: so lange darf nur plündern, wer den Gegner besiegt
+  hat (0 = jeder sofort). Baumeister und Admins dürfen immer.
+
+Leichen überstehen einen Neustart des Servers: Sie werden mit den Spielern
+gespeichert (`spieler/leichen.json`) und liegen danach wieder da.
 
 ---
 
@@ -1278,6 +1286,8 @@ lp          = 15                         # heilt 15 Lebenspunkte
 | `mana_kosten`, `ausdauer_kosten`, `kosten` | kostet Mana, Ausdauer oder Geld (kleinste Münze) |
 | `abklingzeit` | Sekunden, bis man ihn wieder benutzen kann |
 | `nicht_im_kampf` | `true` = nicht mitten im Kampf |
+| `nur_draussen` | nicht in Häusern und Höhlen |
+| `tageszeiten`, `jahreszeiten`, `wetter` | nur dann, z.B. `["nacht"]`, `["winter"]`, `["klar"]`; `nicht_jetzt` = Meldung sonst (Kapitel 23) |
 | `rolle`, `aktiv` | wie bei Gesten |
 
 **Texte:** `selbst`, `andere`, `selbst_ziel`, `ziel`, `andere_ziel` wie bei
@@ -1924,6 +1934,7 @@ schaden_pro_minute = 2       # LP-Verlust pro Minute bei 0 (sterben kann man dar
 ohne_erholung      = true    # bei 0 keine Erholung von LP und Mana
 nahrung_standard   = 25      # Essen ohne Angabe
 getraenk_standard  = 30      # Getränke ohne Angabe
+nur_spieler        = true    # Baumeister und Admins werden nicht hungrig
 ```
 
 - **Essen** (`typ = "nahrung"`) sättigt, **Getränke** (`typ = "getraenk"`)
@@ -1969,17 +1980,86 @@ schaden = 4
 ```
 
 Jedes Körperteil kann wie ein Detail beschrieben werden: `text`, `geruch`,
-`geraeusch`, `gefuehl`, `nutzt` und `details` mit Unter-Details.
+`geraeusch`, `gefuehl`, `nutzt` und `details` mit Unter-Details. Dazu:
 
+| Feld | Bedeutung |
+|------|-----------|
+| `text_andere` | so sehen andere das Teil („schau bert hand“), `{name}` = der Besitzer |
+| `plaetze` | diese Ausrüstungsplätze trägt das Teil, z.B. `["kopf", "hals"]` |
+| `halten` | eine Hand: hält Waffe, Schild oder Fackel |
+| `angriff` | Angriff von Monstern (und was andere sehen, wenn ein Spieler damit angreift) |
+| `angriff_du` | Angriff eines Spielers ohne Waffe, z.B. `"schlägst {ziel} mit der Faust"` |
+| `schaden` | Schaden dieses Angriffs (0 = normal) |
+
+Ein Körperbau kann auch eine **eigene Inventar-Figur** haben (`figur` und
+`[[koerper.figur_plaetze]]`, wie in `[darstellung]`). Die Zwerge der Beispielwelt
+haben so eine eigene, gedrungene Figur. Mit `erbt = "humanoid"` übernimmt ein
+Körperbau alle Teile eines anderen.
+
+- **Ausrüstung:** Gibt irgendein Teil `plaetze` an, kann man nur noch anlegen,
+  wofür es ein passendes Teil gibt – ein Wesen ohne Kopf trägt keinen Helm.
+- **Ohne Waffe** kämpft ein Spieler mit seinen Körperteilen („Du schlägst eine
+  fette Ratte mit der Faust.“).
 - **Halten:** Teile mit `halten = true` sind Hände. Man kann nur so viele Dinge
   halten (Platz `waffe`, `schild`, `licht`), wie man Hände hat. Ein Mensch mit
   zwei Händen hält also z.B. Schwert und Schild – für eine Fackel ist dann
   keine Hand mehr frei. Ein Zweihänder (`haende = 2`) braucht beide.
 - **Angreifen:** Monster greifen mit den Teilen an, die einen `angriff` haben.
 - **Ansehen:** `schau maul` (am Monster im Raum oder an seiner Leiche),
-  `schau hand` (der eigene Körper). Beim Ansehen eines Monsters steht dabei,
-  welche Körperteile man genauer ansehen kann.
+  `schau hand` (der eigene Körper), `schau bert hand` und `schau wolf maul`.
+  Beim Ansehen eines Monsters oder Spielers steht dabei, welche Körperteile man
+  genauer ansehen kann.
 
 Ohne Körperbau gibt es keine Begrenzung der Hände, und Monster greifen wie
 bisher mit `angriffe` an.
+
+---
+
+## 23. Tag und Nacht, Jahreszeiten und Wetter
+
+```toml
+[zeit]
+aktiv               = true
+minuten_pro_stunde  = 2.0    # echte Minuten pro Spielstunde: ein Tag dauert 48 Minuten
+tage_pro_jahreszeit = 7      # ein Jahr hat 28 Spieltage
+morgen = 6                   # ab diesen Stunden beginnen die Tageszeiten
+tag    = 9
+abend  = 18
+nacht  = 21
+text_morgen = "Im Osten färbt sich der Himmel rot – die Sonne geht auf."   # Meldung draußen
+text_nacht  = "Es wird dunkel. Die ersten Sterne erscheinen."
+zusatz_nacht = "Es ist Nacht."       # steht draußen unter der Raumbeschreibung
+text_winter  = "Der Winter hält Einzug."   # Meldung an alle
+wetter_minuten = 15                  # ungefähr so oft wechselt das Wetter
+```
+
+(Dazu gibt es `text_tag`, `text_abend`, `zusatz_morgen`, `zusatz_tag`,
+`zusatz_abend`, `text_fruehling`, `text_sommer`, `text_herbst`.)
+
+- Die Spielzeit wird aus der echten Uhr berechnet: Sie ist für alle gleich und
+  läuft auch weiter, wenn der Server aus ist.
+- `zeit` (oder `uhr`, `datum`, `wetter`) zeigt Uhrzeit, Tag, Jahreszeit und Wetter.
+- Draußen steht unter der Raumbeschreibung die Tageszeit und das Wetter, z.B.
+  „Es ist Nacht. Dichter Nebel liegt über allem.“ Beim Wechsel bekommen alle
+  draußen eine Meldung.
+- **Drinnen:** Gelände mit `drinnen = true` (in `welt.toml`, z.B. Haus, Tempel,
+  Höhle) haben kein Wetter. Ein einzelner Raum kann das mit `drinnen = true`
+  oder `false` ändern (im Welteditor: *Drinnen oder draußen*).
+- **Nachts anders:** Räume können `beschreibung_nacht` haben – nachts steht
+  dann diese Beschreibung da (im Welteditor unter der Beschreibung: *Bei Nacht*).
+- **Eigene Befehle** können an Tageszeit, Jahreszeit und Wetter gebunden werden
+  (Beispiel: `sterne` geht nur nachts bei klarem Himmel und nur draußen).
+- Für Skripte: GMCP `Char.Status` enthält `time`, `daytime`, `season`, `weather`.
+
+**Wetterarten** stehen in `daten/wetter/` (im Welteditor: ☁ Wetter):
+
+```toml
+[[wetter]]
+id      = "schnee"
+name    = "Schnee"                         # für "zeit"
+text    = "Schneeflocken tanzen durch die Luft."   # draußen unter der Raumbeschreibung
+beginn  = "Es fängt an zu schneien."       # Meldung, wenn es anfängt
+gewicht = 4                                # wie oft (höher = häufiger)
+jahreszeiten = ["winter"]                  # leer = immer
+```
 

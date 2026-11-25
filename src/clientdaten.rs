@@ -112,6 +112,10 @@ pub fn werte(w: &Welt, sid: u64) {
             "dead": s.tot_bis.is_some(),
             "enemy": g.as_ref().map(|g| g.name.clone()).unwrap_or_default(),
             "enemy_health": g.as_ref().map(|g| g.prozent).unwrap_or(0),
+            "time": crate::zeit::jetzt(w).map(|z| format!("{:02}:{:02}", z.stunde, z.minute)).unwrap_or_default(),
+            "daytime": crate::zeit::jetzt(w).map(|z| z.tageszeit_id()).unwrap_or_default(),
+            "season": crate::zeit::jetzt(w).map(|z| z.jahreszeit_id()).unwrap_or_default(),
+            "weather": crate::zeit::wetter(w).map(|x| x.name.clone()).unwrap_or_default(),
         }),
         true,
     );

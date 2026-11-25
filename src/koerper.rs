@@ -52,6 +52,42 @@ pub fn haende_pruefen(w: &Welt, sid: u64, neu: &GegenstandDef) -> Result<(), Str
     Ok(())
 }
 
+/// Passt der Platz zum Körper? Gibt ein Körperbau irgendwo `plaetze` an, braucht
+/// jeder Platz (außer Waffe, Schild, Licht – die hält man) ein Teil, das ihn trägt.
+pub fn platz_pruefen(w: &Welt, sid: u64, g: &GegenstandDef) -> Result<(), String> {
+    let Some(k) = von_spieler(w, sid) else { return Ok(()) };
+    if g.platz.is_empty() || HALTE_PLAETZE.contains(&g.platz.as_str()) || k.teile.iter().all(|t| t.plaetze.is_empty()) {
+        return Ok(());
+    }
+    if k.teile.iter().any(|t| t.plaetze.contains(&g.platz)) {
+        Ok(())
+    } else {
+        Err(format!("{} passt nicht an deinen Körper.", crate::text::gross(&w.d.gegenstand_name(&g.id))))
+    }
+}
+
+/// Angriff ohne Waffe mit einem Körperteil: (Text für "Du ...", Text für andere, Schaden)
+pub fn spieler_angriff(w: &Welt, sid: u64, ziel_akk: &str, ziel_dativ: &str) -> Option<(String, String, i32)> {
+    use rand::seq::SliceRandom;
+    let s = w.spieler.get(&sid)?;
+    if s.sp.ausruestung.contains_key("waffe") {
+        return None;
+    }
+    let k = von_spieler(w, sid)?;
+    let teile: Vec<_> = k.teile.iter().filter(|t| !t.angriff_du.trim().is_empty()).collect();
+    let t = teile.choose(&mut rand::thread_rng())?;
+    let fuellen = |a: &str| {
+        let a = a.trim();
+        if a.contains('{') {
+            a.replace("{ziel_dativ}", ziel_dativ).replace("{ziel}", ziel_akk)
+        } else {
+            format!("{a} {ziel_akk}")
+        }
+    };
+    let er = if t.angriff.trim().is_empty() { format!("greift {ziel_akk} an") } else { fuellen(&t.angriff) };
+    Some((fuellen(&t.angriff_du), er, t.schaden))
+}
+
 /// Ein Angriff eines Monsters mit einem Körperteil: (Text für "dich", Text für andere, Schaden)
 pub fn monster_angriff(w: &Welt, def: &MonsterDef, ziel_name: &str) -> Option<(String, String, i32)> {
     use rand::seq::SliceRandom;

@@ -1233,6 +1233,30 @@ impl App {
                 .desired_width(f32::INFINITY)
                 .hint_text("Was sieht man hier? Farben: {gruen}Text{/}"),
         );
+        egui::CollapsingHeader::new(if r.beschreibung_nacht.is_empty() { "Bei Nacht (leer = wie am Tag)" } else { "Bei Nacht (eigene Beschreibung)" })
+            .id_salt("nacht")
+            .show(ui, |ui| {
+                crate::kontext::feld(
+                    ui,
+                    egui::TextEdit::multiline(&mut r.beschreibung_nacht)
+                        .desired_rows(4)
+                        .desired_width(f32::INFINITY)
+                        .hint_text("So sieht der Raum nachts aus (mit Tag und Nacht in Welt → Zeit)."),
+                );
+            });
+        ui.horizontal(|ui| {
+            ui.label("Drinnen oder draußen:");
+            let text = match r.drinnen {
+                None => "wie das Gelände",
+                Some(true) => "drinnen (kein Wetter)",
+                Some(false) => "draußen",
+            };
+            egui::ComboBox::from_id_salt("drinnen").selected_text(text).show_ui(ui, |ui| {
+                ui.selectable_value(&mut r.drinnen, None, "wie das Gelände");
+                ui.selectable_value(&mut r.drinnen, Some(true), "drinnen (kein Wetter)");
+                ui.selectable_value(&mut r.drinnen, Some(false), "draußen");
+            });
+        });
 
         ui.add_space(8.0);
         ui.strong("Ausgänge");
