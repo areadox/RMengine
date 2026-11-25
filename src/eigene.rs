@@ -17,6 +17,47 @@ thread_local! {
     static LAEUFT: std::cell::RefCell<Vec<String>> = const { std::cell::RefCell::new(Vec::new()) };
 }
 
+/// Der Gegenstand eines Befehls wie "fuehre schwert": (ID, gefunden wo)
+fn ding_finden(w: &Welt, sid: u64, b: &EigenerBefehlDef, such: &str) -> Result<String, String> {
+    let s = &w.spieler[&sid];
+    let ort = if b.gegenstand_ort.is_empty() { "dabei" } else { b.gegenstand_ort.as_str() };
+    let angelegt: Vec<String> = s.sp.ausruestung.values().cloned().collect();
+    let boden: Vec<String> = w.boden.get(&s.sp.raum).cloned().unwrap_or_default();
+    let listen: Vec<&[String]> = match ort {
+        "inventar" => vec![&s.sp.inventar],
+        "angelegt" => vec![&angelegt],
+        "raum" => vec![&boden],
+        _ => vec![&s.sp.inventar, &angelegt],
+    };
+    // Erst unter den passenden Arten suchen, dann unter allen (für eine bessere Meldung)
+    let passt_typ = |id: &String| b.gegenstand_typen.is_empty() || w.d.gegenstaende.get(id).is_some_and(|g| b.gegenstand_typen.contains(&g.typ));
+    for l in &listen {
+        let passende: Vec<String> = l.iter().filter(|id| passt_typ(id)).cloned().collect();
+        if let Some(i) = crate::befehle::finde_gegenstand(&w.d, &passende, such) {
+            return Ok(passende[i].clone());
+        }
+    }
+    for l in &listen {
+        if let Some(i) = crate::befehle::finde_gegenstand(&w.d, l, such) {
+            let id = &l[i];
+            let t = if b.falscher_gegenstand.trim().is_empty() {
+                format!("Mit {} geht das nicht.", w.d.gegenstand_dativ(id))
+            } else {
+                b.falscher_gegenstand
+                    .replace("{ding_akk}", &w.d.gegenstand_akk(id))
+                    .replace("{ding_dativ}", &w.d.gegenstand_dativ(id))
+                    .replace("{ding}", &w.d.gegenstand_name(id))
+            };
+            return Err(gross(&t));
+        }
+    }
+    Err(match ort {
+        "raum" => "So etwas siehst du hier nicht.".into(),
+        "angelegt" => "So etwas hast du nicht angelegt.".into(),
+        _ => "So etwas hast du nicht dabei.".into(),
+    })
+}
+
 /// Ziel eines Befehls: (Name, Dativ, Spieler-ID)
 type Ziel = (String, String, Option<u64>);
 
@@ -115,8 +156,42 @@ pub fn ausfuehren(w: &mut Welt, sid: u64, i: usize, rest: &str) {
         (s.sp.name.clone(), s.sp.raum.clone())
     };
 
-    // Ziel? Nur wenn es Texte mit Ziel gibt
-    let mit_ziel = !rest.is_empty() && !b.selbst_ziel.trim().is_empty();
+    // Gegenstand? ("fuehre schwert")
+    let ding = if b.mit_ding() {
+        if rest.is_empty() {
+            let t = if b.ohne_gegenstand.trim().is_empty() {
+                let wort = b.woerter.first().cloned().unwrap_or_default();
+                let art = b.gegenstand_typen.first().map(|t| t.as_str()).unwrap_or("ding");
+                format!("Womit? (z.B. {wort} <{art}>)")
+            } else {
+                b.ohne_gegenstand.clone()
+            };
+            w.sende(sid, &t);
+            return;
+        }
+        match ding_finden(w, sid, &b, rest) {
+            Ok(id) => Some(id),
+            Err(m) => {
+                w.sende(sid, &m);
+                return;
+            }
+        }
+    } else {
+        None
+    };
+    let ding_akk = ding.as_deref().map(|d| w.d.gegenstand_akk(d)).unwrap_or_default();
+    let ding_name = ding.as_deref().map(|d| w.d.gegenstand_name(d)).unwrap_or_default();
+    let ding_dativ = ding.as_deref().map(|d| w.d.gegenstand_dativ(d)).unwrap_or_default();
+    // Geht das mit dem Gegenstand überhaupt? (vor Kosten und Texten)
+    if let Some(id) = &ding {
+        if let Err(m) = ding_pruefen(w, sid, &b.mit_gegenstand, id) {
+            w.sende(sid, &m);
+            return;
+        }
+    }
+
+    // Ziel? Nur wenn es Texte mit Ziel gibt (und kein Gegenstand gemeint ist)
+    let mit_ziel = ding.is_none() && !rest.is_empty() && !b.selbst_ziel.trim().is_empty();
     let ziel = if mit_ziel {
         match ziel_finden(w, &raum, rest) {
             Some(z) => Some(z),
@@ -134,8 +209,23 @@ pub fn ausfuehren(w: &mut Welt, sid: u64, i: usize, rest: &str) {
     };
     let (ziel_name, ziel_dativ, ziel_sid) = ziel.clone().unwrap_or_default();
     let fuellen = |t: &str| {
-        gross(&t.replace("{name}", &name).replace("{ziel_dativ}", &ziel_dativ).replace("{ziel}", &ziel_name).replace("{rest}", rest))
+        gross(
+            &t.replace("{name}", &name)
+                .replace("{ziel_dativ}", &ziel_dativ)
+                .replace("{ziel}", &ziel_name)
+                .replace("{ding_akk}", &ding_akk)
+                .replace("{ding_dativ}", &ding_dativ)
+                .replace("{ding}", &ding_name)
+                .replace("{rest}", rest),
+        )
     };
+
+    // Nur zum Essen/Trinken da, aber man ist satt? Dann nichts tun.
+    let nur_ernaehrung = b.lp == 0 && b.mp == 0 && b.ausdauer == 0 && b.geld == 0 && b.erfahrung == 0 && b.gib.is_empty() && b.zauber.is_empty() && b.teleport.is_empty();
+    if nur_ernaehrung && w.d.ernaehrung.aktiv && crate::ernaehrung::zu_satt(w, sid, b.essen, b.trinken) {
+        w.sende(sid, if b.essen > 0 { "Du bist satt." } else { "Du hast keinen Durst." });
+        return;
+    }
 
     // Kosten werden immer fällig, auch bei Misserfolg
     if let Some(s) = w.spieler.get_mut(&sid) {
@@ -155,6 +245,16 @@ pub fn ausfuehren(w: &mut Welt, sid: u64, i: usize, rest: &str) {
             w.sende_raum(&raum, &fuellen(&b.misserfolg_andere), &[sid]);
         }
         return;
+    }
+
+    // Erst mit dem Gegenstand handeln – mit eigenem Text ohne die eingebaute Meldung
+    if let Some(id) = &ding {
+        let eigener_text = !b.selbst.trim().is_empty() && b.mit_gegenstand != "benutzen";
+        if eigener_text {
+            crate::welt::still(|| mit_ding(w, sid, &b.mit_gegenstand, id));
+        } else {
+            mit_ding(w, sid, &b.mit_gegenstand, id);
+        }
     }
 
     // Texte
@@ -196,6 +296,60 @@ pub fn ausfuehren(w: &mut Welt, sid: u64, i: usize, rest: &str) {
     }
 }
 
+/// Klappt die Handlung mit dem Gegenstand? Err = Meldung
+fn ding_pruefen(w: &Welt, sid: u64, was: &str, id: &str) -> Result<(), String> {
+    let s = &w.spieler[&sid];
+    let Some(g) = w.d.gegenstaende.get(id) else { return Ok(()) };
+    match was {
+        "anlegen" => {
+            if s.sp.ausruestung.values().any(|x| x == id) && !s.sp.inventar.iter().any(|x| x == id) {
+                return Err(format!("Du hast {} schon angelegt.", w.d.gegenstand_akk(id)));
+            }
+            if g.platz.is_empty() {
+                return Err(gross(&format!("{} kann man nicht anlegen.", w.d.gegenstand_akk(id))));
+            }
+            if let Some(alt) = s.sp.ausruestung.get(&g.platz) {
+                return Err(format!("Du musst erst {} ausziehen.", w.d.gegenstand_akk(alt)));
+            }
+            crate::koerper::haende_pruefen(w, sid, g)?;
+        }
+        "ausziehen" if !s.sp.ausruestung.values().any(|x| x == id) => {
+            return Err(format!("Du hast {} nicht angelegt.", w.d.gegenstand_akk(id)));
+        }
+        "nehmen" => {
+            if !g.tragbar {
+                return Err(gross(&format!("{} kann man nicht mitnehmen.", w.d.gegenstand_akk(id))));
+            }
+            if !crate::behaelter::kann_tragen(w, sid, g.gewicht.max(0)) {
+                return Err("Das ist dir zu schwer.".into());
+            }
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+/// Was mit dem Gegenstand passiert (die eingebauten Befehle melden selbst, was geschieht)
+fn mit_ding(w: &mut Welt, sid: u64, was: &str, id: &str) {
+    match was {
+        "anlegen" => crate::befehle::anlegen(w, sid, id),
+        "ausziehen" => crate::befehle::ausziehen(w, sid, id),
+        "benutzen" => crate::befehle::benutzen(w, sid, id),
+        "fallenlassen" => crate::befehle::fallenlassen(w, sid, id),
+        "nehmen" => crate::befehle::nehmen(w, sid, id),
+        "verbrauchen" => {
+            if let Some(s) = w.spieler.get_mut(&sid) {
+                if let Some(i) = s.sp.inventar.iter().position(|x| x == id) {
+                    s.sp.inventar.remove(i);
+                } else if let Some(p) = s.sp.ausruestung.iter().find(|(_, x)| *x == id).map(|(p, _)| p.clone()) {
+                    s.sp.ausruestung.remove(&p);
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
 fn wirkungen(w: &mut Welt, sid: u64, b: &EigenerBefehlDef) {
     // Gegenstände nehmen und geben
     if let Some(s) = w.spieler.get_mut(&sid) {
@@ -229,6 +383,12 @@ fn wirkungen(w: &mut Welt, sid: u64, b: &EigenerBefehlDef) {
     }
     if b.ausdauer > 0 {
         wirkung_anwenden(w, sid, "ausdauer", b.ausdauer, "");
+    }
+    if b.essen != 0 || b.trinken != 0 {
+        let t = crate::ernaehrung::auffuellen(w, sid, b.essen, b.trinken);
+        if !t.is_empty() {
+            w.sende(sid, &format!("{{gruen}}({}){{/}}", t.join(", ")));
+        }
     }
     if b.geld > 0 {
         if let Some(s) = w.spieler.get_mut(&sid) {

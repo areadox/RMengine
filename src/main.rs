@@ -30,6 +30,9 @@ mod text;
 mod update;
 mod gemeinschaft;
 mod handel;
+mod koerper;
+mod leichen;
+mod ernaehrung;
 mod neue_welt;
 mod eigene;
 mod quests;
@@ -141,7 +144,7 @@ async fn main() {
         "'{}': {} Räume, {} Gegenstände, {} Monster, {} Fertigkeiten, {} Zauber{}.",
         d.welt.name,
         d.raeume.len(),
-        d.gegenstaende.len(),
+        d.gegenstaende.keys().filter(|k| !k.starts_with("leiche:")).count(),
         d.monster.len(),
         d.fertigkeiten.len(),
         d.zauber.len(),

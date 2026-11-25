@@ -199,6 +199,8 @@ pub struct WeltConfig {
     pub max_berufe: u32,
     /// Kampftechniken gibt es nur für Mitglieder einer Gilde (gilde = "..." bei jeder Technik)
     pub techniken_nur_gilden: bool,
+    /// Körperbau der Spieler, wenn die Rasse keinen eigenen hat (leer = keine Körperteile)
+    pub koerper: String,
     /// Tragkraft: so viel Gewicht trägt jeder ...
     pub tragkraft_basis: i32,
     /// ... und so viel mehr pro Punkt Stärke (beides 0 = unbegrenzt)
@@ -233,6 +235,7 @@ impl Default for WeltConfig {
             karten_fertigkeit_max: 3,
             max_berufe: 2,
             techniken_nur_gilden: true,
+            koerper: String::new(),
             tragkraft_basis: 40,
             tragkraft_pro_staerke: 3,
         }
@@ -340,6 +343,10 @@ pub struct KampfConfig {
     pub tod_gegenstaende: String,
     /// Monster erholen sich außerhalb des Kampfes um so viel Prozent pro Takt
     pub monster_erholung_prozent: i32,
+    /// So viele Minuten bleibt die Leiche eines Gegners liegen (0 = keine Leichen)
+    pub leichen_minuten: u64,
+    /// Beute liegt in der Leiche ("nimm alles aus leiche") statt am Boden
+    pub beute_in_leiche: bool,
 }
 
 impl Default for KampfConfig {
@@ -365,6 +372,8 @@ impl Default for KampfConfig {
             tod_ep_verlust_prozent: 0,
             tod_gegenstaende: "behalten".into(),
             monster_erholung_prozent: 5,
+            leichen_minuten: 5,
+            beute_in_leiche: true,
         }
     }
 }
@@ -390,6 +399,51 @@ struct WeltDatei {
     geld: GeldConfig,
     #[serde(default)]
     darstellung: DarstellungConfig,
+    #[serde(default)]
+    ernaehrung: ErnaehrungConfig,
+}
+
+/// [ernaehrung]: Hunger und Durst
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields, default)]
+pub struct ErnaehrungConfig {
+    /// Hunger und Durst einschalten (Standard: aus)
+    pub aktiv: bool,
+    /// So viel passt hinein (satt bzw. ohne Durst)
+    pub max_essen: i32,
+    pub max_trinken: i32,
+    /// So viel geht pro Minute verloren
+    pub essen_pro_minute: f64,
+    pub trinken_pro_minute: f64,
+    /// Ab diesem Wert ist man hungrig bzw. durstig
+    pub hungrig_ab: i32,
+    pub durstig_ab: i32,
+    /// Lebenspunkte, die man pro Minute verliert, wenn Essen oder Trinken bei 0 ist (man stirbt nicht daran)
+    pub schaden_pro_minute: i32,
+    /// Bei 0 keine Erholung von Lebenspunkten und Mana
+    pub ohne_erholung: bool,
+    /// Wie viel Essen ohne Angabe sättigt (eigenschaften: essen = ...)
+    pub nahrung_standard: i32,
+    /// Wie viel ein Getränk ohne Angabe den Durst löscht (eigenschaften: trinken = ...)
+    pub getraenk_standard: i32,
+}
+
+impl Default for ErnaehrungConfig {
+    fn default() -> Self {
+        ErnaehrungConfig {
+            aktiv: false,
+            max_essen: 100,
+            max_trinken: 100,
+            essen_pro_minute: 1.0,
+            trinken_pro_minute: 1.5,
+            hungrig_ab: 30,
+            durstig_ab: 30,
+            schaden_pro_minute: 2,
+            ohne_erholung: true,
+            nahrung_standard: 25,
+            getraenk_standard: 30,
+        }
+    }
 }
 
 /// [geld]: Geldeinheiten, z.B. Gold = 100, Silber = 10, Kupfer = 1.
@@ -581,6 +635,9 @@ pub struct GegenstandDef {
     /// Waffe: Sekunden zwischen zwei Angriffen (schnelle Waffen < 2, schwere > 3)
     #[serde(default)]
     pub erholung: Option<f64>,
+    /// So viele Hände braucht man zum Halten (Waffe, Schild, Fackel). Standard 1, Zweihänder 2.
+    #[serde(default)]
+    pub haende: Option<u32>,
     /// Waffe: Fertigkeit, die benutzt und geübt wird, z.B. "schwertkampf"
     #[serde(default)]
     pub fertigkeit: String,
@@ -615,6 +672,92 @@ pub struct GegenstandDef {
 
     #[serde(skip)]
     pub quelle: String,
+}
+
+/// Ein Körperbau: welche Körperteile ein Wesen hat ([[koerper]] in daten/koerper/).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct KoerperDef {
+    pub id: String,
+    /// Anzeigename, z.B. "Menschengestalt" (für den Editor und die Prüfung)
+    #[allow(dead_code)]
+    pub name: String,
+    #[serde(default)]
+    pub teile: Vec<TeilDef>,
+    #[serde(skip)]
+    pub quelle: String,
+}
+
+/// Ein Körperteil: beschreibbar wie ein Detail, kann etwas halten oder angreifen.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(deny_unknown_fields, default)]
+pub struct TeilDef {
+    pub id: String,
+    /// z.B. "rechte Hand", "Maul"
+    pub name: String,
+    /// Weitere Wörter zum Ansehen (der Name zählt immer)
+    pub woerter: Vec<String>,
+    /// Beschreibung (schau hand)
+    pub text: String,
+    pub geruch: String,
+    pub geraeusch: String,
+    pub gefuehl: String,
+    pub nutzt: Vec<String>,
+    pub details: BTreeMap<String, Detail>,
+    /// Kann etwas halten (Waffe, Schild, Fackel)
+    pub halten: bool,
+    /// Angriff mit diesem Teil, z.B. "beißt" oder "schlägt mit der Pfote nach {ziel_dativ}"
+    pub angriff: String,
+    /// Schaden dieses Angriffs (0 = der normale Schaden des Wesens)
+    pub schaden: i32,
+}
+
+impl TeilDef {
+    /// Als Detail zum Ansehen (Name, Wörter, Text, Sinne, Unter-Details)
+    pub fn als_detail(&self) -> (String, Detail) {
+        let mut woerter = self.woerter.clone();
+        woerter.push(self.name.clone());
+        if let Some(letztes) = self.name.split_whitespace().last() {
+            woerter.push(letztes.to_string());
+        }
+        let text = if self.text.is_empty() { format!("{} – nichts Besonderes daran.", text::gross(&self.name)) } else { self.text.clone() };
+        let d = crate::beschreibung::DetailDef {
+            text,
+            woerter,
+            geruch: self.geruch.clone(),
+            geraeusch: self.geraeusch.clone(),
+            gefuehl: self.gefuehl.clone(),
+            nutzt: self.nutzt.clone(),
+            details: self.details.clone(),
+        };
+        (self.id.clone(), Detail::Voll(d))
+    }
+}
+
+/// Die Leiche eines Monsters: Name, Beschreibung, Details und Sinne wie bei Gegenständen.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(deny_unknown_fields, default)]
+pub struct LeicheDef {
+    /// false = dieses Monster hinterlässt keine Leiche
+    pub aktiv: Option<bool>,
+    /// z.B. "die Leiche einer Ratte" (leer = "die Leiche von der Ratte")
+    pub name: String,
+    pub akkusativ: String,
+    pub dativ: String,
+    /// Was im Raum steht, z.B. "Der Kadaver eines Wolfs liegt im Gras."
+    pub bodentext: String,
+    pub beschreibung: String,
+    /// Weitere Wörter (immer: leiche, kadaver, ueberreste)
+    pub schluesselwoerter: Vec<String>,
+    pub details: BTreeMap<String, Detail>,
+    pub geruch: String,
+    pub geraeusch: String,
+    pub gefuehl: String,
+    pub nutzt: Vec<String>,
+    /// So lange bleibt sie liegen (leer = [kampf] leichen_minuten)
+    pub minuten: Option<u64>,
+    /// Text, wenn sie verschwindet
+    pub verwest: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -708,6 +851,12 @@ pub struct MonsterDef {
     /// Der NPC nimmt in diesen Beruf / diese Zunft auf (Befehl: beitreten)
     #[serde(default)]
     pub beruf: String,
+    /// Körperbau, z.B. "wolf": Maul und Pfoten – damit greift es an
+    #[serde(default)]
+    pub koerper: String,
+    /// Wie die Leiche aussieht ([monster.leiche])
+    #[serde(default)]
+    pub leiche: LeicheDef,
     /// Steht in einer eigenen NPC-Datei ([npc])
     #[serde(skip)]
     pub ist_npc: bool,
@@ -900,6 +1049,9 @@ pub struct LehrDef {
 pub struct GemeinschaftDef {
     pub id: String,
     pub name: String,
+    /// Nur bei Rassen: Körperbau (Hände, Kopf ...), z.B. "humanoid"
+    #[serde(default)]
+    pub koerper: String,
     #[serde(default)]
     pub beschreibung: String,
     /// Zuschläge auf die Werte, z.B. { staerke = 2, intelligenz = -1 }
@@ -1076,7 +1228,9 @@ fn wahr() -> bool {
 // ---------------------------------------------------------------------------
 
 pub const GEGENSTAND_TYPEN: &[&str] =
-    &["waffe", "ruestung", "trank", "nahrung", "schluessel", "werkzeug", "schmuck", "behaelter", "sonstiges"];
+    &["waffe", "ruestung", "trank", "nahrung", "getraenk", "schluessel", "werkzeug", "schmuck", "behaelter", "sonstiges"];
+pub const GEGENSTAND_ORTE: &[&str] = &["dabei", "inventar", "angelegt", "raum"];
+pub const MIT_GEGENSTAND: &[&str] = &["anlegen", "ausziehen", "benutzen", "verbrauchen", "fallenlassen", "nehmen"];
 pub const PLAETZE: &[&str] = &[
     "waffe", "schild", "kopf", "koerper", "haende", "beine", "fuesse", "hals", "ring", "umhang", "licht", "ruecken", "guertel",
 ];
@@ -1137,6 +1291,22 @@ pub struct EigenerBefehlDef {
     /// Meldung, wenn Raum/Gebiet nicht passen
     #[serde(default)]
     pub nicht_hier: String,
+    // --- Mit einem Gegenstand ("fuehre schwert") ---
+    /// Nur Gegenstände dieser Arten (waffe, nahrung ...). Gesetzt = der Befehl braucht einen Gegenstand.
+    #[serde(default)]
+    pub gegenstand_typen: Vec<String>,
+    /// Wo der Gegenstand sein muss: dabei (Inventar oder angelegt), inventar, angelegt, raum
+    #[serde(default)]
+    pub gegenstand_ort: String,
+    /// Was mit dem Gegenstand passiert: anlegen, ausziehen, benutzen, verbrauchen, fallenlassen, nehmen (leer = nichts)
+    #[serde(default)]
+    pub mit_gegenstand: String,
+    /// Meldung, wenn kein Gegenstand angegeben ist
+    #[serde(default)]
+    pub ohne_gegenstand: String,
+    /// Meldung, wenn der Gegenstand nicht passt ({ding} = der Gegenstand)
+    #[serde(default)]
+    pub falscher_gegenstand: String,
     // --- Texte (wie bei Gesten) ---
     #[serde(default)]
     pub selbst: String,
@@ -1163,6 +1333,11 @@ pub struct EigenerBefehlDef {
     pub mp: i32,
     #[serde(default)]
     pub ausdauer: i32,
+    /// Sättigt bzw. löscht den Durst (bei Hunger und Durst)
+    #[serde(default)]
+    pub essen: i32,
+    #[serde(default)]
+    pub trinken: i32,
     #[serde(default)]
     pub geld: u64,
     #[serde(default)]
@@ -1200,6 +1375,13 @@ fn text_oder_liste<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Vec<String>
     })
 }
 
+impl EigenerBefehlDef {
+    /// Braucht der Befehl einen Gegenstand ("fuehre schwert")?
+    pub fn mit_ding(&self) -> bool {
+        !self.gegenstand_typen.is_empty() || !self.mit_gegenstand.is_empty()
+    }
+}
+
 fn standard_rolle_befehl() -> String {
     "spieler".into()
 }
@@ -1219,6 +1401,7 @@ pub struct Daten {
     pub berufe: BTreeMap<String, GemeinschaftDef>,
     pub quests: BTreeMap<String, QuestDef>,
     pub eigene_befehle: BTreeMap<String, EigenerBefehlDef>,
+    pub koerper: BTreeMap<String, KoerperDef>,
     /// Welcher Raum liegt an welcher Koordinate?
     /// (karte, x, y, z) -> Raum
     pub koordinaten: HashMap<(String, i32, i32, i32), String>,
@@ -1233,6 +1416,7 @@ pub struct Daten {
     /// Die Geldeinheiten für die Anzeige (aus [geld] oder waehrung)
     pub geld_einheiten: Vec<crate::darstellung::Einheit>,
     pub darstellung: DarstellungConfig,
+    pub ernaehrung: ErnaehrungConfig,
     /// Befehle und Gesten aus befehle.toml / befehle/*.toml
     pub befehle: crate::befehlskonfig::Befehle,
     pub oberwelt: Option<Oberwelt>,
@@ -1379,6 +1563,20 @@ impl Daten {
         }
     }
 
+    /// Name im Dativ ("mit dem Schwert"). Ohne Angabe: der normale Name.
+    pub fn gegenstand_dativ(&self, id: &str) -> String {
+        match self.gegenstaende.get(id) {
+            Some(g) if !g.dativ.is_empty() => g.dativ.clone(),
+            _ => self.gegenstand_name(id),
+        }
+    }
+
+    /// Der Körperbau eines Spielers: von der Rasse, sonst aus [welt] koerper
+    pub fn koerper_von(&self, rasse: &str) -> Option<&KoerperDef> {
+        let id = self.rassen.get(rasse).map(|r| r.koerper.as_str()).filter(|k| !k.is_empty()).unwrap_or(&self.welt.koerper);
+        self.koerper.get(id)
+    }
+
     pub fn gegenstand_name(&self, id: &str) -> String {
         self.gegenstaende.get(id).map(|g| g.name.clone()).unwrap_or_else(|| format!("<{id}>"))
     }
@@ -1407,6 +1605,7 @@ pub fn laden(ordner: &Path) -> Result<Daten, Vec<String>> {
         berufe: BTreeMap::new(),
         quests: BTreeMap::new(),
         eigene_befehle: BTreeMap::new(),
+        koerper: BTreeMap::new(),
         koordinaten: HashMap::new(),
         deko_farben: wd.deko,
         namen: wd.namen,
@@ -1415,6 +1614,7 @@ pub fn laden(ordner: &Path) -> Result<Daten, Vec<String>> {
         geld_einheiten: Vec::new(),
         geld: wd.geld,
         darstellung: wd.darstellung,
+        ernaehrung: wd.ernaehrung,
         befehle: Default::default(),
         oberwelt: None,
         bibliothek: BTreeMap::new(),
@@ -1469,6 +1669,7 @@ pub fn laden(ordner: &Path) -> Result<Daten, Vec<String>> {
     let mut berufe: Vec<(String, GemeinschaftDef)> = Vec::new();
     let mut quests: Vec<(String, QuestDef)> = Vec::new();
     let mut eigene: Vec<(String, EigenerBefehlDef)> = Vec::new();
+    let mut koerper: Vec<(String, KoerperDef)> = Vec::new();
     for (i, t) in fertig {
         let r = &roh[i];
         let id = t.get("id").and_then(|v| v.as_str()).unwrap_or("?").to_string();
@@ -1494,6 +1695,7 @@ pub fn laden(ordner: &Path) -> Result<Daten, Vec<String>> {
             "beruf" => umwandeln!(berufe),
             "quest" => umwandeln!(quests),
             "befehl" => umwandeln!(eigene),
+            "koerper" => umwandeln!(koerper),
             _ => umwandeln!(bibliothek),
         }
     }
@@ -1529,6 +1731,8 @@ pub fn laden(ordner: &Path) -> Result<Daten, Vec<String>> {
     einsortieren!(berufe, d.berufe, "Beruf");
     einsortieren!(quests, d.quests, "Quest");
     einsortieren!(eigene, d.eigene_befehle, "Befehl");
+    einsortieren!(koerper, d.koerper, "Körper");
+    leichen_anlegen(&mut d);
 
     d.oberwelt = oberwelt::laden(ordner, &mut fehler);
     d.befehle = crate::befehlskonfig::laden(ordner, &d.eigene_befehle, &mut fehler, &mut warnungen);
@@ -1539,6 +1743,63 @@ pub fn laden(ordner: &Path) -> Result<Daten, Vec<String>> {
         Ok(d)
     } else {
         Err(fehler)
+    }
+}
+
+/// ID des Gegenstands, der die Leiche eines Monsters darstellt
+pub fn leichen_id(monster: &str) -> String {
+    format!("leiche:{monster}")
+}
+
+/// Für jedes Monster mit Leiche einen (nicht tragbaren) Gegenstand anlegen,
+/// damit man sie ansehen, riechen und ihre Details untersuchen kann.
+fn leichen_anlegen(d: &mut Daten) {
+    let standard = d.kampf.leichen_minuten;
+    let mut neu = Vec::new();
+    for m in d.monster.values() {
+        let l = &m.leiche;
+        if !l.aktiv.unwrap_or(true) || l.minuten.unwrap_or(standard) == 0 {
+            continue;
+        }
+        let von = if m.dativ.is_empty() { m.name.clone() } else { m.dativ.clone() };
+        let name = if l.name.is_empty() { format!("die Leiche von {von}") } else { l.name.clone() };
+        let mut t = toml::Table::new();
+        t.insert("id".into(), leichen_id(&m.id).into());
+        t.insert("name".into(), name.clone().into());
+        let akk = if l.akkusativ.is_empty() { name.clone() } else { l.akkusativ.clone() };
+        t.insert("akkusativ".into(), akk.into());
+        let dativ = if l.dativ.is_empty() { name.replacen("die ", "der ", 1) } else { l.dativ.clone() };
+        t.insert("dativ".into(), dativ.into());
+        let bodentext = if l.bodentext.is_empty() { format!("{} liegt hier.", text::gross(&name)) } else { l.bodentext.clone() };
+        t.insert("bodentext".into(), bodentext.into());
+        let beschreibung =
+            if l.beschreibung.is_empty() { format!("{} liegt reglos am Boden.", text::gross(&m.name)) } else { l.beschreibung.clone() };
+        t.insert("beschreibung".into(), beschreibung.into());
+        let mut woerter: Vec<toml::Value> = ["leiche", "kadaver", "ueberreste"].iter().map(|w| (*w).into()).collect();
+        woerter.extend(l.schluesselwoerter.iter().map(|w| w.clone().into()));
+        t.insert("schluesselwoerter".into(), toml::Value::Array(woerter));
+        t.insert("typ".into(), "sonstiges".into());
+        t.insert("tragbar".into(), false.into());
+        t.insert("gewicht".into(), 0.into());
+        for (k, v) in [("geruch", &l.geruch), ("geraeusch", &l.geraeusch), ("gefuehl", &l.gefuehl)] {
+            t.insert(k.into(), v.clone().into());
+        }
+        t.insert("nutzt".into(), toml::Value::Array(l.nutzt.iter().map(|w| w.clone().into()).collect()));
+        if let Ok(mut g) = toml::Value::Table(t).try_into::<GegenstandDef>() {
+            g.details = l.details.clone();
+            // Die Körperteile kann man auch an der Leiche ansehen (eigene Details gehen vor)
+            if let Some(k) = d.koerper.get(&m.koerper) {
+                for teil in &k.teile {
+                    let (id, det) = teil.als_detail();
+                    g.details.entry(id).or_insert(det);
+                }
+            }
+            g.quelle = m.quelle.clone();
+            neu.push(g);
+        }
+    }
+    for g in neu {
+        d.gegenstaende.insert(g.id.clone(), g);
     }
 }
 
@@ -1618,7 +1879,7 @@ struct Roh {
 }
 
 const ARTEN: &[&str] =
-    &["raum", "gegenstand", "monster", "npc", "fertigkeit", "zauber", "beschreibung", "rasse", "gilde", "beruf", "quest", "befehl"];
+    &["raum", "gegenstand", "monster", "npc", "fertigkeit", "zauber", "beschreibung", "rasse", "gilde", "beruf", "quest", "befehl", "koerper"];
 
 fn art_anzeige(art: &str) -> &'static str {
     match art {
@@ -1633,6 +1894,7 @@ fn art_anzeige(art: &str) -> &'static str {
         "beruf" => "Beruf",
         "quest" => "Quest",
         "befehl" => "Befehl",
+        "koerper" => "Körper",
         _ => "Beschreibung",
     }
 }
@@ -2264,6 +2526,31 @@ fn pruefen(d: &mut Daten, fehler: &mut Vec<String>, warn: &mut Vec<String>) {
     }
 
     // --- Quests ---
+    // Körperbau
+    for k in d.koerper.values() {
+        let wo = format!("[{}] Körper '{}'", k.quelle, k.id);
+        let mut ids = std::collections::HashSet::new();
+        for t in &k.teile {
+            if t.id.is_empty() || t.name.is_empty() {
+                fehler.push(format!("{wo}: Jedes Körperteil braucht eine id und einen name."));
+            } else if !ids.insert(t.id.clone()) {
+                fehler.push(format!("{wo}: Das Körperteil '{}' gibt es doppelt.", t.id));
+            }
+        }
+    }
+    if !d.welt.koerper.is_empty() {
+        verweis(&d.koerper, &d.welt.koerper, "welt.toml (koerper)", "Körper", fehler);
+    }
+    for r in d.rassen.values() {
+        if !r.koerper.is_empty() {
+            verweis(&d.koerper, &r.koerper, &format!("[{}] Rasse '{}'", r.quelle, r.id), "Körper", fehler);
+        }
+    }
+    for m in d.monster.values() {
+        if !m.koerper.is_empty() {
+            verweis(&d.koerper, &m.koerper, &format!("[{}] Monster '{}'", m.quelle, m.id), "Körper", fehler);
+        }
+    }
     for b in d.eigene_befehle.values() {
         let wo = format!("[{}] Befehl '{}'", b.quelle, b.id);
         if b.woerter.iter().all(|x| x.trim().is_empty()) {
@@ -2293,10 +2580,21 @@ fn pruefen(d: &mut Daten, fehler: &mut Vec<String>, warn: &mut Vec<String>) {
         if !b.zauber.is_empty() {
             verweis(&d.zauber, &b.zauber, &wo, "Zauber", fehler);
         }
+        for t in &b.gegenstand_typen {
+            if !GEGENSTAND_TYPEN.contains(&t.as_str()) {
+                warn.push(format!("{wo}: unbekannte Gegenstandsart '{t}'. Bekannt: {}", GEGENSTAND_TYPEN.join(", ")));
+            }
+        }
+        if !b.gegenstand_ort.is_empty() && !GEGENSTAND_ORTE.contains(&b.gegenstand_ort.as_str()) {
+            fehler.push(format!("{wo}: gegenstand_ort '{}' gibt es nicht. Erlaubt: {}", b.gegenstand_ort, GEGENSTAND_ORTE.join(", ")));
+        }
+        if !b.mit_gegenstand.is_empty() && !MIT_GEGENSTAND.contains(&b.mit_gegenstand.as_str()) {
+            fehler.push(format!("{wo}: mit_gegenstand '{}' gibt es nicht. Erlaubt: {}", b.mit_gegenstand, MIT_GEGENSTAND.join(", ")));
+        }
         if b.chance > 100 {
             fehler.push(format!("{wo}: 'chance' ist in Prozent (0 bis 100)."));
         }
-        if b.selbst.trim().is_empty() && b.selbst_ziel.trim().is_empty() && b.befehle.is_empty() {
+        if b.selbst.trim().is_empty() && b.selbst_ziel.trim().is_empty() && b.befehle.is_empty() && b.mit_gegenstand.is_empty() {
             warn.push(format!("{wo}: Es gibt keinen Text 'selbst' – der Spieler sieht nicht, dass etwas passiert."));
         }
     }
@@ -2425,6 +2723,22 @@ mod tests {
         assert!(d.monster["ratte"].aggressiv);
         let segen = &d.zauber["segen"];
         assert_eq!((segen.ziel.as_str(), segen.fertigkeit.as_str()), ("raum", "heilkunde"));
+    }
+
+    #[test]
+    fn leichen_koerper_und_eigene_befehle() {
+        let d = laden(Path::new(env!("CARGO_MANIFEST_DIR")).join("daten").as_path()).expect("Beispielwelt lädt");
+        // Leiche des Wolfs: eigene Details und die Körperteile aus koerper = "wolf"
+        let l = &d.gegenstaende[&leichen_id("wolf")];
+        assert!(!l.tragbar);
+        assert!(l.details.contains_key("fell") && l.details.contains_key("maul"), "{:?}", l.details.keys());
+        // Zwei Hände für Spieler, Zweihänder braucht beide
+        let k = d.koerper_von("mensch").expect("Körper der Spieler");
+        assert_eq!(k.teile.iter().filter(|t| t.halten).count(), 2);
+        assert_eq!(d.gegenstaende["streitaxt"].haende, Some(2));
+        // Eigene Befehle mit Gegenstandsarten
+        assert_eq!(d.eigene_befehle["fuehren"].gegenstand_typen, vec!["waffe".to_string()]);
+        assert!(d.ernaehrung.aktiv);
     }
 
     #[test]

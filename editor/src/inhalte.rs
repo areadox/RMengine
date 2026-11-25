@@ -265,6 +265,7 @@ impl Inhalte {
             Ziel::Beruf => self.ids_von(&["beruf"], false),
             Ziel::Quest => self.ids_von(&["quest"], false),
             Ziel::Befehl => self.ids_von(&["befehl"], false),
+            Ziel::Koerper => self.ids_von(&["koerper"], false),
             Ziel::Beschreibung => self.ids_von(&["beschreibung"], false),
             Ziel::Gleich => {
                 if art.gruppe() == "monster" {
@@ -434,6 +435,7 @@ fn ziel_name(z: Ziel, art: &Art) -> &'static str {
         Ziel::Beruf => "beruf",
         Ziel::Quest => "quest",
         Ziel::Befehl => "befehl",
+        Ziel::Koerper => "koerper",
         Ziel::Beschreibung => "beschreibung",
         Ziel::Gleich => match art.gruppe() {
             "monster" => "gleich:monster",
@@ -877,8 +879,12 @@ fn feld_zeigen(ui: &mut egui::Ui, ctx: &mut Kontext, t: &mut dyn TableLike, feld
                 }
             });
         }
-        Typ::VerweisListe(z) => {
-            let liste = ctx.ids(z);
+        Typ::VerweisListe(_) | Typ::AuswahlListe(_) => {
+            let liste = match feld.typ {
+                Typ::VerweisListe(z) => ctx.ids(z),
+                Typ::AuswahlListe(moeglich) => moeglich.iter().map(|s| s.to_string()).collect(),
+                _ => Vec::new(),
+            };
             ui.horizontal_wrapped(|ui| {
                 beschriftung(ui, feld, pflicht);
                 let mut v = liste_lesen(t, feld.name);

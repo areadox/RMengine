@@ -1,0 +1,119 @@
+# =====================================================================
+#  Körperbau: welche Körperteile ein Wesen hat
+# =====================================================================
+#  Rassen und Monster verweisen darauf mit  koerper = "..."
+#  (Spieler ohne Rasse-Körper bekommen [welt] koerper).
+#
+#  Jedes Teil kann man ansehen ("schau hand", "schau maul") – mit Text,
+#  Sinnen (geruch, geraeusch, gefuehl) und Unter-Details wie bei Räumen.
+#    halten  = true        kann etwas halten (Waffe, Schild, Fackel)
+#    angriff = "beißt"     Monster greifen damit an; {ziel} = dich, {ziel_dativ} = dir
+#    schaden = 5           Schaden dieses Angriffs (0 = normaler Schaden)
+# =====================================================================
+
+[[koerper]]
+id   = "humanoid"
+name = "Menschengestalt"
+
+[[koerper.teile]]
+id   = "kopf"
+name = "Kopf"
+text = "Dein Kopf – mit allem, was dazugehört."
+woerter = ["gesicht"]
+
+[[koerper.teile]]
+id     = "rechte_hand"
+name   = "rechte Hand"
+text   = "Deine rechte Hand. Mit ihr führst du meist die Waffe."
+halten = true
+woerter = ["haende", "rechte"]
+
+[[koerper.teile]]
+id     = "linke_hand"
+name   = "linke Hand"
+text   = "Deine linke Hand – gut für einen Schild oder eine Fackel."
+halten = true
+woerter = ["linke"]
+
+[[koerper.teile]]
+id   = "beine"
+name = "Beine"
+text = "Zwei Beine, die dich schon weit getragen haben."
+woerter = ["bein", "fuesse", "fuss"]
+
+# ---------------------------------------------------------------------
+
+[[koerper]]
+id   = "wolf"
+name = "Wolf"
+
+[[koerper.teile]]
+id      = "maul"
+name    = "Maul"
+text    = "Ein langes Maul voller gelblicher Reißzähne."
+woerter = ["schnauze", "zaehne", "gebiss"]
+geruch  = "Der Atem riecht nach rohem Fleisch."
+angriff = "beißt"
+schaden = 7
+
+[[koerper.teile]]
+id      = "pfoten"
+name    = "Vorderpfoten"
+text    = "Breite Pfoten mit stumpfen, aber kräftigen Krallen."
+woerter = ["pfote", "krallen", "kralle"]
+angriff = "schlägt mit der Pfote nach {ziel_dativ}"
+schaden = 4
+
+
+[[koerper.teile]]
+id      = "fell"
+name    = "Fell"
+text    = "Graues, struppiges Fell voller Kletten."
+gefuehl = "Rau und borstig."
+
+# ---------------------------------------------------------------------
+
+[[koerper]]
+id   = "ratte"
+name = "Ratte"
+
+[[koerper.teile]]
+id      = "zaehne"
+name    = "Nagezähne"
+text    = "Zwei lange, gelbe Nagezähne."
+woerter = ["zaehne", "zahn", "maul"]
+angriff = "beißt"
+
+[[koerper.teile]]
+id      = "krallen"
+name    = "Krallen"
+text    = "Kleine, spitze Krallen."
+woerter = ["kralle", "pfoten"]
+angriff = "kratzt"
+
+[[koerper.teile]]
+id   = "schwanz"
+name = "Schwanz"
+text = "Ein langer, nackter Schwanz, der unruhig hin und her peitscht."
+
+# ---------------------------------------------------------------------
+
+[[koerper]]
+id   = "spinne"
+name = "Spinne"
+
+[[koerper.teile]]
+id      = "kieferklauen"
+name    = "Kieferklauen"
+text    = "Zwei schwarze, glänzende Kieferklauen, an denen ein Tropfen Gift hängt."
+woerter = ["klauen", "kiefer", "maul", "gift"]
+angriff = "schlägt die Kieferklauen nach {ziel_dativ}"
+
+[[koerper.teile]]
+id      = "beine"
+name    = "acht Beine"
+text    = "Acht lange, behaarte Beine."
+woerter = ["bein", "beine"]
+gefuehl = "Die Haare an den Beinen sind steif wie Borsten."
+angriff = "tritt nach {ziel_dativ}"
+schaden = 3

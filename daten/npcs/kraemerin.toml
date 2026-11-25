@@ -35,7 +35,7 @@ antwort = "Die blauen Pilze vom Waldweg geben einem Kraft für Zauberei, sagt ma
 # Greta handelt: "waren" zeigt das Angebot, "kaufe brot", "verkaufe pelz"
 [npc.haendler]
 laden           = "Gretas Krämerladen"   # Name in der Liste (leer = Name des NPCs)
-waren           = ["brot", "apfel", "heiltrank", "manatrank", "fackel", "landkarte", "lederbeutel", "rucksack", "trankguertel"]
+waren           = ["brot", "apfel", "wasserschlauch", "heiltrank", "manatrank", "fackel", "landkarte", "lederbeutel", "rucksack", "trankguertel"]
 ankauf          = true      # kauft Gegenstände an
 ankauf_prozent  = 50        # zahlt die Hälfte des Werts
 verkauf_prozent = 100       # verkauft zum vollen Wert

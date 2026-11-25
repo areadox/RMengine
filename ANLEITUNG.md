@@ -351,6 +351,7 @@ daten/
   befehle/             Befehle anpassen und eigene Gesten
   eigene_befehle/      eigene Befehle mit Bedingungen und Wirkungen (Kapitel 12)
   quests/, rassen/, gilden/, berufe/   Aufgaben, Rassen, Gilden, Berufe
+  koerper/             Körperbau: Hände, Maul, Pfoten ... (Kapitel 22)
   vorlagen/            Vorlagen, von denen andere Einträge erben
   fertigkeiten/*.toml  Fertigkeiten
   zauber/*.toml        Zaubersprüche
@@ -926,12 +927,15 @@ eigenschaften = { heilung = 40 }
 benutzen_text = "Du trinkst den Trank."
 ```
 
-- **typ:** `waffe ruestung trank nahrung schluessel werkzeug schmuck behaelter sonstiges`
+- **typ:** `waffe ruestung trank nahrung getraenk schluessel werkzeug schmuck behaelter sonstiges`
 - **platz:** `waffe schild kopf koerper haende beine fuesse hals ring umhang licht ruecken guertel`
 - **eigenschaften:** Hier darfst du beliebige Zahlen eintragen. `heilung` und
   `mana` machen einen Gegenstand benutzbar (er wird dabei verbraucht),
   `schaden` und `ruestung` zählen im Kampf, Werte wie `staerke` erhöhen den Wert,
-  solange man den Gegenstand angelegt hat.
+  solange man den Gegenstand angelegt hat. Mit Hunger und Durst (Kapitel 21)
+  sättigt `essen` und `trinken` löscht den Durst.
+- **haende:** So viele Hände braucht man, um ihn zu halten (Waffe, Schild,
+  Fackel: Standard 1). Ein Zweihänder hat `haende = 2`. Siehe Kapitel 22.
 
 ### Behälter: Taschen, Beutel und Rucksäcke
 
@@ -1162,6 +1166,44 @@ angreifbar = false                  # z.B. für friedliche Tiere (NPCs: Standard
 
 Admins können mit `erfahrung <spieler> <menge>` zum Testen Erfahrung vergeben.
 
+Hat ein Monster einen Körperbau (`koerper = "wolf"`, Kapitel 22), greift es mit
+seinen Körperteilen an – z.B. „Ein grauer Wolf beißt dich!“ mit dem Maul oder
+„… schlägt mit der Pfote nach dir“. Dann gelten die `angriff`- und
+`schaden`-Angaben der Körperteile statt `angriffe`.
+
+### Leichen
+
+Besiegte Gegner hinterlassen eine Leiche. Sie liegt ein paar Minuten im Raum,
+die Beute steckt darin. Spieler: `schau leiche` (zeigt auch, was darin ist),
+`nimm alles aus leiche`, `nimm pelz aus leiche`, dazu `riech leiche`,
+`taste leiche` und die Details. Danach verwest sie; was noch darin war, fällt
+zu Boden.
+
+```toml
+[monster.leiche]
+name      = "der Kadaver eines Wolfs"       # leer = "die Leiche von ..."
+akkusativ = "den Kadaver eines Wolfs"
+dativ     = "dem Kadaver eines Wolfs"       # für "nimm alles aus ..."
+bodentext = "Der Kadaver eines grauen Wolfs liegt im Laub."
+beschreibung = "Der Wolf liegt ausgestreckt da ..."
+geruch    = "Nasses Fell und Blut."
+gefuehl   = "Das Fell ist rau und noch ein wenig warm."
+minuten   = 5                               # leer = [kampf] leichen_minuten
+verwest   = "Vom Wolf bleiben nur ein paar Knochen."
+# aktiv = false                             # dieses Monster hinterlässt keine Leiche
+
+[monster.leiche.details.fell]                # Details wie bei Räumen, mit Unter-Details
+text    = "Grau, struppig und an der Flanke aufgerissen."
+woerter = ["pelz"]
+
+[monster.leiche.details.fell.details.wunde]
+text = "Eine tiefe Wunde – hier hat dein letzter Hieb getroffen."
+```
+
+Die Körperteile des Monsters (Maul, Pfoten …) kann man auch an der Leiche
+ansehen. In `[kampf]` gibt es `leichen_minuten = 5` (0 = keine Leichen) und
+`beute_in_leiche = true` (false = die Beute fällt wie früher zu Boden).
+
 ---
 
 ## 12. Befehle anpassen, Gesten und eigene Befehle
@@ -1250,11 +1292,35 @@ Misserfolg fällig.
 | Feld | Bedeutung |
 |------|-----------|
 | `lp`, `mp`, `ausdauer` | heilt (oder schadet, mit Minus) |
+| `essen`, `trinken` | sättigt bzw. löscht den Durst (Kapitel 21), z.B. an einem Brunnen |
 | `geld`, `erfahrung` | gibt Geld bzw. Erfahrungspunkte |
 | `gib` | diese Gegenstände bekommt man |
 | `teleport` | versetzt in diesen Raum |
 | `zauber` | legt die Wirkungen dieses Zaubers auf einen selbst, ohne Kosten (z.B. einen Schild) |
 | `befehle` | danach weitere Befehle ausführen, z.B. `["sage Hallo {rest}", "winke {rest}"]` |
+
+**Mit einem Gegenstand:** Ein Befehl kann sich auf einen Gegenstand beziehen,
+z.B. „fuehre schwert“. Mit `gegenstand_typen` geht er nur mit bestimmten Arten:
+
+```toml
+[[befehl]]
+id                  = "fuehren"
+woerter             = ["fuehre", "fuehren"]
+syntax              = "fuehre <waffe>"
+gegenstand_typen    = ["waffe"]          # waffe, ruestung, trank, nahrung, getraenk ...
+gegenstand_ort      = "dabei"            # dabei (Standard), inventar, angelegt, raum
+mit_gegenstand      = "anlegen"          # anlegen, ausziehen, benutzen, verbrauchen, fallenlassen, nehmen
+ohne_gegenstand     = "Welche Waffe willst du führen?"
+falscher_gegenstand = "{ding} ist keine Waffe."
+selbst              = "Du nimmst {ding_akk} fest in die Hand."
+andere              = "{name} nimmt {ding_akk} fest in die Hand."
+```
+
+In den Texten steht `{ding}` für den Gegenstand („ein Schwert“), `{ding_akk}`
+für den Akkusativ und `{ding_dativ}` für den Dativ. Gibt es einen eigenen Text
+`selbst`, entfällt die eingebaute Meldung („Du legst … an.“). Ob das Anlegen
+klappt (freier Platz, freie Hand), wird vorher geprüft – sonst kostet der
+Befehl nichts und zeigt keinen Text.
 
 Eigene Befehle stehen in der Hilfe unter *Besondere Befehle*. Ruft ein Befehl
 über `befehle` sich selbst auf, wird das übersprungen. Eine Quest kann einen
@@ -1834,7 +1900,86 @@ titel        = ""
 | `bringen`  | man `anzahl` Gegenstände `ziel` beim NPC `an` abgibt (leer = Geber) |
 | `besuchen` | man den Raum `ziel` betritt                                   |
 | `sprechen` | man mit dem NPC `ziel` redet                                  |
+| `befehl`   | man den eigenen Befehl `ziel` `anzahl`-mal benutzt (Kapitel 12) |
 
 Spieler: `aufgaben`, `aufgaben erledigt`, `annehmen [nr|name]`, `abgeben`,
 `abbrechen <nr|name>`. Zum Abgeben reicht es auch, mit dem Geber zu reden.
+
+---
+
+## 21. Hunger und Durst
+
+Eingeschaltet wird es in `welt.toml` (Standard: aus):
+
+```toml
+[ernaehrung]
+aktiv              = true
+max_essen          = 100
+max_trinken        = 100
+essen_pro_minute   = 1.0     # von satt bis leer: 100 Minuten
+trinken_pro_minute = 1.5
+hungrig_ab         = 30      # darunter: "hungrig"
+durstig_ab         = 30
+schaden_pro_minute = 2       # LP-Verlust pro Minute bei 0 (sterben kann man daran nicht)
+ohne_erholung      = true    # bei 0 keine Erholung von LP und Mana
+nahrung_standard   = 25      # Essen ohne Angabe
+getraenk_standard  = 30      # Getränke ohne Angabe
+```
+
+- **Essen** (`typ = "nahrung"`) sättigt, **Getränke** (`typ = "getraenk"`)
+  löschen den Durst. Wie viel, steht bei den Gegenständen:
+  `eigenschaften = { essen = 40 }` bzw. `{ trinken = 50 }`. Auch Tränke können
+  `trinken` haben.
+- Spieler essen und trinken mit `iss brot` und `trinke wasser` (oder `benutze`).
+  Wer satt ist, bekommt nichts mehr hinunter.
+- Wird man hungrig oder durstig, kommt eine Meldung, und der Prompt zeigt
+  `[hungrig]` bzw. `[durstig]`. `sp` zeigt den Zustand immer.
+- Eigene Befehle können mit `essen` und `trinken` sättigen – z.B. Wasser an
+  einem Brunnen schöpfen (Beispiel: `schoepfe` auf dem Dorfplatz).
+- Für Skripte: GMCP `Char.Vitals` enthält dann `food`, `maxfood`, `drink`, `maxdrink`.
+
+---
+
+## 22. Körperbau und Körperteile
+
+Ein Körperbau legt fest, welche Körperteile ein Wesen hat (`daten/koerper/`).
+Rassen bekommen ihn mit `koerper = "..."`, alle anderen Spieler den aus
+`[welt] koerper`. Monster ebenfalls mit `koerper = "..."`. Im Welteditor
+steht er unter 📚 Inhalte → ✋ Körperbau.
+
+```toml
+[[koerper]]
+id   = "wolf"
+name = "Wolf"
+
+[[koerper.teile]]
+id      = "maul"
+name    = "Maul"
+woerter = ["schnauze", "zaehne"]         # weitere Wörter zum Ansehen
+text    = "Ein langes Maul voller gelblicher Reißzähne."
+geruch  = "Der Atem riecht nach rohem Fleisch."
+angriff = "beißt"                        # "Ein grauer Wolf beißt dich!"
+schaden = 7                              # 0 = normaler Schaden des Monsters
+
+[[koerper.teile]]
+id      = "pfoten"
+name    = "Vorderpfoten"
+angriff = "schlägt mit der Pfote nach {ziel_dativ}"   # {ziel} = dich, {ziel_dativ} = dir
+schaden = 4
+```
+
+Jedes Körperteil kann wie ein Detail beschrieben werden: `text`, `geruch`,
+`geraeusch`, `gefuehl`, `nutzt` und `details` mit Unter-Details.
+
+- **Halten:** Teile mit `halten = true` sind Hände. Man kann nur so viele Dinge
+  halten (Platz `waffe`, `schild`, `licht`), wie man Hände hat. Ein Mensch mit
+  zwei Händen hält also z.B. Schwert und Schild – für eine Fackel ist dann
+  keine Hand mehr frei. Ein Zweihänder (`haende = 2`) braucht beide.
+- **Angreifen:** Monster greifen mit den Teilen an, die einen `angriff` haben.
+- **Ansehen:** `schau maul` (am Monster im Raum oder an seiner Leiche),
+  `schau hand` (der eigene Körper). Beim Ansehen eines Monsters steht dabei,
+  welche Körperteile man genauer ansehen kann.
+
+Ohne Körperbau gibt es keine Begrenzung der Hände, und Monster greifen wie
+bisher mit `angriffe` an.
 

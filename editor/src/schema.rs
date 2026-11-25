@@ -21,6 +21,8 @@ pub enum Ziel {
     Quest,
     /// Eigene Befehle
     Befehl,
+    /// Körperbau
+    Koerper,
     Beschreibung,
     /// Dieselbe Art wie der Eintrag (für erbt)
     Gleich,
@@ -42,6 +44,8 @@ pub enum Typ {
     Auswahl(&'static [&'static str]),
     Verweis(Ziel),
     VerweisListe(Ziel),
+    /// Mehrere Werte aus einer festen Liste, z.B. Gegenstandsarten
+    AuswahlListe(&'static [&'static str]),
     /// Name -> Zahl, z.B. eigenschaften = { schaden = 3 }
     Werte(&'static [&'static str]),
     /// ID -> Zahl, z.B. fertigkeiten = { schwertkampf = 5 }
@@ -115,7 +119,7 @@ impl Art {
 // ---------------------------------------------------------------------------
 
 pub const GEGENSTAND_TYPEN: &[&str] =
-    &["waffe", "ruestung", "trank", "nahrung", "schluessel", "werkzeug", "schmuck", "behaelter", "sonstiges"];
+    &["waffe", "ruestung", "trank", "nahrung", "getraenk", "schluessel", "werkzeug", "schmuck", "behaelter", "sonstiges"];
 pub const PLAETZE: &[&str] =
     &["waffe", "schild", "kopf", "koerper", "haende", "beine", "fuesse", "hals", "ring", "umhang", "licht", "ruecken", "guertel"];
 pub const ZIELE: &[&str] = &["selbst", "spieler", "gegner", "raum"];
@@ -125,7 +129,7 @@ pub const WIRKUNGEN: &[&str] =
 pub const QUEST_ARTEN: &[&str] = &["aufgabe", "quest"];
 pub const SCHRITT_ARTEN: &[&str] = &["toeten", "bringen", "besuchen", "sprechen", "befehl"];
 pub const ROLLEN: &[&str] = &["spieler", "baumeister", "admin"];
-const EIGENSCHAFTEN: &[&str] = &["schaden", "ruestung", "heilung", "mana", "landkarte", "staerke", "geschick", "ausdauer", "intelligenz", "weisheit"];
+const EIGENSCHAFTEN: &[&str] = &["schaden", "ruestung", "heilung", "mana", "essen", "trinken", "landkarte", "staerke", "geschick", "ausdauer", "intelligenz", "weisheit"];
 const WERTE: &[&str] = &["staerke", "geschick", "ausdauer", "intelligenz", "weisheit"];
 
 const VERERBUNG: [Feld; 2] = [
@@ -181,8 +185,9 @@ const GEGENSTAND: &[Feld] = felder![
     f("gewicht", "Gewicht", Typ::Zahl, ""),
     f("tragbar", "Tragbar", Typ::Schalter, "Kann man ihn aufheben?"),
     f("erholung", "Erholung (s)", Typ::Komma, "Waffe: Sekunden zwischen zwei Angriffen."),
+    f("haende", "Hände zum Halten", Typ::Zahl, "Waffe, Schild, Fackel: Standard 1. Zweihänder: 2."),
     f("fertigkeit", "Fertigkeit", Typ::Verweis(Ziel::Fertigkeit), "Waffe: welche Fertigkeit geübt wird."),
-    f("eigenschaften", "Eigenschaften", Typ::Werte(EIGENSCHAFTEN), "schaden, ruestung, heilung, mana oder Werte wie staerke."),
+    f("eigenschaften", "Eigenschaften", Typ::Werte(EIGENSCHAFTEN), "schaden, ruestung, heilung, mana, essen (sättigt), trinken (löscht Durst) oder Werte wie staerke."),
     f("benutzen_text", "Text beim Benutzen", Typ::Text, ""),
     f("fassungsvermoegen", "Behälter: fasst", Typ::Zahl, "So viel Gewicht passt hinein. Leer/0 = kein Behälter."),
     f("max_dinge", "Behälter: höchstens Dinge", Typ::Zahl, "Leer = beliebig viele."),
@@ -233,6 +238,23 @@ const WESEN_REST: [Feld; 10] = [
     VERERBUNG[0],
 ];
 
+const LEICHE: &[Feld] = felder![
+    f("aktiv", "Hinterlässt eine Leiche", Typ::Schalter, "Standard: ja (wenn Kampf → Leichen-Minuten größer als 0)."),
+    f("name", "Name", Typ::Text, "z.B. \"der Kadaver eines Wolfs\". Leer = \"die Leiche von ...\"."),
+    f("akkusativ", "Akkusativ", Typ::Text, "\"den Kadaver eines Wolfs\""),
+    f("dativ", "Dativ", Typ::Text, "\"dem Kadaver eines Wolfs\" (für \"nimm alles aus ...\")"),
+    f("bodentext", "Text im Raum", Typ::Text, "z.B. \"Der Kadaver eines Wolfs liegt im Laub.\""),
+    f("beschreibung", "Beschreibung", Typ::Mehrzeilig, "Was man bei \"schau leiche\" sieht."),
+    f("schluesselwoerter", "Schlüsselwörter", Typ::Liste, "Zusätzlich zu leiche, kadaver, ueberreste."),
+    f("details", "Details", Typ::Details, "z.B. fell, zaehne, wunde – mit Unter-Details und Sinnen."),
+    f("geruch", "Geruch", Typ::Text, ""),
+    f("geraeusch", "Geräusch", Typ::Text, ""),
+    f("gefuehl", "Gefühl", Typ::Text, ""),
+    f("nutzt", "Nutzt Beschreibungen", Typ::VerweisListe(Ziel::Beschreibung), ""),
+    f("minuten", "Bleibt liegen (Minuten)", Typ::Zahl, "Leer = Kampf → Leichen-Minuten."),
+    f("verwest", "Text beim Verschwinden", Typ::Text, "Leer = \"... zerfällt zu Staub.\""),
+];
+
 const MONSTER: &[Feld] = felder![
     WESEN_GRUND[0], WESEN_GRUND[1], WESEN_GRUND[2], WESEN_GRUND[3], WESEN_GRUND[4], WESEN_GRUND[5], WESEN_GRUND[6],
     WESEN_GRUND[7], WESEN_GRUND[8], WESEN_GRUND[9], WESEN_GRUND[10], WESEN_GRUND[11], WESEN_GRUND[12], WESEN_GRUND[13],
@@ -240,6 +262,8 @@ const MONSTER: &[Feld] = felder![
     WESEN_GRUND[21], WESEN_GRUND[22],
     WESEN_REST[0], WESEN_REST[1], WESEN_REST[2], WESEN_REST[3], WESEN_REST[4], WESEN_REST[5], WESEN_REST[6], WESEN_REST[7],
     WESEN_REST[8], WESEN_REST[9], VERERBUNG[1],
+    f("koerper", "Körperbau", Typ::Verweis(Ziel::Koerper), "Maul, Pfoten ...: damit greift es an, und man kann sie ansehen."),
+    f("leiche", "Leiche", Typ::Unter(LEICHE), "Wie die Leiche nach dem Kampf aussieht. Die Beute liegt darin."),
 ];
 
 const GESPRAECH: &[Feld] = felder![
@@ -260,7 +284,7 @@ const HAENDLER: &[Feld] = felder![
     f("laden", "Ladenname", Typ::Text, "Überschrift der Liste, z.B. \"Gretas Krämerladen\" (leer = Name des NPCs)."),
     f("waren", "Waren", Typ::VerweisListe(Ziel::Gegenstand), "Was er verkauft (unbegrenzt)."),
     f("ankauf", "Kauft an", Typ::Schalter, "Standard: ja"),
-    f("ankauf_typen", "Kauft nur", Typ::Liste, "Typen, z.B. waffe, ruestung (leer = alles)"),
+    f("ankauf_typen", "Kauft nur", Typ::AuswahlListe(GEGENSTAND_TYPEN), "Leer = alles."),
     f("verkauf_prozent", "Verkauf %", Typ::Zahl, "Preis in Prozent vom Wert (Standard 100)."),
     f("ankauf_prozent", "Ankauf %", Typ::Zahl, "Was er zahlt, in Prozent vom Wert (Standard 50)."),
 ];
@@ -285,6 +309,8 @@ const NPC: &[Feld] = felder![
     WESEN_GRUND[21], WESEN_GRUND[22],
     WESEN_REST[0], WESEN_REST[1], WESEN_REST[2], WESEN_REST[3], WESEN_REST[4], WESEN_REST[5], WESEN_REST[6], WESEN_REST[7],
     WESEN_REST[8], WESEN_REST[9],
+    f("koerper", "Körperbau", Typ::Verweis(Ziel::Koerper), "Wenn man ihn angreifen kann: damit wehrt er sich."),
+    f("leiche", "Leiche", Typ::Unter(LEICHE), "Nur wenn man ihn angreifen kann."),
 ];
 
 const FERTIGKEIT: &[Feld] = felder![
@@ -335,6 +361,7 @@ const RASSE: &[Feld] = felder![
     GEMEINSCHAFT[0], GEMEINSCHAFT[1], GEMEINSCHAFT[2], GEMEINSCHAFT[3], GEMEINSCHAFT[4], GEMEINSCHAFT[5], GEMEINSCHAFT[6],
     GEMEINSCHAFT[7], GEMEINSCHAFT[8],
     f("waehlbar", "Wählbar", Typ::Schalter, "Bei der Erschaffung wählbar (Standard: ja)."),
+    f("koerper", "Körperbau", Typ::Verweis(Ziel::Koerper), "Leer = der Körperbau aus Welt."),
 ];
 const GILDE: &[Feld] = felder![
     GEMEINSCHAFT[0], GEMEINSCHAFT[1], GEMEINSCHAFT[2],
@@ -372,6 +399,12 @@ const BEFEHL: &[Feld] = felder![
     f("raeume", "Nur in Räumen", Typ::VerweisListe(Ziel::Raum), "Leer = überall."),
     f("gebiete", "Nur in Gebieten", Typ::Liste, "z.B. wald, dorf. Leer = überall."),
     f("nicht_hier", "Text: falscher Ort", Typ::Text, "Leer = \"Das geht hier nicht.\""),
+    // Mit einem Gegenstand
+    f("gegenstand_typen", "Mit Gegenstand der Art", Typ::AuswahlListe(GEGENSTAND_TYPEN), "z.B. waffe: \"fuehre schwert\" geht nur mit Waffen. Gesetzt = der Befehl braucht einen Gegenstand."),
+    f("gegenstand_ort", "Gegenstand ist", Typ::Auswahl(&["dabei", "inventar", "angelegt", "raum"]), "dabei = im Inventar oder angelegt (Standard), raum = liegt im Raum."),
+    f("mit_gegenstand", "Mit dem Gegenstand", Typ::Auswahl(&["anlegen", "ausziehen", "benutzen", "verbrauchen", "fallenlassen", "nehmen"]), "Was danach mit ihm passiert. Leer = nichts (nur Texte und Wirkungen)."),
+    f("ohne_gegenstand", "Text: kein Gegenstand", Typ::Text, "Wenn man nur \"fuehre\" tippt. Leer = \"Womit? (z.B. fuehre <waffe>)\""),
+    f("falscher_gegenstand", "Text: falsche Art", Typ::Text, "z.B. \"{ding} ist keine Waffe.\" Leer = \"Mit einem Laib Brot geht das nicht.\""),
     f("braucht", "Braucht Gegenstände", Typ::VerweisListe(Ziel::Gegenstand), "Muss man dabeihaben (bleiben erhalten)."),
     f("nimm", "Verbraucht Gegenstände", Typ::VerweisListe(Ziel::Gegenstand), "Werden weggenommen."),
     f("mindest_stufe", "Ab Stufe", Typ::Zahl, ""),
@@ -385,7 +418,7 @@ const BEFEHL: &[Feld] = felder![
     f("abklingzeit", "Abklingzeit (s)", Typ::Zahl, "So lange kann man ihn danach nicht wieder benutzen."),
     f("nicht_im_kampf", "Nicht im Kampf", Typ::Schalter, ""),
     // Texte
-    f("selbst", "Text für dich", Typ::Mehrzeilig, "Ohne Ziel. {name} = wer den Befehl benutzt, {rest} = was dahinter getippt wurde."),
+    f("selbst", "Text für dich", Typ::Mehrzeilig, "Ohne Ziel. {name} = wer den Befehl benutzt, {ding} / {ding_akk} / {ding_dativ} = der Gegenstand (\"ein Schwert\" / \"ein Schwert\" / \"einem Schwert\"), {rest} = was dahinter getippt wurde."),
     f("andere", "Text für andere", Typ::Mehrzeilig, "Was die anderen im Raum lesen."),
     f("selbst_ziel", "Mit Ziel: für dich", Typ::Mehrzeilig, "z.B. \"Du segnest {ziel}.\" Leer = kein Ziel möglich. {ziel_dativ} = \"dem Wirt\"."),
     f("ziel", "Mit Ziel: fürs Ziel", Typ::Mehrzeilig, "Was das Ziel liest (nur Spieler)."),
@@ -398,6 +431,8 @@ const BEFEHL: &[Feld] = felder![
     f("lp", "Lebenspunkte +/-", Typ::Zahl, "Heilt (oder schadet, negativ)."),
     f("mp", "Mana +/-", Typ::Zahl, ""),
     f("ausdauer", "Ausdauer +", Typ::Zahl, ""),
+    f("essen", "Sättigt", Typ::Zahl, "Bei Hunger und Durst: so viel Essen."),
+    f("trinken", "Löscht Durst", Typ::Zahl, "Bei Hunger und Durst: so viel Trinken, z.B. an einem Brunnen."),
     f("geld", "Gibt Geld", Typ::Betrag, ""),
     f("erfahrung", "Gibt Erfahrung", Typ::Zahl, ""),
     f("gib", "Gibt Gegenstände", Typ::VerweisListe(Ziel::Gegenstand), ""),
@@ -433,6 +468,26 @@ const BESCHREIBUNG: &[Feld] = felder![
     VERERBUNG[0], VERERBUNG[1],
 ];
 
+const TEIL: &[Feld] = felder![
+    f("id", "ID", Typ::Text, "z.B. rechte_hand, maul"),
+    f("name", "Name", Typ::Text, "z.B. \"rechte Hand\", \"Maul\""),
+    f("woerter", "Weitere Wörter", Typ::Liste, "Zum Ansehen, z.B. hand, pfote."),
+    f("text", "Beschreibung", Typ::Mehrzeilig, ""),
+    f("halten", "Kann halten", Typ::Schalter, "Waffe, Schild, Fackel. So viele Teile, so viele Hände."),
+    f("angriff", "Angriff", Typ::Text, "Monster greifen damit an, z.B. \"beißt\" oder \"schlägt mit der Pfote nach {ziel_dativ}\"."),
+    f("schaden", "Schaden", Typ::Zahl, "0 = der normale Schaden des Monsters."),
+    f("geruch", "Geruch", Typ::Text, ""),
+    f("geraeusch", "Geräusch", Typ::Text, ""),
+    f("gefuehl", "Gefühl", Typ::Text, ""),
+    f("nutzt", "Nutzt Beschreibungen", Typ::VerweisListe(Ziel::Beschreibung), ""),
+    f("details", "Details", Typ::Details, "Noch genauer: z.B. finger, krallen."),
+];
+const KOERPER: &[Feld] = felder![
+    f("id", "ID", Typ::Text, "z.B. humanoid, wolf"),
+    f("name", "Name", Typ::Text, "z.B. \"Menschengestalt\""),
+    f("teile", "Körperteile", Typ::Tabellen { felder: TEIL, inline: false }, ""),
+];
+
 const WELT: &[Feld] = felder![
     f("name", "Name der Welt", Typ::Text, ""),
     f("port", "Port", Typ::Zahl, "Mit diesem Port verbinden sich die Spieler."),
@@ -442,6 +497,7 @@ const WELT: &[Feld] = felder![
     f("waehrung", "Name des Geldes", Typ::Text, "z.B. Taler – nur, wenn es unter 💰 Geld keine Einheiten gibt."),
     f("max_berufe", "Berufe höchstens", Typ::Zahl, ""),
     f("techniken_nur_gilden", "Techniken nur für Gilden", Typ::Schalter, "Standard: ja. Jede Kampftechnik braucht dann gilde = \"...\"."),
+    f("koerper", "Körperbau der Spieler", Typ::Verweis(Ziel::Koerper), "Wenn die Rasse keinen eigenen hat. Bestimmt z.B., wie viele Hände man zum Halten hat."),
     f("tragkraft_basis", "Tragkraft", Typ::Zahl, "So viel Gewicht trägt jeder (beide 0 = unbegrenzt)."),
     f("tragkraft_pro_staerke", "Tragkraft pro Stärke", Typ::Zahl, "Plus so viel pro Punkt Stärke."),
     f("karte_beim_umsehen", "Karte beim Umsehen", Typ::Schalter, ""),
@@ -469,6 +525,20 @@ const START: &[Feld] = felder![
     f("fertigkeiten", "Fertigkeiten", Typ::VerweisWerte(Ziel::Fertigkeit), ""),
     f("werte", "Grundwerte", Typ::Werte(WERTE), "Diese Werte gibt es in der Welt."),
 ];
+const ERNAEHRUNG: &[Feld] = felder![
+    f("aktiv", "Hunger und Durst", Typ::Schalter, "Standard: aus."),
+    f("max_essen", "Satt bei", Typ::Zahl, "Standard 100."),
+    f("max_trinken", "Ohne Durst bei", Typ::Zahl, "Standard 100."),
+    f("essen_pro_minute", "Hunger pro Minute", Typ::Komma, "So viel geht pro Minute verloren (Standard 1 = 100 Minuten bis leer)."),
+    f("trinken_pro_minute", "Durst pro Minute", Typ::Komma, "Standard 1,5."),
+    f("hungrig_ab", "Hungrig unter", Typ::Zahl, "Standard 30."),
+    f("durstig_ab", "Durstig unter", Typ::Zahl, "Standard 30."),
+    f("schaden_pro_minute", "LP-Verlust pro Minute bei 0", Typ::Zahl, "Sterben kann man daran nicht. Standard 2."),
+    f("ohne_erholung", "Keine Erholung bei 0", Typ::Schalter, "LP und Mana erholen sich nicht, solange Essen oder Trinken leer ist. Standard: ja."),
+    f("nahrung_standard", "Essen ohne Angabe", Typ::Zahl, "So viel sättigt Nahrung ohne eigenschaften.essen (Standard 25)."),
+    f("getraenk_standard", "Getränk ohne Angabe", Typ::Zahl, "So viel löscht ein Getränk ohne eigenschaften.trinken (Standard 30)."),
+];
+
 const KAMPF: &[Feld] = felder![
     f("auto_angriff", "Automatisch weiter", Typ::Schalter, ""),
     f("waffenlos_schaden", "Schaden ohne Waffe", Typ::Zahl, ""),
@@ -489,6 +559,8 @@ const KAMPF: &[Feld] = felder![
     f("tod_ep_verlust_prozent", "EP-Verlust beim Tod %", Typ::Zahl, ""),
     f("tod_gegenstaende", "Gegenstände beim Tod", Typ::Auswahl(&["behalten", "fallen_lassen"]), ""),
     f("monster_erholung_prozent", "Monster-Erholung %/Takt", Typ::Zahl, ""),
+    f("leichen_minuten", "Leichen-Minuten", Typ::Zahl, "So lange bleiben Leichen liegen (0 = keine Leichen). Standard 5."),
+    f("beute_in_leiche", "Beute in der Leiche", Typ::Schalter, "ja = \"nimm alles aus leiche\", nein = Beute fällt zu Boden. Standard: ja."),
 ];
 
 const EINHEIT: &[Feld] = felder![
@@ -525,6 +597,7 @@ pub const ARTEN: &[Art] = &[
     Art { schluessel: "zauber", titel: "Zauber und Techniken", einzahl: "Zauber", symbol: "✨", ordner: "zauber", ablage: Ablage::Liste, felder: ZAUBER, hilfe: "Zauber (zaubere) und Kampftechniken (spezial). Wirkungen mit Dauer sind Schilde und Stärkungen." },
     Art { schluessel: "quest", titel: "Aufgaben und Quests", einzahl: "Quest", symbol: "📜", ordner: "quests", ablage: Ablage::Liste, felder: QUEST, hilfe: "Ein NPC bietet sie an (geber). Die Schritte werden der Reihe nach erledigt." },
     Art { schluessel: "befehl", titel: "Eigene Befehle", einzahl: "Befehl", symbol: "⌨", ordner: "eigene_befehle", ablage: Ablage::Liste, felder: BEFEHL, hilfe: "Neue Befehle mit Bedingungen (Ort, Gegenstände, Gilde, Kosten) und Wirkungen (Heilen, Geld, Gegenstände, Teleport, Zauber, weitere Befehle). Für reine Texte gibt es Gesten unter ⌨ Befehle." },
+    Art { schluessel: "koerper", titel: "Körperbau", einzahl: "Körper", symbol: "✋", ordner: "koerper", ablage: Ablage::Liste, felder: KOERPER, hilfe: "Körperteile für Rassen und Monster: Hände zum Halten, Maul und Pfoten zum Angreifen – alles mit Beschreibung und Details." },
     Art { schluessel: "rasse", titel: "Rassen", einzahl: "Rasse", symbol: "👥", ordner: "rassen", ablage: Ablage::Liste, felder: RASSE, hilfe: "Werden bei der Erschaffung einer Figur gewählt." },
     Art { schluessel: "gilde", titel: "Gilden", einzahl: "Gilde", symbol: "🛡", ordner: "gilden", ablage: Ablage::Liste, felder: GILDE, hilfe: "Man ist in höchstens einer Gilde. Beitreten bei einem NPC mit dieser Gilde." },
     Art { schluessel: "beruf", titel: "Berufe und Zünfte", einzahl: "Beruf", symbol: "⚒", ordner: "berufe", ablage: Ablage::Liste, felder: GILDE, hilfe: "Man kann mehrere Berufe haben (Welt → Berufe höchstens)." },
@@ -533,6 +606,7 @@ pub const ARTEN: &[Art] = &[
     Art { schluessel: "start", titel: "Start neuer Figuren", einzahl: "Start", symbol: "🐣", ordner: "", ablage: Ablage::Fest { datei: "welt.toml" }, felder: START, hilfe: "Womit neue Figuren beginnen." },
     Art { schluessel: "geld", titel: "Geld und Währung", einzahl: "Geld", symbol: "💰", ordner: "", ablage: Ablage::Fest { datei: "welt.toml" }, felder: GELD, hilfe: "Einheiten wie Gold, Silber, Kupfer. Alle Preise in den Daten stehen in der kleinsten Einheit." },
     Art { schluessel: "darstellung", titel: "Darstellung", einzahl: "Darstellung", symbol: "🎨", ordner: "", ablage: Ablage::Fest { datei: "welt.toml" }, felder: DARSTELLUNG, hilfe: "Wie Handelslisten, Spielstand und Spielerbuch im Spiel aussehen – mit Vorschau." },
+    Art { schluessel: "ernaehrung", titel: "Hunger und Durst", einzahl: "Hunger und Durst", symbol: "🍞", ordner: "", ablage: Ablage::Fest { datei: "welt.toml" }, felder: ERNAEHRUNG, hilfe: "Essen (Typ nahrung) sättigt, Getränke (Typ getraenk) löschen den Durst. Wie viel, steht bei den Gegenständen unter Eigenschaften: essen, trinken." },
     Art { schluessel: "kampf", titel: "Kampfregeln", einzahl: "Kampf", symbol: "⚔", ordner: "", ablage: Ablage::Fest { datei: "welt.toml" }, felder: KAMPF, hilfe: "Den Raum für Wiederbelebungen wählt man unter 🗺 Räume." },
 ];
 

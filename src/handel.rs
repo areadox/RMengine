@@ -28,6 +28,7 @@ pub fn rahmen(w: &Welt, t: String) -> String {
 /// Typen in der Reihenfolge der Anzeige (Stil "kategorien")
 const KATEGORIEN: &[(&str, &str)] = &[
     ("nahrung", "Essen"),
+    ("getraenk", "Getränke"),
     ("trank", "Tränke"),
     ("waffe", "Waffen"),
     ("ruestung", "Rüstung"),

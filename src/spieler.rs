@@ -99,6 +99,9 @@ pub struct SpielerDaten {
     pub behaelter: Vec<Behaelter>,
     /// Zauber oder Technik, die der Autoangriff von selbst einsetzt (bereite ...)
     pub bereit: String,
+    /// Hunger und Durst: wie satt bzw. wie wenig durstig (negativ = noch nicht gesetzt, also voll)
+    pub essen: f64,
+    pub trinken: f64,
 }
 
 /// Ein gefüllter Behälter. Leere Behälter haben keinen Eintrag.
@@ -199,6 +202,8 @@ impl Default for SpielerDaten {
             erledigt: BTreeMap::new(),
             behaelter: Vec::new(),
             bereit: String::new(),
+            essen: -1.0,
+            trinken: -1.0,
         }
     }
 }

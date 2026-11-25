@@ -420,7 +420,7 @@ fn pruef_bericht(ergebnis: &Result<daten::Daten, Vec<String>>) -> (bool, String)
             let mut t = format!(
                 "Alles in Ordnung: {} Räume, {} Gegenstände, {} Monster, {} Zauber.",
                 d.raeume.len(),
-                d.gegenstaende.len(),
+                d.gegenstaende.keys().filter(|k| !k.starts_with("leiche:")).count(),
                 d.monster.len(),
                 d.zauber.len()
             );

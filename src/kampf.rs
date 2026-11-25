@@ -515,6 +515,7 @@ fn monster_schlaegt(w: &mut Welt, mid: u64) {
         .collect::<Vec<_>>()
         .choose(&mut rng)
         .map(|z| (*z).clone());
+    let teil_angriff = crate::koerper::monster_angriff(w, &def, &name);
     let (grundschaden, verb_dich, verb_andere, magisch) = match zauber {
         Some(z) if rng.gen_range(0..100) < 30 => {
             if let Some(m) = w.monster.get_mut(&mid) {
@@ -522,6 +523,11 @@ fn monster_schlaegt(w: &mut Welt, mid: u64) {
             }
             let wert = z.wirkungen.iter().filter(|wi| wi.art == "schaden").map(|wi| wi.wert).sum::<i32>();
             (wert, format!("schleudert {} auf dich", z.name), format!("schleudert {} auf {name}", z.name), true)
+        }
+        // Mit einem Körperteil (Maul, Pfote ...)
+        _ if teil_angriff.is_some() => {
+            let (dich, andere, schaden) = teil_angriff.expect("geprüft");
+            (schaden, dich, andere, false)
         }
         _ => {
             let verb = def.angriffe.choose(&mut rng).cloned().unwrap_or_else(|| "greift".into());
@@ -594,14 +600,13 @@ pub(crate) fn monster_stirbt(w: &mut Welt, mid: u64) {
     };
     w.sende_raum(&m.raum, &format!("{{hellgelb}}{text}{{/}}"), &[]);
 
-    // Beute fällt zu Boden
+    // Beute: in die Leiche oder (ohne Leiche) auf den Boden
     let mut rng = rand::thread_rng();
-    for b in &def.beute {
-        if rng.gen_range(0..100) < b.chance {
-            w.boden.entry(m.raum.clone()).or_default().push(b.gegenstand.clone());
-            let g = gross(&w.d.gegenstand_name(&b.gegenstand));
-            w.sende_raum(&m.raum, &format!("{g} fällt zu Boden."), &[]);
-        }
+    let beute: Vec<String> = def.beute.iter().filter(|b| rng.gen_range(0..100) < b.chance).map(|b| b.gegenstand.clone()).collect();
+    for g in crate::leichen::hinlegen(w, &def.id, &m.raum, beute) {
+        w.boden.entry(m.raum.clone()).or_default().push(g.clone());
+        let g = gross(&w.d.gegenstand_name(&g));
+        w.sende_raum(&m.raum, &format!("{g} fällt zu Boden."), &[]);
     }
 
     // Erfahrung (und Geld) für alle, die mitgekämpft haben und noch da sind

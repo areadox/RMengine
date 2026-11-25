@@ -79,16 +79,21 @@ pub fn angemeldet(w: &Welt, sid: u64) {
 pub fn werte(w: &Welt, sid: u64) {
     let Some(s) = w.spieler.get(&sid) else { return };
     let p = &s.sp;
-    gmcp_senden(
-        s,
-        "Char.Vitals",
-        json!({
-            "hp": p.lebenspunkte, "maxhp": p.max_lebenspunkte,
-            "mp": p.mana, "maxmp": p.max_mana,
-            "ep": p.ausdauer, "maxep": p.max_ausdauer,
-        }),
-        true,
-    );
+    let mut vitals = json!({
+        "hp": p.lebenspunkte, "maxhp": p.max_lebenspunkte,
+        "mp": p.mana, "maxmp": p.max_mana,
+        "ep": p.ausdauer, "maxep": p.max_ausdauer,
+    });
+    // Hunger und Durst (nur wenn eingeschaltet)
+    let e = &w.d.ernaehrung;
+    if e.aktiv {
+        let voll = |v: f64, max: i32| if v < 0.0 { max } else { v.round() as i32 };
+        vitals["food"] = json!(voll(p.essen, e.max_essen));
+        vitals["maxfood"] = json!(e.max_essen);
+        vitals["drink"] = json!(voll(p.trinken, e.max_trinken));
+        vitals["maxdrink"] = json!(e.max_trinken);
+    }
+    gmcp_senden(s, "Char.Vitals", vitals, true);
     let g = gegner(w, s);
     gmcp_senden(
         s,
@@ -360,7 +365,7 @@ pub fn mssp(w: &Welt, startzeit: u64) -> Vec<(String, String)> {
         ("CRAWL DELAY", "-1".into()),
         ("AREAS", gebiete.len().to_string()),
         ("ROOMS", w.d.raeume.len().to_string()),
-        ("OBJECTS", w.d.gegenstaende.len().to_string()),
+        ("OBJECTS", w.d.gegenstaende.keys().filter(|k| !k.starts_with("leiche:")).count().to_string()),
         ("MOBILES", w.d.monster.len().to_string()),
         ("PLAYER KILLING", "None".into()),
         ("ANSI", "1".into()),

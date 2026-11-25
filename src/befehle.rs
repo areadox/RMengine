@@ -368,7 +368,17 @@ fn prompt_text(w: &Welt, sid: u64) {
             .map(|(d, lp)| format!(" {{hellrot}}[{}: {}]{{/}}", gross(&d.name), kampf::zustand(lp, d.lebenspunkte)))
             .unwrap_or_default();
         let bereit = crate::bereitschaft::anzeige(w, sid);
-        let bereit = if bereit.is_empty() { String::new() } else { format!(" {{magenta}}[{bereit}]{{/}}") };
+        let mut bereit = if bereit.is_empty() { String::new() } else { format!(" {{magenta}}[{bereit}]{{/}}") };
+        // Hunger und Durst nur zeigen, wenn es drängt
+        if let Some((h, d)) = crate::ernaehrung::zustand(w, p) {
+            for z in [h, d] {
+                if z.starts_with("hungrig") || z.starts_with("durstig") {
+                    bereit.push_str(&format!(" {{gelb}}[{z}]{{/}}"));
+                } else if z.starts_with("am ") {
+                    bereit.push_str(&format!(" {{hellrot}}[{z}]{{/}}"));
+                }
+            }
+        }
         s.sende_ohne_umbruch(&format!(
             "\n{{gruen}}LP {}/{}{{/}} {{cyan}}MP {}/{}{{/}} {{gelb}}AP {}/{}{{/}}{bereit}{gegner} > ",
             p.lebenspunkte, p.max_lebenspunkte, p.mana, p.max_mana, p.ausdauer, p.max_ausdauer
@@ -773,6 +783,18 @@ fn finde(w: &Welt, sid: u64, such: &str) -> Option<Ziel> {
                 if let Some((n, d)) = beschreibung::suchen(&k, &wort) {
                     return Some(Ziel::Detail(n.to_string(), d.clone()));
                 }
+                // Körperteile: Maul, Pfoten ...
+                let teile = crate::koerper::details(w, &def.koerper);
+                if let Some((n, d)) = beschreibung::suchen(&teile, &wort) {
+                    return Some(Ziel::Detail(n.to_string(), d.clone()));
+                }
+            }
+        }
+        // Der eigene Körper ("schau hand")
+        if let Some(k) = w.d.koerper_von(&s.sp.rasse) {
+            let teile: std::collections::BTreeMap<String, Detail> = k.teile.iter().map(|t| t.als_detail()).collect();
+            if let Some((n, d)) = beschreibung::suchen(&teile, &wort) {
+                return Some(Ziel::Detail(n.to_string(), d.clone()));
             }
         }
         // 5. Allgemeine Beschreibungen aus der Bibliothek (Bäume, Himmel ...)
@@ -817,6 +839,10 @@ fn untersuchen(w: &Welt, sid: u64, such: &str) {
             if !g.platz.is_empty() {
                 t.push_str(&format!("\n{{grau}}(Kann angelegt werden: {}){{/}}", w.d.anzeigename(&g.platz)));
             }
+            if let Some(inhalt) = crate::leichen::inhalt_text(w, &s.sp.raum, &id) {
+                t.push('\n');
+                t.push_str(&inhalt);
+            }
             if s.baut() {
                 t.push_str(&format!(
                     "\n{{grau}}[id: {}, typ: {}, gewicht: {}, wert: {}, eigenschaften: {:?}, datei: {}]{{/}}",
@@ -830,6 +856,12 @@ fn untersuchen(w: &Welt, sid: u64, such: &str) {
             let Some(def) = w.d.monster.get(&m.def) else { return };
             let mut t = format!("{{fett}}{}{{/}}\n", gross(&def.name));
             t.push_str(&umbrechen(if def.beschreibung.is_empty() { "Nichts Besonderes." } else { &def.beschreibung }, br));
+            if let Some(k) = w.d.koerper.get(&def.koerper) {
+                let teile: Vec<String> = k.teile.iter().map(|t| t.name.clone()).collect();
+                if !teile.is_empty() {
+                    t.push_str(&format!("\n{{grau}}Genauer ansehen: {}{{/}}", aufzaehlen(&teile)));
+                }
+            }
             if s.baut() {
                 t.push_str(&format!(
                     "\n{{grau}}[id: {}, stufe: {}, LP: {}/{}, MP: {}, heimat: {}, datei: {}]{{/}}",
@@ -924,9 +956,13 @@ fn wahrnehmen(w: &Welt, sid: u64, such: &str, sinn: Sinn) {
 // Gegenstände
 // ---------------------------------------------------------------------------
 
-fn nehmen(w: &mut Welt, sid: u64, such: &str) {
+pub(crate) fn nehmen(w: &mut Welt, sid: u64, such: &str) {
     if such.is_empty() {
         w.sende(sid, "Was willst du nehmen?");
+        return;
+    }
+    // "nimm alles aus leiche"
+    if crate::leichen::nehmen(w, sid, such) {
         return;
     }
     // "nimm brot aus rucksack"
@@ -985,7 +1021,7 @@ fn nehmen(w: &mut Welt, sid: u64, such: &str) {
     }
 }
 
-fn fallenlassen(w: &mut Welt, sid: u64, such: &str) {
+pub(crate) fn fallenlassen(w: &mut Welt, sid: u64, such: &str) {
     if such.is_empty() {
         w.sende(sid, "Was willst du hinlegen?");
         return;
@@ -1089,7 +1125,7 @@ fn inventar_figur(w: &Welt, sid: u64) -> Option<String> {
     crate::darstellung::inventar_figur(&inv, &bild, &plaetze, breite(w, sid))
 }
 
-fn anlegen(w: &mut Welt, sid: u64, such: &str) {
+pub(crate) fn anlegen(w: &mut Welt, sid: u64, such: &str) {
     let Some(s) = w.spieler.get_mut(&sid) else { return };
     let Some(i) = finde_gegenstand(&w.d, &s.sp.inventar, such) else {
         w.sende(sid, "So etwas hast du nicht dabei.");
@@ -1106,6 +1142,12 @@ fn anlegen(w: &mut Welt, sid: u64, such: &str) {
         w.sende(sid, &format!("Du musst erst {alt} ausziehen."));
         return;
     }
+    // Nur so viel in den Händen, wie man Hände hat
+    if let Err(m) = crate::koerper::haende_pruefen(w, sid, g) {
+        w.sende(sid, &m);
+        return;
+    }
+    let Some(s) = w.spieler.get_mut(&sid) else { return };
     s.sp.inventar.remove(i);
     s.sp.ausruestung.insert(g.platz.clone(), id);
     let (raum, name) = (s.sp.raum.clone(), s.sp.name.clone());
@@ -1114,7 +1156,7 @@ fn anlegen(w: &mut Welt, sid: u64, such: &str) {
     w.sende_raum(&raum, &format!("{name} legt {n} an."), &[sid]);
 }
 
-fn ausziehen(w: &mut Welt, sid: u64, such: &str) {
+pub(crate) fn ausziehen(w: &mut Welt, sid: u64, such: &str) {
     let Some(s) = w.spieler.get_mut(&sid) else { return };
     let platz = s.sp.ausruestung.iter().find_map(|(p, id)| {
         let g = w.d.gegenstaende.get(id)?;
@@ -1132,19 +1174,27 @@ fn ausziehen(w: &mut Welt, sid: u64, such: &str) {
     w.sende_raum(&raum, &format!("{name} nimmt {n} ab."), &[sid]);
 }
 
-fn benutzen(w: &mut Welt, sid: u64, such: &str) {
-    let Some(s) = w.spieler.get_mut(&sid) else { return };
+pub(crate) fn benutzen(w: &mut Welt, sid: u64, such: &str) {
+    let Some(s) = w.spieler.get(&sid) else { return };
     let Some(i) = finde_gegenstand(&w.d, &s.sp.inventar, such) else {
         w.sende(sid, "So etwas hast du nicht dabei.");
         return;
     };
-    let Some(g) = w.d.gegenstaende.get(&s.sp.inventar[i]) else { return };
+    let id = s.sp.inventar[i].clone();
+    let Some(g) = w.d.gegenstaende.get(&id).cloned() else { return };
     let heilung = g.eigenschaften.get("heilung").copied().unwrap_or(0);
     let mana = g.eigenschaften.get("mana").copied().unwrap_or(0);
-    if heilung == 0 && mana == 0 {
+    let (essen, trinken) = crate::ernaehrung::naehrwert(w, &g);
+    if heilung == 0 && mana == 0 && essen == 0 && trinken == 0 {
         w.sende(sid, "Damit kannst du nichts anfangen.");
         return;
     }
+    if heilung == 0 && mana == 0 && crate::ernaehrung::zu_satt(w, sid, essen, trinken) {
+        let t = if essen > 0 { "Du bist satt – mehr bekommst du nicht hinunter." } else { "Du hast keinen Durst." };
+        w.sende(sid, t);
+        return;
+    }
+    let Some(s) = w.spieler.get_mut(&sid) else { return };
     s.sp.inventar.remove(i);
     let vorher = (s.sp.lebenspunkte, s.sp.mana);
     s.sp.lebenspunkte = (s.sp.lebenspunkte + heilung).min(s.sp.max_lebenspunkte);
@@ -1154,7 +1204,13 @@ fn benutzen(w: &mut Welt, sid: u64, such: &str) {
     let (raum, name) = (s.sp.raum.clone(), s.sp.name.clone());
 
     let akk = if g.akkusativ.is_empty() { g.name.clone() } else { g.akkusativ.clone() };
-    let t = if g.benutzen_text.is_empty() { format!("Du benutzt {akk}.") } else { g.benutzen_text.clone() };
+    // Essen isst man, Getränke und Tränke trinkt man
+    let verb = match g.typ.as_str() {
+        "nahrung" => ("isst", "isst"),
+        "getraenk" | "trank" => ("trinkst", "trinkt"),
+        _ => ("benutzt", "benutzt"),
+    };
+    let t = if g.benutzen_text.is_empty() { format!("Du {} {akk}.", verb.0) } else { g.benutzen_text.clone() };
     let mut extra = Vec::new();
     if plus_lp > 0 {
         extra.push(format!("+{plus_lp} LP"));
@@ -1162,12 +1218,13 @@ fn benutzen(w: &mut Welt, sid: u64, such: &str) {
     if plus_mp > 0 {
         extra.push(format!("+{plus_mp} MP"));
     }
+    extra.extend(crate::ernaehrung::auffuellen(w, sid, essen, trinken));
     if extra.is_empty() {
         w.sende(sid, &t);
     } else {
         w.sende(sid, &format!("{t} {{gruen}}({}){{/}}", extra.join(", ")));
     }
-    w.sende_raum(&raum, &format!("{name} benutzt {akk}."), &[sid]);
+    w.sende_raum(&raum, &format!("{name} {} {akk}.", verb.1), &[sid]);
 }
 
 // ---------------------------------------------------------------------------
@@ -1770,7 +1827,7 @@ fn admin_befehl(w: &mut Welt, sid: u64, befehl: &str, rest: &str) -> bool {
                 let mut t = format!(
                     "{{gruen}}Welt neu geladen:{{/}} {} Räume, {} Gegenstände, {} Monster, {} Fertigkeiten, {} Zauber.",
                     w.d.raeume.len(),
-                    w.d.gegenstaende.len(),
+                    w.d.gegenstaende.keys().filter(|k| !k.starts_with("leiche:")).count(),
                     w.d.monster.len(),
                     w.d.fertigkeiten.len(),
                     w.d.zauber.len()
@@ -1976,6 +2033,9 @@ fn spielstand(w: &Welt, sid: u64, rest: &str) {
     kopf.push(format!("Stufe {}", sp.stufe));
 
     let mut hinweise = Vec::new();
+    if let Some((h, d)) = crate::ernaehrung::zustand(w, sp) {
+        hinweise.push(format!("Essen: {h} · Trinken: {d}"));
+    }
     if sp.freie_punkte > 0 {
         let p = if sp.freie_punkte == 1 { "Punkt" } else { "Punkte" };
         hinweise.push(format!("{} {p} zu verteilen (steigere <wert>)", sp.freie_punkte));

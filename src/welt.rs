@@ -8,6 +8,20 @@ use rand::Rng;
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
+
+thread_local! {
+    /// Solange gesetzt, gehen keine Meldungen an Spieler hinaus
+    /// (eigene Befehle mit eigenem Text rufen eingebaute Befehle still auf).
+    static STUMM: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Führt `f` aus, ohne dass Meldungen verschickt werden.
+pub fn still<T>(f: impl FnOnce() -> T) -> T {
+    let vorher = STUMM.with(|s| s.replace(true));
+    let r = f();
+    STUMM.with(|s| s.set(vorher));
+    r
+}
 pub use crate::telnet::Sender;
 
 /// Ein eingeloggter Spieler.
@@ -46,6 +60,9 @@ impl Sitzung {
     }
     /// Fertige Bytes (passend zum Zeichensatz des Clients umgewandelt).
     pub fn roh(&self, b: Vec<u8>) {
+        if STUMM.with(|s| s.get()) {
+            return;
+        }
         let b = crate::telnet::sperren(&self.proto).kodieren(b);
         crate::telnet::senden(&self.sender, b);
     }
@@ -99,6 +116,8 @@ pub struct Welt {
     pub boden: HashMap<String, Vec<String>>,
     pub monster: BTreeMap<u64, Monster>,
     pub spieler: BTreeMap<u64, Sitzung>,
+    /// Leichen besiegter Gegner (der Gegenstand dazu liegt in `boden`)
+    pub leichen: Vec<crate::leichen::Leiche>,
     naechste_id: u64,
     takte: u64,
 }
@@ -111,6 +130,7 @@ impl Welt {
             boden: HashMap::new(),
             monster: BTreeMap::new(),
             spieler: BTreeMap::new(),
+            leichen: Vec::new(),
             naechste_id: 1,
             takte: 0,
         };
@@ -366,15 +386,22 @@ impl Welt {
         let (lp, mp) = (self.d.welt.regeneration_lp, self.d.welt.regeneration_mp);
         let takt = self.d.welt.takt_sekunden;
         let ausdauer = self.d.kampf.ausdauer_erholung;
-        for s in self.spieler.values_mut() {
+        let erschoepft: Vec<u64> =
+            self.spieler.iter().filter(|(_, s)| crate::ernaehrung::erschoepft(self, &s.sp)).map(|(id, _)| *id).collect();
+        for (id, s) in self.spieler.iter_mut() {
             s.sp.spielzeit += takt;
             if s.tot_bis.is_some() {
                 continue; // Tote erholen sich nicht
             }
             s.sp.ausdauer = (s.sp.ausdauer + ausdauer).min(s.sp.max_ausdauer);
+            if erschoepft.contains(id) {
+                continue; // Hunger oder Durst: keine Erholung
+            }
             s.sp.lebenspunkte = (s.sp.lebenspunkte + lp).min(s.sp.max_lebenspunkte);
             s.sp.mana = (s.sp.mana + mp).min(s.sp.max_mana);
         }
+        crate::ernaehrung::takt(self, self.takte % pro_minute == 0);
+        crate::leichen::takt(self);
 
         // Monster erholen sich, wenn sie nicht kämpfen
         let prozent = self.d.kampf.monster_erholung_prozent;

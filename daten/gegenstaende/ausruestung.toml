@@ -73,6 +73,7 @@ wert = 600
 beschreibung = "Eine zweischneidige Axt, so schwer, dass man sie mit beiden Händen führen muss."
 eigenschaften = { schaden = 14 }
 erholung   = 3.8
+haende     = 2            # Zweihänder: braucht beide Hände
 
 [[gegenstand]]
 id   = "zauberstab"

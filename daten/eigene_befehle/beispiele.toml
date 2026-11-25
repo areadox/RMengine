@@ -47,3 +47,27 @@ mp          = 10
 # ziel        = "{name} segnet dich. Du fühlst dich beschützt."
 # andere_ziel = "{name} segnet {ziel}."
 # zauber      = "schutzschild"
+
+# Eine Waffe führen: geht nur mit Gegenständen der Art "waffe"
+[[befehl]]
+id                  = "fuehren"
+woerter             = ["fuehre", "fuehren"]
+syntax              = "fuehre <waffe>"
+hilfe               = "Eine Waffe in die Hand nehmen"
+gegenstand_typen    = ["waffe"]
+mit_gegenstand      = "anlegen"
+ohne_gegenstand     = "Welche Waffe willst du führen?"
+falscher_gegenstand = "{ding} ist keine Waffe."
+selbst              = "Du nimmst {ding_akk} fest in die Hand."
+andere              = "{name} nimmt {ding_akk} fest in die Hand."
+
+# Am Dorfbrunnen Wasser trinken (bei Hunger und Durst)
+[[befehl]]
+id          = "schoepfen"
+woerter     = ["schoepfe", "schoepfen"]
+hilfe       = "Am Brunnen Wasser schöpfen und trinken"
+raeume      = ["dorfplatz"]
+nicht_hier  = "Hier gibt es kein Wasser zum Schöpfen."
+selbst      = "Du schöpfst mit den Händen kühles Wasser aus dem Brunnen und trinkst."
+andere      = "{name} schöpft Wasser aus dem Brunnen und trinkt."
+trinken     = 40

@@ -6,7 +6,8 @@
 #  platz:  waffe, schild, kopf, koerper, haende, beine, fuesse, hals, ring, umhang, licht
 #          (nur nötig, wenn man den Gegenstand anlegen kann)
 #  akkusativ: Name nach "Du nimmst ..." (z.B. "einen roten Apfel"); fehlt er, wird name benutzt
-#  eigenschaften: frei wählbare Zahlen. "heilung" und "mana" wirken beim Benutzen.
+#  eigenschaften: frei wählbare Zahlen. "heilung" und "mana" wirken beim Benutzen,
+#  "essen" sättigt und "trinken" löscht den Durst (wenn Hunger und Durst an sind).
 
 [[gegenstand]]
 id   = "apfel"
@@ -15,7 +16,7 @@ name = "ein roter Apfel"
 akkusativ = "einen roten Apfel"
 schluesselwoerter = ["apfel"]
 beschreibung = "Ein knackiger, roter Apfel."
-eigenschaften = { heilung = 5 }
+eigenschaften = { heilung = 5, essen = 10, trinken = 5 }
 benutzen_text = "Du beißt in den Apfel. Lecker!"
 
 [[gegenstand]]
@@ -25,8 +26,30 @@ name = "ein Laib Brot"
 akkusativ = "einen Laib Brot"
 schluesselwoerter = ["brot", "laib"]
 beschreibung = "Frisch gebacken und noch ein wenig warm."
-eigenschaften = { heilung = 10 }
+eigenschaften = { heilung = 10, essen = 40 }
 benutzen_text = "Du isst das Brot und fühlst dich gestärkt."
+
+[[gegenstand]]
+id   = "wasserschlauch"
+erbt = "vorlage_getraenk"
+name = "ein Wasserschlauch"
+akkusativ = "einen Wasserschlauch"
+dativ = "einem Wasserschlauch"
+schluesselwoerter = ["wasser", "schlauch", "wasserschlauch"]
+beschreibung = "Ein lederner Schlauch voll mit frischem Wasser."
+eigenschaften = { trinken = 50 }
+benutzen_text = "Du trinkst in langen Zügen aus dem Wasserschlauch."
+
+[[gegenstand]]
+id   = "bier"
+erbt = "vorlage_getraenk"
+name = "ein Krug Bier"
+akkusativ = "einen Krug Bier"
+dativ = "einem Krug Bier"
+schluesselwoerter = ["bier", "krug"]
+beschreibung = "Dunkles Bier mit einer dicken Schaumkrone."
+eigenschaften = { trinken = 30, essen = 5 }
+benutzen_text = "Du leerst den Krug. Das tut gut!"
 
 [[gegenstand]]
 id   = "pilz"

@@ -27,6 +27,7 @@ karten_fertigkeit_max    = 3               # ... höchstens um 3 Felder
 waehrung   = "Gold"           # Name des Geldes, wenn es unten keine [geld]-Einheiten gibt
 max_berufe = 2                # So viele Berufe darf man gleichzeitig haben
 techniken_nur_gilden = true   # Kampftechniken (spezial) gibt es nur für Gilden
+koerper    = "humanoid"       # Körperbau der Spieler (daten/koerper): zwei Hände zum Halten
 tragkraft_basis       = 40    # So viel Gewicht trägt jeder ...
 tragkraft_pro_staerke = 3     # ... plus so viel pro Punkt Stärke (beides 0 = unbegrenzt)
 stadtkarte_stil     = "kasten"    # "kasten" = ( ) und [ ] im Rahmen, "linien" = ein Zeichen pro Raum
@@ -269,6 +270,26 @@ wert     = 10
 name     = "Kupfer"
 kurz     = "K"
 wert     = 1            # die kleinste Einheit hat immer wert = 1
+
+# ---------------------------------------------------------------------
+# Hunger und Durst
+# ---------------------------------------------------------------------
+# Essen (typ "nahrung") sättigt, Getränke (typ "getraenk") löschen den Durst.
+# Wie viel, steht bei den Gegenständen: eigenschaften = { essen = 40 } bzw.
+# { trinken = 50 }. Bei 0 erholt man sich nicht und verliert Lebenspunkte
+# (sterben kann man daran nicht).
+[ernaehrung]
+aktiv              = true
+max_essen          = 100
+max_trinken        = 100
+essen_pro_minute   = 1.0     # von satt bis leer: 100 Minuten
+trinken_pro_minute = 1.5     # von voll bis leer: etwa 67 Minuten
+hungrig_ab         = 30      # darunter: "hungrig"
+durstig_ab         = 30
+schaden_pro_minute = 2       # LP-Verlust pro Minute bei 0
+ohne_erholung      = true    # bei 0 keine Erholung von LP und Mana
+nahrung_standard   = 25      # Essen ohne Angabe
+getraenk_standard  = 30      # Getränke ohne Angabe
 
 # ---------------------------------------------------------------------
 # Darstellung: wie Listen im Spiel aussehen (Vorschau im Welteditor)

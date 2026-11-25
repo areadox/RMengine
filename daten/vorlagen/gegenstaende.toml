@@ -48,6 +48,14 @@ typ     = "nahrung"
 gewicht = 1
 wert    = 20
 
+[[gegenstand]]
+id      = "vorlage_getraenk"
+vorlage = true
+name    = "etwas zu trinken"
+typ     = "getraenk"
+gewicht = 1
+wert    = 15
+
 # ---------------------------------------------------------------------
 #  Behälter: Taschen, Beutel, Rucksäcke
 # ---------------------------------------------------------------------

@@ -21,6 +21,7 @@
 [[monster]]
 id   = "ratte"
 erbt = "vorlage_raubtier"
+koerper = "ratte"
 name = "eine fette Ratte"
 schluesselwoerter = ["ratte"]
 beschreibung = "Eine Ratte, so groß wie eine Katze, mit gelben Zähnen."
@@ -33,4 +34,18 @@ geld  = [10, 30]          # Geld beim Sieg (in Kupfer): eine Zahl oder [von, bis
 erholung  = 2.5
 angriffe  = ["beißt", "kratzt"]
 todestext = "*fiept ein letztes Mal und bleibt reglos liegen."
+
+# Die Leiche: liegt nach dem Kampf ein paar Minuten im Raum,
+# die Beute steckt darin ("nimm alles aus leiche")
+[monster.leiche]
+name      = "der Kadaver einer Ratte"
+dativ     = "dem Kadaver einer Ratte"
+bodentext = "Der Kadaver einer fetten Ratte liegt in einer Ecke."
+beschreibung = "Die Ratte liegt auf der Seite, die gelben Zähne gebleckt. Ihr nackter Schwanz ist seltsam verdreht."
+geruch    = "Ein fauliger Geruch steigt von dem Kadaver auf."
+verwest   = "Der Rattenkadaver ist von Fliegen bedeckt und zerfällt."
+minuten   = 3
+
+[monster.leiche.details]
+schwanz = { text = "Ein langer, schuppiger Schwanz – manche Leute zahlen dafür.", woerter = ["rattenschwanz"] }
 

@@ -12,6 +12,7 @@ angreifbar = false
 [[monster]]
 id   = "wolf"
 erbt = "vorlage_raubtier"
+koerper = "wolf"
 name = "ein grauer Wolf"
 akkusativ = "einen grauen Wolf"
 schluesselwoerter = ["wolf"]
@@ -34,8 +35,30 @@ geraeusch = "Ein tiefes Knurren dringt aus seiner Kehle."
 augen  = "Gelbe Augen, die dich nicht eine Sekunde loslassen."
 zaehne = { text = "Lange, gelbliche Reißzähne.", woerter = ["gebiss", "fang"] }
 
+[monster.leiche]
+name      = "der Kadaver eines Wolfs"
+dativ     = "dem Kadaver eines Wolfs"
+bodentext = "Der Kadaver eines grauen Wolfs liegt im Laub."
+beschreibung = "Der Wolf liegt ausgestreckt da, die gelben Augen sind gebrochen. Sein struppiges Fell ist blutverklebt."
+geruch    = "Nasses Fell und Blut."
+gefuehl   = "Das Fell ist rau und noch ein wenig warm."
+verwest   = "Vom Wolf bleiben nur ein paar Knochen, die bald unter dem Laub verschwinden."
+
+[monster.leiche.details.fell]
+text    = "Grau, struppig und an der Flanke aufgerissen. Ein Kürschner könnte daraus noch etwas machen."
+woerter = ["pelz", "flanke"]
+gefuehl = "Rau und borstig."
+
+[monster.leiche.details.fell.details.wunde]
+text = "Eine tiefe Wunde – hier hat dein letzter Hieb getroffen."
+
+[monster.leiche.details.zaehne]
+text    = "Die Reißzähne sind noch immer gefletscht."
+woerter = ["gebiss", "fang", "maul"]
+
 [[monster]]
 id   = "hoehlenspinne"
+koerper = "spinne"
 name = "eine riesige Höhlenspinne"
 schluesselwoerter = ["spinne"]
 raumtext = "Eine riesige Spinne lauert in ihrem Netz an der Decke."
