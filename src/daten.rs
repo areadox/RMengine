@@ -1910,8 +1910,9 @@ fn pruefen(d: &mut Daten, fehler: &mut Vec<String>, warn: &mut Vec<String>) {
         if !z.gilde.is_empty() {
             verweis(&d.gilden, &z.gilde, &wo, "Gilde", fehler);
         } else if z.ist_technik() && d.welt.techniken_nur_gilden {
-            fehler.push(format!(
-                "{wo}: Kampftechniken gibt es nur für Gilden – bitte gilde = \"...\" angeben (oder techniken_nur_gilden = false in welt.toml)."
+            // Nur eine Warnung, damit ältere Welten weiter starten – benutzbar ist die Technik so nicht
+            warn.push(format!(
+                "{wo}: Kampftechniken gibt es nur für Gilden – ohne gilde = \"...\" kann sie niemand benutzen (oder techniken_nur_gilden = false in welt.toml)."
             ));
         }
         if z.waffen_faktor < 0.0 || z.ausdauer_kosten < 0 || z.mana_kosten < 0 {

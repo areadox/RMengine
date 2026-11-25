@@ -1260,7 +1260,8 @@ des Zaubers. Mit dem Zaubern übt man die zugehörige Fertigkeit.
 Mit `gilde = "..."` gehört ein Zauber oder eine Technik einer Gilde: Nur ihre
 Mitglieder können ihn lernen und benutzen. **Kampftechniken gibt es nur für
 Gilden** (`techniken_nur_gilden = true` in `welt.toml`, das ist der Standard).
-Jede Technik braucht dann eine `gilde`, sonst meldet die Prüfung einen Fehler.
+Jede Technik braucht dann eine `gilde`. Eine Technik ohne Gilde kann niemand
+benutzen, und die Prüfung zeigt einen Hinweis.
 In der Beispielwelt sind die Magier eine Gilde (Magister Orelius im
 Magierturm, Feuerpfeil, Schutzschild, Eissplitter), die Techniken gehören dem
 Bund der Krieger (Hauptmann Brandt am Nordtor).

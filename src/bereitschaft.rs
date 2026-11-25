@@ -29,9 +29,18 @@ fn moeglich(w: &Welt, sid: u64) -> Vec<ZauberDef> {
     sp.zauber
         .iter()
         .filter_map(|id| w.d.zauber.get(id))
-        .filter(|z| z.ziel == "gegner" && (z.gilde.is_empty() || z.gilde == sp.gilde))
+        .filter(|z| z.ziel == "gegner" && gilde_passt(w, sp, z))
         .cloned()
         .collect()
+}
+
+/// Gilde passt (Techniken ohne Gilde gibt es nicht, wenn techniken_nur_gilden gilt).
+fn gilde_passt(w: &Welt, sp: &crate::spieler::SpielerDaten, z: &ZauberDef) -> bool {
+    if z.gilde.is_empty() {
+        !(z.ist_technik() && w.d.welt.techniken_nur_gilden)
+    } else {
+        z.gilde == sp.gilde
+    }
 }
 
 /// Kann der Zauber jetzt (still) gewirkt werden? Keine Meldungen – sonst schlägt man normal zu.
@@ -40,7 +49,7 @@ fn kann_wirken(w: &Welt, sid: u64, z: &ZauberDef) -> bool {
     let sp = &s.sp;
     let jetzt = Instant::now();
     sp.zauber.contains(&z.id)
-        && (z.gilde.is_empty() || z.gilde == sp.gilde)
+        && gilde_passt(w, sp, z)
         && (z.ist_technik() || hat_zauberstab(w, sid))
         && (z.fertigkeit.is_empty() || sp.fertigkeiten.get(&z.fertigkeit).copied().unwrap_or(0) >= z.mindest_stufe)
         && s.abklingzeiten.get(&z.id).is_none_or(|bis| *bis <= jetzt)

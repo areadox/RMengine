@@ -1396,6 +1396,10 @@ pub(crate) fn zaubern(w: &mut Welt, sid: u64, rest: &str, technik: bool) {
                 return;
             }
         }
+        if z.ist_technik() && z.gilde.is_empty() && w.d.welt.techniken_nur_gilden {
+            w.sende(sid, "Kampftechniken gibt es nur für Gilden – diese gehört keiner und kann nicht benutzt werden.");
+            return;
+        }
         if !z.gilde.is_empty() && s.sp.gilde != z.gilde {
             let g = w.d.gilden.get(&z.gilde).map(|g| g.name.clone()).unwrap_or_default();
             w.sende(sid, &format!("Das können nur Mitglieder von „{g}“."));
