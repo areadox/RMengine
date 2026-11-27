@@ -489,6 +489,8 @@ impl Oberwelt {
             details: ort.map(|o| o.details.clone()).unwrap_or_default(),
             beschreibung_nacht: String::new(),
             drinnen: Some(false),
+            tueren: BTreeMap::new(),
+            skript: String::new(),
             nutzt: {
                 // Auch was auf den Nachbarfeldern wächst und liegt, kann man ansehen.
                 let mut n = f.nutzt.clone();

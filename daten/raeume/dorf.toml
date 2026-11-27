@@ -111,6 +111,13 @@ nutzt     = ["theke", "fass", "feuer", "tisch", "stuhl", "bank", "treppe"]
 geruch    = "Es riecht nach Bier, Bratenfett und Holzrauch."
 geraeusch = "Das Feuer knistert, Krüge klappern."
 
+# Eine Tür am Ausgang nach unten (gilt auch von unten für den Weg nach oben)
+[raum.tueren.runter]
+name    = "die Falltür"
+woerter = ["falltuer", "luke"]
+beschreibung = "Eine schwere Falltür aus Eichenbohlen mit einem eisernen Ring zum Hochziehen."
+zu      = true
+
 [[raum]]
 id       = "gaestezimmer"
 name     = "Ein Gästezimmer"
@@ -135,10 +142,64 @@ gelaende = "hoehle"
 beschreibung = """
 Feucht und dunkel. Zwischen den Weinfässern raschelt es verdächtig. Ein
 enger Gang führt weiter nach Osten."""
-ausgaenge = { ost = "kellergang" }
+ausgaenge = { ost = "kellergang", west = "geheimkammer" }
 monster   = ["ratte"]
 nutzt     = ["fass", "spinnweben"]
 geruch    = "Es riecht nach saurem Wein und Mäusedreck."
+# Ein Skript direkt am Raum: Befehle gelten nur hier
+skript = '''
+-- "schieb das fass": dahinter ist eine Geheimtür
+befehl{
+  woerter = {"schieb", "schiebe", "drueck", "druecke"},
+  funktion = function(s, rest, raum)
+    if not rest:find("fass") then return false end
+    if raum.tueren.west == "offen" then
+      s:sende("Das große Fass steht schon zur Seite.")
+      return
+    end
+    s:sende("Du stemmst dich gegen das größte Fass. Knirschend rutscht es zur Seite – dahinter kommt eine niedrige Tür zum Vorschein!")
+    s:andere(s.name .. " schiebt ein großes Fass zur Seite. Dahinter ist eine Tür!")
+    welt.tuer(raum.id, "west", "offen")
+    -- Nach zwei Minuten rollt das Fass zurück
+    spaeter(120, function()
+      welt.tuer("keller", "west", "zu")
+      welt.sende_raum("keller", "Das Fass rollt knarrend zurück vor die Geheimtür.")
+      welt.sende_raum("geheimkammer", "Draußen rollt etwas Schweres vor die Tür.")
+    end)
+  end,
+}
+'''
+
+# Die Geheimtür: Solange sie zu ist, sieht man von hier aus keinen Ausgang
+[raum.tueren.west]
+name      = "die Geheimtür"
+woerter   = ["geheimtuer"]
+versteckt = true
+
+[[raum]]
+id       = "geheimkammer"
+name     = "Eine verborgene Kammer"
+x = 0
+y = 0
+z = -1
+gebiet   = "keller"
+gelaende = "hoehle"
+beschreibung = """
+Eine winzige Kammer, kaum größer als ein Schrank. Auf einem Brett an der Wand
+stehen verstaubte Flaschen, und in einer Ecke liegt eine alte Truhe ohne Deckel."""
+ausgaenge = { ost = "keller" }
+gegenstaende = ["heiltrank"]
+geruch   = "Muffig – hier war seit Jahren niemand."
+skript = '''
+-- Wer die Kammer zum ersten Mal findet, bekommt Erfahrung
+bei_betreten(function(s, raum)
+  if not s.merker.geheimkammer then
+    s:merke("geheimkammer", true)
+    s:sende("{hellgelb}Du hast eine verborgene Kammer entdeckt!{/}")
+    s:erfahrung(25)
+  end
+end)
+'''
 
 [[raum]]
 id       = "kellergang"

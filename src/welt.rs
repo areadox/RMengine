@@ -126,6 +126,12 @@ pub struct Welt {
     /// Lua-Skripte (daten/skripte) und was sie sich für die Welt merken
     pub skripte: crate::skripte::Skripte,
     pub skript_merker: BTreeMap<String, crate::spieler::Merk>,
+    /// Zustand der Türen (zu, verschlossen) – fehlt einer, gilt der Anfangszustand
+    pub tuer_zustand: HashMap<String, (bool, bool)>,
+    /// Von Skripten geänderte Ausgänge: Some(ziel) = neu/umgeleitet, None = gesperrt
+    pub extra_ausgaenge: HashMap<(String, daten::Richtung), Option<String>>,
+    /// Von Skripten gesetzte Zusatzzeilen unter der Raumbeschreibung
+    pub raum_zusatz: HashMap<String, String>,
     naechste_id: u64,
     takte: u64,
 }
@@ -142,12 +148,16 @@ impl Welt {
             wetter: String::new(),
             wetter_bis: Instant::now(),
             zeit_stand: None,
-            skripte: crate::skripte::laden(daten_ordner).0,
+            skripte: crate::skripte::Skripte::default(),
             skript_merker: BTreeMap::new(),
+            tuer_zustand: HashMap::new(),
+            extra_ausgaenge: HashMap::new(),
+            raum_zusatz: HashMap::new(),
             naechste_id: 1,
             takte: 0,
         };
         w.bevoelkern();
+        w.skripte = crate::skripte::laden(&w.daten_ordner, &w.d).0;
         crate::leichen::laden(&mut w);
         crate::skripte::merker_laden(&mut w);
         crate::zeit::takt(&mut w);
@@ -197,6 +207,47 @@ impl Welt {
         Some(id)
     }
 
+    /// Alle Ausgänge eines Raums – mit den Änderungen aus Skripten (ohne Türen zu prüfen)
+    pub fn ausgaenge(&self, raum: &str) -> BTreeMap<daten::Richtung, String> {
+        let mut a = self.d.ausgaenge(raum);
+        if !self.extra_ausgaenge.is_empty() {
+            for ((r, richt), ziel) in &self.extra_ausgaenge {
+                if r == raum {
+                    match ziel {
+                        Some(z) => {
+                            a.insert(*richt, z.clone());
+                        }
+                        None => {
+                            a.remove(richt);
+                        }
+                    }
+                }
+            }
+        }
+        a
+    }
+
+    /// Tür an einem Ausgang: (Zustands-Schlüssel, Tür, zu, verschlossen)
+    pub fn tuer(&self, raum: &str, richt: daten::Richtung) -> Option<(&String, &daten::TuerDef, bool, bool)> {
+        let (k, t) = self.d.tueren.get(&(raum.to_string(), richt))?;
+        let (zu, verschlossen) = self.tuer_zustand.get(k).copied().unwrap_or((t.zu, t.verschlossen));
+        Some((k, t, zu, verschlossen))
+    }
+
+    /// Ausgänge, die man sieht (ohne geschlossene Geheimtüren)
+    pub fn sichtbare_ausgaenge(&self, raum: &str) -> BTreeMap<daten::Richtung, String> {
+        let mut a = self.ausgaenge(raum);
+        a.retain(|r, _| self.tuer(raum, *r).is_none_or(|(_, t, zu, _)| !(t.versteckt && zu)));
+        a
+    }
+
+    /// Ausgänge, durch die man jetzt gehen kann (offene Türen)
+    pub fn offene_ausgaenge(&self, raum: &str) -> BTreeMap<daten::Richtung, String> {
+        let mut a = self.ausgaenge(raum);
+        a.retain(|r, _| self.tuer(raum, *r).is_none_or(|(_, _, zu, _)| !zu));
+        a
+    }
+
     pub fn monster_name(&self, id: u64) -> String {
         self.monster
             .get(&id)
@@ -225,7 +276,7 @@ impl Welt {
         let neu = daten::laden(&self.daten_ordner)?;
         let warnungen = neu.warnungen.clone();
         self.d = neu;
-        self.skripte = crate::skripte::laden(&self.daten_ordner).0;
+        self.skripte = crate::skripte::laden(&self.daten_ordner, &self.d).0;
         self.bevoelkern();
         let start = self.d.welt.startraum.clone();
         let d = &self.d;
@@ -473,7 +524,7 @@ impl Welt {
             if !m.ziele.is_empty() {
                 continue; // wer kämpft, wandert nicht und plaudert nicht
             }
-            let ausgaenge = self.d.ausgaenge(&m.raum);
+            let ausgaenge = self.offene_ausgaenge(&m.raum);
 
             if def.wandert && rng.gen_range(0..100) < def.wander_chance {
                 // Monster bleiben in ihrem Gebiet (falls ihr Heimatraum eines hat).
@@ -525,6 +576,10 @@ impl Welt {
 
     /// Fehlende Gegenstände und Monster wieder auffüllen.
     pub fn zuruecksetzen(&mut self) {
+        // Türen, von Skripten geöffnete Gänge und Raum-Zusätze wie am Anfang
+        self.tuer_zustand.clear();
+        self.extra_ausgaenge.clear();
+        self.raum_zusatz.clear();
         let mut neue_monster = Vec::new();
         for (raum_id, gegenstaende, monster) in self.d.bevoelkerung() {
             let boden = self.boden.entry(raum_id.clone()).or_default();

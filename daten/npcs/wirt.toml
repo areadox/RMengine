@@ -50,6 +50,28 @@ sprueche = [
 ]
 sprech_chance = 8
 
+# Ein Skript am NPC: gilt, solange der Wirt im Raum ist
+skript = '''
+-- "gib rattenschwanz an wirt": Dafür zahlt er ein paar Münzen
+bei_bekommen(function(s, id, npc, raum)
+  if id == "rattenschwanz" then
+    npc:sage("Ha! Wieder eine weniger da unten. Hier, für deine Mühe.")
+    s:geld_aendern(5)
+    return true
+  end
+  npc:sage("Was soll ich denn damit?")
+  return false
+end)
+-- Fragt jemand nach einem Geheimnis, verrät er etwas über den Keller
+bei_gespraech(function(s, text, npc, raum)
+  if text:lower():find("geheim") then
+    npc:tu("beugt sich über die Theke und flüstert:")
+    npc:sage("Mein Großvater hat unten im Keller hinter einem Fass etwas versteckt. Ich hab es nie gefunden.")
+    return false
+  end
+end)
+'''
+
 [npc.gespraech]
 begruessung = [
   "Willkommen im Goldenen Eber, {spieler}! Setz dich, das Feuer ist warm.",

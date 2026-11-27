@@ -30,6 +30,7 @@ mod text;
 mod update;
 mod gemeinschaft;
 mod handel;
+mod tueren;
 mod skripte;
 mod zeit;
 mod koerper;

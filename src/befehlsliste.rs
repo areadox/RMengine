@@ -70,6 +70,10 @@ pub const EINGEBAUT: &[Eingebaut] = &[
     b("karte", &["karte", "map", "k"], "spieler", UMSEHEN, "karte [größe]", "Die Karte der Umgebung zeigen", true),
     b("weltkarte", &["weltkarte", "landkarte", "worldmap"], "spieler", UMSEHEN, "weltkarte", "Die ganze Oberwelt (mit einer Landkarte)", false),
     b("zeit", &["zeit", "uhr", "uhrzeit", "datum", "wetter", "time"], "spieler", UMSEHEN, "zeit", "Uhrzeit, Jahreszeit und Wetter", true),
+    b("oeffnen", &["oeffnen", "oeffne", "open"], "spieler", UMSEHEN, "oeffne <tür>", "Eine Tür öffnen (mit Schlüssel auch eine verschlossene)", false),
+    b("schliessen", &["schliessen", "schliesse", "zumachen", "close"], "spieler", UMSEHEN, "schliesse <tür>", "Eine Tür schließen (\"schliesse tuer auf\" / \"ab\")", false),
+    b("aufschliessen", &["aufschliessen", "unlock"], "spieler", UMSEHEN, "aufschliessen <tür>", "Eine Tür mit dem Schlüssel aufschließen", false),
+    b("abschliessen", &["abschliessen", "verschliessen", "lock"], "spieler", UMSEHEN, "abschliessen <tür>", "Eine Tür mit dem Schlüssel abschließen", false),
     // Gegenstände
     b("nimm", &["nimm", "nehme", "take", "get"], "spieler", DINGE, "nimm <ding|alles>", "Etwas aufheben", false),
     b("lege", &["lege", "leg", "ablegen", "drop", "fallenlassen"], "spieler", DINGE, "lege <ding|alles>", "Etwas fallen lassen", false),
@@ -78,6 +82,7 @@ pub const EINGEBAUT: &[Eingebaut] = &[
     b("anlegen", &["anlegen", "anziehen", "ausruesten", "zuecke", "wear", "wield"], "spieler", DINGE, "anlegen <ding>", "Waffe oder Rüstung anlegen", false),
     b("ausziehen", &["ausziehen", "abnehmen", "remove"], "spieler", DINGE, "ausziehen <ding>", "Ausrüstung wieder abnehmen", false),
     b("benutze", &["benutze", "benutzen", "trinke", "trink", "iss", "esse", "use", "drink", "eat"], "spieler", DINGE, "benutze <ding>", "Trank trinken, Essen essen ...", false),
+    b("gib", &["gib", "gebe", "give", "schenke"], "spieler", DINGE, "gib <ding|betrag> [an] <wem>", "Einem Spieler oder NPC etwas geben", false),
     // Unterhaltung
     b("sage", &["sage", "sag", "say"], "spieler", REDEN, "sage <text>", "Etwas sagen (kurz: 'text) – NPCs hören zu", true),
     b("frage", &["frage", "frag", "ask"], "spieler", REDEN, "frage <npc> nach <thema>", "Einen NPC etwas fragen", false),
@@ -109,7 +114,7 @@ pub const EINGEBAUT: &[Eingebaut] = &[
     // Aufgaben
     b("aufgaben", &["aufgaben", "quests", "auftraege", "aufgabenbuch"], "spieler", AUFGABEN, "aufgaben [erledigt]", "Deine Aufgaben und Quests", true),
     b("annehmen", &["annehmen", "akzeptiere", "accept"], "spieler", AUFGABEN, "annehmen [nr|aufgabe]", "Eine angebotene Aufgabe übernehmen", false),
-    b("abgeben", &["abgeben", "abschliessen"], "spieler", AUFGABEN, "abgeben", "Erledigte Aufgaben und Gegenstände beim NPC abgeben", false),
+    b("abgeben", &["abgeben"], "spieler", AUFGABEN, "abgeben", "Erledigte Aufgaben und Gegenstände beim NPC abgeben", false),
     b("abbrechen", &["abbrechen"], "spieler", AUFGABEN, "abbrechen <nr|aufgabe>", "Eine Aufgabe aufgeben", false),
     // Gemeinschaft
     b("rasse", &["rasse", "race"], "spieler", GEMEINSCHAFT, "rasse [name]", "Deine Rasse (Figuren ohne Rasse können hier wählen)", true),

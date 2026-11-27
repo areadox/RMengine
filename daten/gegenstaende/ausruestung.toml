@@ -87,3 +87,19 @@ erholung   = 2.2
 wert       = 400
 # zauberstab = 1: Damit kann man einen Kampfzauber bereithalten (bereite ...)
 eigenschaften = { schaden = 2, zauberstab = 1, intelligenz = 1 }
+# Ein Skript am Gegenstand: Der Befehl gilt, solange man den Stab dabeihat
+skript = '''
+befehl{
+  woerter = {"schwinge", "schwenke"},
+  syntax  = "schwinge stab",
+  hilfe   = "Den Zauberstab schwingen",
+  funktion = function(s, rest)
+    if not rest:find("stab") then return false end
+    s:sende("Du schwingst den Zauberstab. Der Kristall glimmt auf und versprüht bunte Funken.")
+    s:andere(s.name .. " schwingt einen Zauberstab – bunte Funken stieben durch die Luft.")
+  end,
+}
+bei_anlegen(function(s, id, raum)
+  s:sende("{grau}Ein leichtes Kribbeln läuft dir den Arm hinauf.{/}")
+end)
+'''

@@ -164,6 +164,10 @@ pub fn angreifen(w: &mut Welt, sid: u64, mid: u64) {
         w.sende(sid, &format!("{name} ist friedlich. Hier wird nicht gekämpft."));
         return;
     }
+    // Skripte können den Angriff verhindern ("Der Wächter weicht geschickt aus ...")
+    if !crate::skripte::angriff(w, sid, mid) {
+        return;
+    }
     let akk = w.monster_akk(mid);
     let (name, raum) = {
         let s = &w.spieler[&sid];
@@ -216,7 +220,8 @@ pub fn fliehen(w: &mut Welt, sid: u64) {
     }
     let raum = w.spieler[&sid].sp.raum.clone();
     let name = w.spieler[&sid].sp.name.clone();
-    let ausgaenge: Vec<_> = w.d.ausgaenge(&raum).into_iter().collect();
+    // Fliehen geht nur durch offene Türen
+    let ausgaenge: Vec<_> = w.offene_ausgaenge(&raum).into_iter().collect();
     let chance = (50 + (wert(w, sid, "geschick") - 10) * 3).clamp(20, 90);
     let mut rng = rand::thread_rng();
     let Some((richt, ziel)) = ausgaenge.choose(&mut rng).cloned() else {

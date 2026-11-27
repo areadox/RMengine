@@ -124,10 +124,15 @@ pub fn ausfuehren(w: &mut Welt, sid: u64, eingabe: &str) -> Folge {
         }
         "hilfe" | "help" | "?" => hilfe(w, sid, rolle, rest),
         "schau" | "schaue" | "l" | "look" | "umsehen" | "betrachte" | "untersuche" | "unt" | "x" => {
+            let raum = w.spieler[&sid].sp.raum.clone();
             if rest.is_empty() {
                 raum_anzeigen(w, sid);
+            } else if !crate::skripte::erlaubt(w, sid, "ansehen", &raum, &[rest]) {
+                // Ein Skript zeigt selbst etwas an
             } else if crate::gemeinschaft::nummer(rest).is_some_and(|n| crate::handel::ware_zeigen(w, sid, n)) {
                 // "schau 3" beim Händler: Ware Nummer 3
+            } else if crate::tueren::ansehen(w, sid, rest) {
+                // "schau tuer"
             } else if !crate::behaelter::ansehen(w, sid, rest) {
                 untersuchen(w, sid, rest);
             }
@@ -195,28 +200,44 @@ pub fn ausfuehren(w: &mut Welt, sid: u64, eingabe: &str) -> Folge {
         "aufgeben" => kampf::aufgeben(w, sid),
         "sage" | "sag" | "say" => {
             sagen(w, sid, rest);
-            crate::skripte::sagen(w, sid, rest);
-            if let Some(mid) = npc_fuer_satz(w, sid, rest) {
-                crate::quests::angesprochen(w, sid, mid, gespraech::fragt_nach_aufgabe(rest));
+            if !rest.is_empty() {
+                // Skripte des Raums und der NPCs zuerst; wen ein Skript übernimmt, antwortet nicht normal
+                let stumm = crate::skripte::sagen(w, sid, rest);
+                npcs_hoeren_zu(w, sid, rest, &stumm);
+                if let Some(mid) = npc_fuer_satz(w, sid, rest).filter(|m| !stumm.contains(m)) {
+                    crate::quests::angesprochen(w, sid, mid, gespraech::fragt_nach_aufgabe(rest));
+                }
             }
         }
         "frage" | "frag" | "ask" => {
-            fragen(w, sid, rest);
             let (wer, thema) = rest.split_once(char::is_whitespace).unwrap_or((rest, ""));
-            if let Some(mid) = finde_monster(w, &w.spieler[&sid].sp.raum, wer).filter(|m| kann_reden(w, *m)) {
-                crate::quests::angesprochen(w, sid, mid, gespraech::fragt_nach_aufgabe(thema));
+            let thema = thema.trim().strip_prefix("nach ").unwrap_or(thema.trim());
+            let mid = finde_monster(w, &w.spieler[&sid].sp.raum, wer).filter(|m| kann_reden(w, *m));
+            if mid.is_some_and(|m| !crate::skripte::gespraech(w, sid, m, thema)) {
+                // Ein Skript hat geantwortet
+            } else {
+                fragen(w, sid, rest);
+                if let Some(mid) = mid {
+                    crate::quests::angesprochen(w, sid, mid, gespraech::fragt_nach_aufgabe(thema));
+                }
             }
         }
         "rede" | "red" | "sprich" | "sprech" | "talk" => {
-            reden(w, sid, rest);
             let wer = rest.strip_prefix("mit ").unwrap_or(rest).trim();
             let raum = w.spieler[&sid].sp.raum.clone();
             let npcs: Vec<u64> = w.monster_im_raum(&raum).into_iter().filter(|m| kann_reden(w, *m)).collect();
             let mid = if wer.is_empty() { (npcs.len() == 1).then(|| npcs[0]) } else { finde_monster(w, &raum, wer) };
-            if let Some(mid) = mid.filter(|m| kann_reden(w, *m)) {
-                crate::quests::angesprochen(w, sid, mid, true);
+            let mid = mid.filter(|m| kann_reden(w, *m));
+            if mid.is_some_and(|m| !crate::skripte::gespraech(w, sid, m, "")) {
+                // Ein Skript hat das Gespräch übernommen
+            } else {
+                reden(w, sid, rest);
+                if let Some(mid) = mid {
+                    crate::quests::angesprochen(w, sid, mid, true);
+                }
             }
         }
+        "gib" | "gebe" | "give" | "schenke" => geben(w, sid, rest),
         "emote" | "me" | "/me" => emote(w, sid, rest),
         "rufe" | "ruf" | "shout" => rufen(w, sid, rest),
         "wer" | "who" => wer(w, sid),
@@ -238,6 +259,7 @@ pub fn ausfuehren(w: &mut Welt, sid: u64, eingabe: &str) -> Folge {
         "lerne" => crate::handel::lernen(w, sid, rest),
         "geld" => crate::handel::geld(w, sid),
         "zeit" => crate::zeit::befehl(w, sid),
+        "oeffnen" | "schliessen" | "aufschliessen" | "abschliessen" => crate::tueren::befehl(w, sid, id, rest),
         "aufgaben" => crate::quests::anzeigen(w, sid, rest),
         "annehmen" => crate::quests::annehmen(w, sid, rest),
         "abgeben" => crate::quests::abgeben(w, sid),
@@ -600,8 +622,19 @@ fn raum_zeigen(w: &Welt, sid: u64, voll: bool) {
     } else if s.baut() {
         kopf.push_str(&format!(" {{grau}}[{}]{{/}}", raum.id));
     }
-    let mut ausgaenge: Vec<String> = raum.ausgaenge.keys().map(|r| r.anzeige().to_string()).collect();
-    let himmelsrichtungen = raum.ausgaenge.keys().filter(|r| r.versatz().2 == 0 && r.versatz() != (0, 0, 0)).count();
+    // Ausgänge mit Türen ("Norden (Tür zu)"), geschlossene Geheimtüren bleiben unsichtbar
+    let sichtbar = w.sichtbare_ausgaenge(&raum.id);
+    let mut ausgaenge: Vec<String> = sichtbar
+        .keys()
+        .map(|r| match w.tuer(&raum.id, *r) {
+            Some((_, t, true, _)) => {
+                let wort = t.name.split_whitespace().last().unwrap_or("Tür");
+                format!("{} ({wort} zu)", r.anzeige())
+            }
+            _ => r.anzeige().to_string(),
+        })
+        .collect();
+    let himmelsrichtungen = sichtbar.keys().filter(|r| r.versatz().2 == 0 && r.versatz() != (0, 0, 0)).count();
     if himmelsrichtungen == 8 {
         ausgaenge.retain(|a| a == "hinein" || a == "hinaus");
         ausgaenge.insert(0, "in alle Richtungen".into());
@@ -622,6 +655,10 @@ fn raum_zeigen(w: &Welt, sid: u64, voll: bool) {
             if !a.trim().is_empty() {
                 absaetze.push((a.to_string(), i > 0));
             }
+        }
+        // Zusatz aus Skripten ("Ein Geheimgang klafft in der Wand.")
+        if let Some(z) = w.raum_zusatz.get(&raum.id) {
+            absaetze.push((z.clone(), false));
         }
         // Tageszeit und Wetter (nur draußen)
         if let Some(z) = crate::zeit::raum_zusatz(w, &raum.id) {
@@ -719,7 +756,7 @@ fn gehen(w: &mut Welt, sid: u64, richt: Richtung) {
     let s = &w.spieler[&sid];
     let alt = s.sp.raum.clone();
     let name = s.sp.name.clone();
-    let Some(ziel) = w.d.ausgaenge(&alt).get(&richt).cloned() else {
+    let Some(ziel) = w.sichtbare_ausgaenge(&alt).get(&richt).cloned() else {
         let t = match richt {
             Richtung::Rein => "Hier gibt es nichts, das du betreten könntest.",
             Richtung::Raus => "Von hier aus kommst du nicht hinaus.",
@@ -728,6 +765,14 @@ fn gehen(w: &mut Welt, sid: u64, richt: Richtung) {
         w.sende(sid, t);
         return;
     };
+    if let Some((_, t, true, _)) = w.tuer(&alt, richt) {
+        w.sende(sid, &format!("{} ist geschlossen.", gross(&t.name)));
+        return;
+    }
+    // Skripte können den Weg versperren (z.B. ein Wächter)
+    if !crate::skripte::erlaubt(w, sid, "gehen", &alt, &[richt.schluessel()]) {
+        return;
+    }
     w.sende_raum(&alt, &format!("{name} {}.", richt.geht()), &[sid]);
     if let Some(s) = w.spieler.get_mut(&sid) {
         s.sp.raum = ziel.clone();
@@ -1074,6 +1119,16 @@ pub(crate) fn nehmen(w: &mut Welt, sid: u64, such: &str) {
     if zu_schwer {
         w.sende(sid, "{grau}Mehr kannst du nicht tragen.{/}");
     }
+    // Skripte können das Nehmen verhindern (z.B. ein verfluchtes Götzenbild)
+    let mut erlaubt = Vec::new();
+    for id in genommen {
+        if crate::skripte::erlaubt(w, sid, "nehmen", &id, &[&id]) {
+            erlaubt.push(id);
+        } else {
+            w.boden.entry(raum.clone()).or_default().push(id);
+        }
+    }
+    let genommen = erlaubt;
     for id in &genommen {
         let n = w.d.gegenstand_akk(id);
         w.sende(sid, &format!("Du nimmst {n}."));
@@ -1081,6 +1136,99 @@ pub(crate) fn nehmen(w: &mut Welt, sid: u64, such: &str) {
     }
     if let Some(s) = w.spieler.get_mut(&sid) {
         s.sp.inventar.extend(genommen);
+    }
+}
+
+/// "gib brot an bert", "gib brot wirt", "gib 50 bert" (Geld)
+fn geben(w: &mut Welt, sid: u64, rest: &str) {
+    let rest = rest.trim();
+    // Wem? Das letzte Wort (nach "an"/"dem"/"der")
+    let woerter: Vec<&str> = rest.split_whitespace().collect();
+    if woerter.len() < 2 {
+        w.sende(sid, "Was willst du wem geben? (z.B. gib brot an bert, gib 50 bert)");
+        return;
+    }
+    let wem = woerter[woerter.len() - 1];
+    let mut was: Vec<&str> = woerter[..woerter.len() - 1].to_vec();
+    while was.last().is_some_and(|w| matches!(normalisieren(w).as_str(), "an" | "dem" | "der" | "den")) {
+        was.pop();
+    }
+    let was = was.join(" ");
+    let raum = w.spieler[&sid].sp.raum.clone();
+    let name = w.spieler[&sid].sp.name.clone();
+    let spieler = finde_spieler_im_raum(w, &raum, wem).filter(|p| *p != sid);
+    let npc = if spieler.is_none() { finde_monster(w, &raum, wem) } else { None };
+    if spieler.is_none() && npc.is_none() {
+        w.sende(sid, "So jemanden siehst du hier nicht.");
+        return;
+    }
+    // Geld: "gib 50 bert" oder "gib 50 kupfer bert"
+    let erstes = was.split_whitespace().next().unwrap_or("");
+    if let (Ok(menge), Some(pid)) = (erstes.parse::<u64>(), spieler) {
+        if w.spieler[&sid].sp.geld < menge || menge == 0 {
+            w.sende(sid, "So viel Geld hast du nicht.");
+            return;
+        }
+        let betrag = crate::handel::betrag(w, menge);
+        let ziel = w.spieler[&pid].sp.name.clone();
+        if let Some(s) = w.spieler.get_mut(&sid) {
+            s.sp.geld -= menge;
+        }
+        if let Some(s) = w.spieler.get_mut(&pid) {
+            s.sp.geld += menge;
+        }
+        w.sende(sid, &format!("Du gibst {ziel} {betrag}."));
+        w.sende(pid, &format!("{name} gibt dir {betrag}."));
+        w.sende_raum(&raum, &format!("{name} gibt {ziel} etwas Geld."), &[sid, pid]);
+        return;
+    }
+    let Some(i) = finde_gegenstand(&w.d, &w.spieler[&sid].sp.inventar, &was) else {
+        w.sende(sid, "So etwas hast du nicht dabei.");
+        return;
+    };
+    let id = w.spieler[&sid].sp.inventar[i].clone();
+    if !crate::behaelter::darf_weg(&w.spieler[&sid].sp, &id) {
+        w.sende(sid, "Da ist noch etwas drin. Nimm es erst heraus (nimm alles aus ...).");
+        return;
+    }
+    let akk = w.d.gegenstand_akk(&id);
+    match (spieler, npc) {
+        (Some(pid), _) => {
+            let gewicht = w.d.gegenstaende.get(&id).map(|g| g.gewicht.max(0)).unwrap_or(0);
+            let ziel = w.spieler[&pid].sp.name.clone();
+            if !crate::behaelter::kann_tragen(w, pid, gewicht) {
+                w.sende(sid, &format!("{ziel} kann nicht noch mehr tragen."));
+                return;
+            }
+            if let Some(s) = w.spieler.get_mut(&sid) {
+                s.sp.inventar.remove(i);
+            }
+            if let Some(s) = w.spieler.get_mut(&pid) {
+                s.sp.inventar.push(id);
+            }
+            w.sende(sid, &format!("Du gibst {ziel} {akk}."));
+            w.sende(pid, &format!("{name} gibt dir {akk}."));
+            w.sende_raum(&raum, &format!("{name} gibt {ziel} {akk}."), &[sid, pid]);
+        }
+        (None, Some(mid)) => {
+            let npc_dativ = w.monster_dativ(mid);
+            let npc_name = gross(&w.monster_name(mid));
+            // Ein Skript des NPCs entscheidet; ohne Skript nimmt er nichts an
+            match crate::skripte::bekommen(w, sid, mid, &id) {
+                Some(true) => {
+                    if let Some(s) = w.spieler.get_mut(&sid) {
+                        if let Some(i) = s.sp.inventar.iter().position(|x| *x == id) {
+                            s.sp.inventar.remove(i);
+                        }
+                    }
+                    w.sende(sid, &format!("Du gibst {npc_dativ} {akk}."));
+                    w.sende_raum(&raum, &format!("{name} gibt {npc_dativ} {akk}."), &[sid]);
+                }
+                Some(false) => {}
+                None => w.sende(sid, &format!("{npc_name} will {akk} nicht haben.")),
+            }
+        }
+        _ => {}
     }
 }
 
@@ -1118,6 +1266,16 @@ pub(crate) fn fallenlassen(w: &mut Welt, sid: u64, such: &str) {
         w.sende(sid, "So etwas hast du nicht.");
         return;
     }
+    // Skripte können das Ablegen verhindern
+    let mut erlaubt = Vec::new();
+    for id in weg {
+        if crate::skripte::erlaubt(w, sid, "ablegen", &id, &[&id]) {
+            erlaubt.push(id);
+        } else if let Some(s) = w.spieler.get_mut(&sid) {
+            s.sp.inventar.push(id);
+        }
+    }
+    let weg = erlaubt;
     for id in &weg {
         let n = w.d.gegenstand_akk(id);
         w.sende(sid, &format!("Du legst {n} ab."));
@@ -1210,7 +1368,17 @@ pub(crate) fn anlegen(w: &mut Welt, sid: u64, such: &str) {
         w.sende(sid, &m);
         return;
     }
+    let g = g.clone();
+    if !crate::skripte::erlaubt(w, sid, "anlegen", &id, &[&id]) {
+        return;
+    }
+    let g = &g;
     let Some(s) = w.spieler.get_mut(&sid) else { return };
+    // Das Skript kann das Inventar geändert haben: neu suchen
+    let Some(i) = s.sp.inventar.iter().position(|x| *x == id) else { return };
+    if s.sp.ausruestung.contains_key(&g.platz) {
+        return;
+    }
     s.sp.inventar.remove(i);
     s.sp.ausruestung.insert(g.platz.clone(), id);
     let (raum, name) = (s.sp.raum.clone(), s.sp.name.clone());
@@ -1229,6 +1397,11 @@ pub(crate) fn ausziehen(w: &mut Welt, sid: u64, such: &str) {
         w.sende(sid, "So etwas hast du nicht angelegt.");
         return;
     };
+    let id = s.sp.ausruestung.get(&platz).cloned().unwrap_or_default();
+    if !crate::skripte::erlaubt(w, sid, "ausziehen", &id, &[&id]) {
+        return;
+    }
+    let Some(s) = w.spieler.get_mut(&sid) else { return };
     let Some(id) = s.sp.ausruestung.remove(&platz) else { return };
     let n = w.d.gegenstand_akk(&id);
     s.sp.inventar.push(id);
@@ -1245,6 +1418,12 @@ pub(crate) fn benutzen(w: &mut Welt, sid: u64, such: &str) {
     };
     let id = s.sp.inventar[i].clone();
     let Some(g) = w.d.gegenstaende.get(&id).cloned() else { return };
+    // Skripte: eigene Wirkung oder verhindern (false)
+    if !crate::skripte::erlaubt(w, sid, "benutzen", &id, &[&id]) {
+        return;
+    }
+    let Some(s) = w.spieler.get(&sid) else { return };
+    let Some(i) = s.sp.inventar.iter().position(|x| *x == id) else { return };
     let heilung = g.eigenschaften.get("heilung").copied().unwrap_or(0);
     let mana = g.eigenschaften.get("mana").copied().unwrap_or(0);
     let (essen, trinken) = crate::ernaehrung::naehrwert(w, &g);
@@ -1303,10 +1482,14 @@ fn sagen(w: &Welt, sid: u64, t: &str) {
     w.sende(sid, &format!("{{cyan}}Du sagst: „{t}“{{/}}"));
     w.sende_raum(&s.raum, &format!("{{cyan}}{} sagt: „{t}“{{/}}", s.name), &[sid]);
     crate::clientdaten::gespraech(w, &w.spieler_im_raum(&s.raum), "say", &s.name, &format!("{} sagt: „{t}“", s.name));
+}
 
-    // Hören NPCs zu? Wer mit Namen angesprochen wird, antwortet immer.
+/// Hören NPCs zu? (außer denen, deren Antwort ein Skript übernommen hat)
+fn npcs_hoeren_zu(w: &Welt, sid: u64, t: &str, stumm: &[u64]) {
+    let s = &w.spieler[&sid].sp;
+    // Wer mit Namen angesprochen wird, antwortet immer.
     // Ist nur ein NPC da, antwortet er, wenn er etwas zum Thema weiß.
-    let npcs: Vec<u64> = w.monster_im_raum(&s.raum).into_iter().filter(|m| kann_reden(w, *m)).collect();
+    let npcs: Vec<u64> = w.monster_im_raum(&s.raum).into_iter().filter(|m| kann_reden(w, *m) && !stumm.contains(m)).collect();
     let satz = gespraech::satz_vorbereiten(t);
     let angesprochen = npcs.iter().copied().find(|mid| {
         w.monster.get(mid).and_then(|m| w.d.monster.get(&m.def)).is_some_and(|d| {
@@ -1968,7 +2151,7 @@ fn admin_befehl(w: &mut Welt, sid: u64, befehl: &str, rest: &str) -> bool {
                 w.sende(sid, &format!("Gegenstand '{rest}' gibt es nicht.{tipp}"));
                 return true;
             }
-            let n = w.d.gegenstand_name(rest);
+            let n = w.d.gegenstand_akk(rest);
             if let Some(s) = w.spieler.get_mut(&sid) {
                 s.sp.inventar.push(rest.to_string());
             }

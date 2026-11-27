@@ -127,8 +127,7 @@ pub fn raum(w: &Welt, sid: u64) {
     let Some(s) = w.spieler.get(&sid) else { return };
     let Some(r) = w.d.raum(&s.sp.raum) else { return };
     let ausgaenge: serde_json::Map<String, Value> = w
-        .d
-        .ausgaenge(&r.id)
+        .sichtbare_ausgaenge(&r.id)
         .iter()
         .map(|(richt, ziel)| (richtung_kurz(*richt).to_string(), json!(raumnummer(ziel))))
         .collect();
@@ -215,7 +214,7 @@ pub fn msdp_wert(w: &Welt, sid: Option<u64>, name: &str) -> Option<MsdpWert> {
     let raum = || w.d.raum(&p.raum);
     let ausgaenge = || {
         MsdpWert::Tabelle(
-            w.d.ausgaenge(&p.raum)
+            w.sichtbare_ausgaenge(&p.raum)
                 .iter()
                 .map(|(r, z)| (richtung_kurz(*r).to_string(), MsdpWert::text(raumnummer(z))))
                 .collect(),

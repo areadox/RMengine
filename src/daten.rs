@@ -494,6 +494,39 @@ pub struct WetterDef {
     pub quelle: String,
 }
 
+/// Eine Tür an einem Ausgang (gilt auch für den Rückweg)
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields, default)]
+pub struct TuerDef {
+    /// Mit Artikel, z.B. "die Eichentür" oder "das Gittertor"
+    pub name: String,
+    /// Weitere Wörter, z.B. ["eichentuer"] (immer: tuer, tor)
+    pub woerter: Vec<String>,
+    pub beschreibung: String,
+    /// Anfangs geschlossen
+    pub zu: bool,
+    /// Anfangs abgeschlossen
+    pub verschlossen: bool,
+    /// Dieser Gegenstand schließt auf und ab (leer = kein Schloss)
+    pub schluessel: String,
+    /// Geheimtür: Solange sie zu ist, sieht man den Ausgang nicht
+    pub versteckt: bool,
+}
+
+impl Default for TuerDef {
+    fn default() -> Self {
+        TuerDef {
+            name: "die Tür".into(),
+            woerter: Vec::new(),
+            beschreibung: String::new(),
+            zu: true,
+            verschlossen: false,
+            schluessel: String::new(),
+            versteckt: false,
+        }
+    }
+}
+
 pub const TAGESZEITEN: &[&str] = &["morgen", "tag", "abend", "nacht"];
 pub const JAHRESZEITEN: &[&str] = &["fruehling", "sommer", "herbst", "winter"];
 
@@ -705,6 +738,12 @@ pub struct RaumDef {
     /// Beschreibung bei Nacht (leer = die normale)
     #[serde(default)]
     pub beschreibung_nacht: String,
+    /// Türen an Ausgängen: [raum.tueren.nord]
+    #[serde(default)]
+    pub tueren: BTreeMap<String, TuerDef>,
+    /// Lua-Skript für diesen Raum (Befehle und Ereignisse gelten hier)
+    #[serde(default)]
+    pub skript: String,
     /// Drinnen oder draußen (leer = wie das Gelände)
     #[serde(default)]
     pub drinnen: Option<bool>,
@@ -755,6 +794,9 @@ pub struct GegenstandDef {
     /// So viele Hände braucht man zum Halten (Waffe, Schild, Fackel). Standard 1, Zweihänder 2.
     #[serde(default)]
     pub haende: Option<u32>,
+    /// Lua-Skript für diesen Gegenstand (Befehle gelten, wenn man ihn dabeihat)
+    #[serde(default)]
+    pub skript: String,
     /// Waffe: Fertigkeit, die benutzt und geübt wird, z.B. "schwertkampf"
     #[serde(default)]
     pub fertigkeit: String,
@@ -995,6 +1037,9 @@ pub struct MonsterDef {
     /// Körperbau, z.B. "wolf": Maul und Pfoten – damit greift es an
     #[serde(default)]
     pub koerper: String,
+    /// Lua-Skript für diesen NPC/dieses Monster (Befehle gelten, wenn es im Raum ist)
+    #[serde(default)]
+    pub skript: String,
     /// Wie die Leiche aussieht ([monster.leiche])
     #[serde(default)]
     pub leiche: LeicheDef,
@@ -1557,6 +1602,8 @@ pub struct Daten {
     pub eigene_befehle: BTreeMap<String, EigenerBefehlDef>,
     pub koerper: BTreeMap<String, KoerperDef>,
     pub wetter: BTreeMap<String, WetterDef>,
+    /// Türen: (Raum, Richtung) -> (Schlüssel für den Zustand, Tür). Beide Seiten eingetragen.
+    pub tueren: HashMap<(String, Richtung), (String, TuerDef)>,
     /// Welcher Raum liegt an welcher Koordinate?
     /// (karte, x, y, z) -> Raum
     pub koordinaten: HashMap<(String, i32, i32, i32), String>,
@@ -1763,6 +1810,7 @@ pub fn laden(ordner: &Path) -> Result<Daten, Vec<String>> {
         eigene_befehle: BTreeMap::new(),
         koerper: BTreeMap::new(),
         wetter: BTreeMap::new(),
+        tueren: HashMap::new(),
         koordinaten: HashMap::new(),
         deko_farben: wd.deko,
         namen: wd.namen,
@@ -1897,7 +1945,7 @@ pub fn laden(ordner: &Path) -> Result<Daten, Vec<String>> {
 
     d.oberwelt = oberwelt::laden(ordner, &mut fehler);
     d.befehle = crate::befehlskonfig::laden(ordner, &d.eigene_befehle, &mut fehler, &mut warnungen);
-    fehler.extend(crate::skripte::pruefen(ordner));
+    fehler.extend(crate::skripte::pruefen(ordner, &d));
     pruefen(&mut d, &mut fehler, &mut warnungen);
 
     if fehler.is_empty() {
@@ -2412,6 +2460,42 @@ fn pruefen(d: &mut Daten, fehler: &mut Vec<String>, warn: &mut Vec<String>) {
             }
         }
     }
+
+    // Türen (gelten für beide Seiten)
+    let mut tueren = HashMap::new();
+    for r in d.raeume.values() {
+        for (k, t) in &r.tueren {
+            let wo = format!("[{}] Raum '{}', Tür '{k}'", r.quelle, r.id);
+            let Some(richt) = Richtung::aus_text(k) else {
+                fehler.push(format!("{wo}: '{k}' ist keine Richtung (nord, ost, hoch, rein ...)."));
+                continue;
+            };
+            let Some(ziel) = r.ausgaenge.get(&richt) else {
+                fehler.push(format!("{wo}: In diese Richtung gibt es keinen Ausgang."));
+                continue;
+            };
+            if !t.schluessel.is_empty() {
+                verweis(&d.gegenstaende, &t.schluessel, &wo, "Schlüssel (Gegenstand)", fehler);
+            }
+            if t.verschlossen && t.schluessel.is_empty() {
+                warn.push(format!("{wo}: ist verschlossen, hat aber keinen Schlüssel – öffnen geht dann nur per Skript."));
+            }
+            let schluessel = format!("{}:{}", r.id, richt.anzeige());
+            tueren.insert((r.id.clone(), richt), (schluessel.clone(), t.clone()));
+            // Die andere Seite, falls von dort ein Weg zurückführt und sie keine eigene Tür hat
+            if let Some(z) = d.raeume.get(ziel) {
+                let zurueck = richt.gegenteil();
+                let eigene = z.tueren.keys().any(|k| Richtung::aus_text(k) == Some(zurueck));
+                if z.ausgaenge.get(&zurueck) == Some(&r.id) && !eigene {
+                    // Versteckt ist eine Geheimtür nur von dieser Seite – von innen sieht man sie
+                    let mut drueben = t.clone();
+                    drueben.versteckt = false;
+                    tueren.insert((z.id.clone(), zurueck), (schluessel, drueben));
+                }
+            }
+        }
+    }
+    d.tueren = tueren;
 
     // Koordinaten
     for r in d.raeume.values() {
