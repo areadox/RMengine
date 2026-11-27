@@ -19,6 +19,8 @@ ureq = { version = "2", default-features = false, features = ["tls", "native-cer
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"] }
 rcgen = { version = "0.13", default-features = false, features = ["ring", "pem", "crypto"] }
+# Skripte in Lua (eingebaut, kein Lua auf dem Rechner nötig)
+mlua = { version = "0.10", features = ["lua54", "vendored", "send"] }
 
 [profile.release]
 strip = true
