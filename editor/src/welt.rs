@@ -537,6 +537,38 @@ impl Welt {
         (1..).map(|i| format!("{basis}_{i}")).find(|id| self.index(id).is_none()).unwrap()
     }
 
+    /// Einmal aufgebaut: Raum-ID -> Index und Rückwege je Zielraum.
+    /// Für Schleifen über alle Räume, damit nicht jeder Raum alle anderen durchsucht.
+    pub fn verzeichnis(&self) -> Verzeichnis {
+        let mut v = Verzeichnis::default();
+        for (i, r) in self.raeume.iter().enumerate() {
+            v.index.insert(r.id.clone(), i);
+            if self.beidseitig {
+                for (ri, z) in &r.ausgaenge {
+                    v.rueck.entry(z.clone()).or_default().push((gegenteil(ri).to_string(), r.id.clone()));
+                }
+            }
+        }
+        v
+    }
+
+    /// Wie `alle_ausgaenge`, aber mit einem fertigen Verzeichnis (schnell)
+    pub fn alle_ausgaenge_mit(&self, v: &Verzeichnis, id: &str) -> BTreeMap<String, (String, bool)> {
+        let mut m: BTreeMap<String, (String, bool)> = BTreeMap::new();
+        if let Some(r) = v.index.get(id).and_then(|i| self.raeume.get(*i)) {
+            for (ri, z) in &r.ausgaenge {
+                m.insert(ri.clone(), (z.clone(), false));
+            }
+        }
+        if let Some(name) = self.eingaenge.get(id) {
+            m.entry("raus".into()).or_insert((format!("Oberwelt: {name}"), true));
+        }
+        for (ri, von) in v.rueck.get(id).into_iter().flatten() {
+            m.entry(ri.clone()).or_insert((von.clone(), true));
+        }
+        m
+    }
+
     /// Alle Ausgänge eines Raums, wie die Engine sie sieht: eigene, Rückwege und "raus" zur Oberwelt.
     /// Rückgabe: Richtung -> (Ziel, automatisch?)
     pub fn alle_ausgaenge(&self, id: &str) -> BTreeMap<String, (String, bool)> {
@@ -732,14 +764,15 @@ impl Welt {
                 });
             }
         }
+        let v = self.verzeichnis();
         for r in &self.raeume {
             if r.beschreibung.trim().is_empty() {
                 p.push(Problem { fehler: false, raum: Some(r.id.clone()), text: format!("'{}' hat keine Beschreibung.", r.id) });
             }
             // Wie die Engine: Ausgänge müssen ins Nachbarfeld führen (gilt auch für Rückwege)
-            for (ri, (ziel, auto)) in self.alle_ausgaenge(&r.id) {
-                if !passt_zur_lage(self, r, &ri, &ziel) {
-                    let z = self.raum(&ziel).unwrap();
+            for (ri, (ziel, auto)) in self.alle_ausgaenge_mit(&v, &r.id) {
+                let Some(z) = v.index.get(&ziel).map(|i| &self.raeume[*i]) else { continue };
+                if !passt_zur_lage_von(r, &ri, z) {
                     let (dx, dy, dz) = versatz(&ri).unwrap();
                     p.push(Problem {
                         fehler: false,
@@ -753,12 +786,12 @@ impl Welt {
                     });
                 }
             }
-            if r.ausgaenge.is_empty() && self.alle_ausgaenge(&r.id).is_empty() {
+            if r.ausgaenge.is_empty() && self.alle_ausgaenge_mit(&v, &r.id).is_empty() {
                 p.push(Problem { fehler: false, raum: Some(r.id.clone()), text: format!("'{}' hat keine Ausgänge.", r.id) });
             }
         }
         // Erreichbarkeit vom Startraum (Oberwelt-Eingänge zählen als erreichbar)
-        if self.index(&self.startraum).is_some() {
+        if v.index.contains_key(&self.startraum) {
             let mut erreicht: BTreeSet<String> = BTreeSet::new();
             let mut offen: Vec<String> = vec![self.startraum.clone()];
             offen.extend(self.eingaenge.keys().cloned());
@@ -766,8 +799,8 @@ impl Welt {
                 if !erreicht.insert(id.clone()) {
                     continue;
                 }
-                for (_, (z, _)) in self.alle_ausgaenge(&id) {
-                    if self.index(&z).is_some() && !erreicht.contains(&z) {
+                for (_, (z, _)) in self.alle_ausgaenge_mit(&v, &id) {
+                    if v.index.contains_key(&z) && !erreicht.contains(&z) {
                         offen.push(z);
                     }
                 }
@@ -988,6 +1021,12 @@ pub fn oberwelt_feld(id: &str) -> Option<(i32, i32)> {
 }
 
 /// Liegt das Ziel eines Ausgangs dort, wo die Richtung hinzeigt? (rein/raus und andere Karten zählen nicht)
+#[derive(Default)]
+pub struct Verzeichnis {
+    pub index: HashMap<String, usize>,
+    rueck: HashMap<String, Vec<(String, String)>>,
+}
+
 pub fn passt_zur_lage(w: &Welt, r: &Raum, richtung: &str, ziel: &str) -> bool {
     match w.raum(ziel) {
         Some(z) => passt_zur_lage_von(r, richtung, z),

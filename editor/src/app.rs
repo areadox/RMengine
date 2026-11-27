@@ -41,6 +41,8 @@ struct KartenCache {
     nachbarn: Vec<usize>,
     /// ID -> Index (nur diese Ebene)
     index: std::collections::HashMap<String, usize>,
+    /// Alle Räume und Rückwege (für die Ausgangs-Marken)
+    verzeichnis: crate::welt::Verzeichnis,
 }
 
 /// Welcher Teil der Welt gerade bearbeitet wird.
@@ -1583,7 +1585,8 @@ impl App {
             let nachbarn: Vec<usize> =
                 (0..raeume.len()).filter(|i| raeume[*i].karte == self.karte && (raeume[*i].z - self.ebene).abs() == 1).collect();
             let index = ebene.iter().map(|i| (raeume[*i].id.clone(), *i)).collect();
-            self.karten_cache = Some(Rc::new(KartenCache { schluessel, ebene, nachbarn, index }));
+            let verzeichnis = self.welt().verzeichnis();
+            self.karten_cache = Some(Rc::new(KartenCache { schluessel, ebene, nachbarn, index, verzeichnis }));
         }
         let cache = self.karten_cache.clone().expect("gerade gebaut");
         let welt = self.welt.as_ref().unwrap();
@@ -1707,13 +1710,15 @@ impl App {
             }
             // Ausgänge, die nicht auf dieser Ebene liegen: hoch/runter/rein/raus
             let mut marken = Vec::new();
-            for (ri, (ziel, _)) in welt.alle_ausgaenge(&r.id) {
-                let andere_ebene = welt.raum(&ziel).is_some_and(|z| z.karte != r.karte || z.z != r.z);
+            let v = &cache.verzeichnis;
+            let raum_von = |id: &str| v.index.get(id).and_then(|i| welt.raeume.get(*i));
+            for (ri, (ziel, _)) in welt.alle_ausgaenge_mit(v, &r.id) {
+                let andere_ebene = raum_von(&ziel).is_some_and(|z| z.karte != r.karte || z.z != r.z);
                 if matches!(ri.as_str(), "hoch" | "runter" | "rein" | "raus") || andere_ebene {
                     let zeichen = match ri.as_str() {
                         "hoch" => "⏶",
                         "runter" => "⏷",
-                        "raus" if welt.raum(&ziel).is_none() => "🌍",
+                        "raus" if raum_von(&ziel).is_none() => "🌍",
                         "rein" | "raus" => "🚪",
                         _ => "🔗",
                     };
@@ -1735,7 +1740,7 @@ impl App {
         if let (Some(id), None) = (&unter_maus, &self.ziehen) {
             if let Some(r) = welt.raum(id) {
                 let aus: Vec<String> = welt
-                    .alle_ausgaenge(id)
+                    .alle_ausgaenge_mit(&cache.verzeichnis, id)
                     .into_iter()
                     .map(|(ri, (z, auto))| format!("{ri} ➡ {z}{}", if auto { " (auto)" } else { "" }))
                     .collect();
