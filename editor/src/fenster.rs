@@ -68,6 +68,8 @@ pub struct ServerFenster {
     hochladen_nach_speichern: bool,
     /// Formular für einen anderen Server zeigen, obwohl gerade eine Arbeitskopie offen ist
     anderer: bool,
+    /// Geänderte Dateien – nur alle paar Sekunden neu prüfen (alle Dateien lesen ist teuer)
+    aenderungen: Option<(std::time::Instant, std::collections::BTreeMap<String, Option<String>>)>,
 }
 
 impl Default for ServerFenster {
@@ -87,6 +89,7 @@ impl Default for ServerFenster {
             holen_bestaetigen: None,
             hochladen_nach_speichern: false,
             anderer: false,
+            aenderungen: None,
         }
     }
 }
@@ -169,7 +172,11 @@ impl ServerFenster {
                     ui.label(RichText::new(format!("Arbeitskopie: {}", ordner.display())).color(GRAU).small());
                     ui.label(RichText::new(format!("Fingerabdruck: {}…", kopie.fingerabdruck.chars().take(23).collect::<String>())).color(GRAU).small());
                     ui.add_space(6.0);
-                    let aenderungen = fw::lokale_aenderungen(ordner, kopie);
+                    let veraltet = self.aenderungen.as_ref().is_none_or(|(t, _)| t.elapsed().as_secs() >= 3) || self.laeuft.is_some();
+                    if veraltet {
+                        self.aenderungen = Some((std::time::Instant::now(), fw::lokale_aenderungen(ordner, kopie)));
+                    }
+                    let aenderungen = self.aenderungen.as_ref().map(|(_, a)| a.clone()).unwrap_or_default();
                     if aenderungen.is_empty() && !ungespeichert {
                         ui.label(RichText::new("Keine Änderungen seit dem letzten Holen/Hochladen.").color(GRUEN));
                     } else {

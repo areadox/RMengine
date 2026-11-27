@@ -158,6 +158,7 @@ impl Welt {
         };
         w.bevoelkern();
         w.skripte = crate::skripte::laden(&w.daten_ordner, &w.d).0;
+        w.boden_laden();
         crate::leichen::laden(&mut w);
         crate::skripte::merker_laden(&mut w);
         crate::zeit::takt(&mut w);
@@ -187,6 +188,47 @@ impl Welt {
         self.leichen.retain(|l| self.d.gegenstaende.contains_key(&l.id));
         for l in &self.leichen {
             self.boden.entry(l.raum.clone()).or_default().push(l.id.clone());
+        }
+    }
+
+    /// Gegenstände am Boden übernehmen (nach neuladen oder aus der Sicherung).
+    /// Leichen verwaltet `leichen` selbst; was es nicht mehr gibt, fällt weg.
+    fn boden_uebernehmen(&mut self, alt: HashMap<String, Vec<String>>) {
+        for (raum, dinge) in alt {
+            if !self.d.raum_existiert(&raum) {
+                continue;
+            }
+            let neu = self.boden.entry(raum).or_default();
+            let leichen: Vec<String> = neu.iter().filter(|g| g.starts_with("leiche:")).cloned().collect();
+            *neu = dinge.into_iter().filter(|g| !g.starts_with("leiche:") && self.d.gegenstaende.contains_key(g)).collect();
+            neu.extend(leichen);
+        }
+    }
+
+    fn boden_datei(&self) -> PathBuf {
+        self.spieler_verzeichnis().join("boden.json")
+    }
+
+    /// Gegenstände am Boden sichern (mit den Spielern), damit sie einen Neustart überstehen
+    pub fn boden_speichern(&self) {
+        let ohne_leichen: BTreeMap<&String, Vec<&String>> = self
+            .boden
+            .iter()
+            .map(|(r, d)| (r, d.iter().filter(|g| !g.starts_with("leiche:")).collect::<Vec<_>>()))
+            .collect();
+        if let Ok(t) = serde_json::to_string(&ohne_leichen) {
+            let _ = std::fs::create_dir_all(self.spieler_verzeichnis());
+            let tmp = self.boden_datei().with_extension("json.tmp");
+            if std::fs::write(&tmp, t).is_ok() {
+                let _ = std::fs::rename(tmp, self.boden_datei());
+            }
+        }
+    }
+
+    fn boden_laden(&mut self) {
+        let Ok(t) = std::fs::read_to_string(self.boden_datei()) else { return };
+        if let Ok(alt) = serde_json::from_str::<HashMap<String, Vec<String>>>(&t) {
+            self.boden_uebernehmen(alt);
         }
     }
 
@@ -277,7 +319,10 @@ impl Welt {
         let warnungen = neu.warnungen.clone();
         self.d = neu;
         self.skripte = crate::skripte::laden(&self.daten_ordner, &self.d).0;
+        // Was Spieler hingelegt haben, bleibt liegen (Monster kommen neu)
+        let alter_boden = std::mem::take(&mut self.boden);
         self.bevoelkern();
+        self.boden_uebernehmen(alter_boden);
         let start = self.d.welt.startraum.clone();
         let d = &self.d;
         for s in self.spieler.values_mut() {
@@ -455,6 +500,7 @@ impl Welt {
         }
         crate::leichen::speichern(self);
         crate::skripte::merker_speichern(self);
+        self.boden_speichern();
     }
 
     // ------------------------------------------------------------------
@@ -519,14 +565,22 @@ impl Welt {
         let mut rng = rand::thread_rng();
         let mut aktionen = Vec::new();
 
+        // Gebiete mit Spielern: Nur dort wandern und reden Monster (die übrige Welt "schläft")
+        let wach: std::collections::HashSet<&str> =
+            self.spieler.values().filter_map(|s| self.d.raeume.get(&s.sp.raum).map(|r| r.gebiet.as_str()).or(Some(s.sp.raum.as_str()))).collect();
+        let raeume_mit_spielern: std::collections::HashSet<&str> = self.spieler.values().map(|s| s.sp.raum.as_str()).collect();
         for (id, m) in &self.monster {
-            let Some(def) = self.d.monster.get(&m.def) else { continue };
             if !m.ziele.is_empty() {
                 continue; // wer kämpft, wandert nicht und plaudert nicht
             }
-            let ausgaenge = self.offene_ausgaenge(&m.raum);
+            let gebiet = self.d.raeume.get(&m.raum).map(|r| r.gebiet.as_str()).unwrap_or(m.raum.as_str());
+            if !wach.contains(gebiet) {
+                continue;
+            }
+            let Some(def) = self.d.monster.get(&m.def) else { continue };
 
             if def.wandert && rng.gen_range(0..100) < def.wander_chance {
+                let ausgaenge = self.offene_ausgaenge(&m.raum);
                 // Monster bleiben in ihrem Gebiet (falls ihr Heimatraum eines hat).
                 let gebiet = self.d.gebiet(&m.heimat);
                 let moeglich: Vec<_> = ausgaenge
@@ -541,7 +595,7 @@ impl Welt {
 
             if !def.sprueche.is_empty()
                 && rng.gen_range(0..100) < def.sprech_chance
-                && self.spieler.values().any(|s| s.sp.raum == m.raum)
+                && raeume_mit_spielern.contains(m.raum.as_str())
             {
                 if let Some(spruch) = def.sprueche.choose(&mut rng) {
                     let name = gross(&def.name);
@@ -581,6 +635,11 @@ impl Welt {
         self.extra_ausgaenge.clear();
         self.raum_zusatz.clear();
         let mut neue_monster = Vec::new();
+        // Lebende Monster einmal nach Heimatraum ordnen (statt für jeden Raum alle Monster zu durchsuchen)
+        let mut lebend_je_raum: HashMap<String, Vec<String>> = HashMap::new();
+        for m in self.monster.values() {
+            lebend_je_raum.entry(m.heimat.clone()).or_default().push(m.def.clone());
+        }
         for (raum_id, gegenstaende, monster) in self.d.bevoelkerung() {
             let boden = self.boden.entry(raum_id.clone()).or_default();
             let mut vorhanden = boden.clone();
@@ -591,10 +650,9 @@ impl Welt {
                     boden.push(g.clone());
                 }
             }
-            let mut lebend: Vec<&String> =
-                self.monster.values().filter(|m| m.heimat == raum_id).map(|m| &m.def).collect();
+            let mut lebend = lebend_je_raum.remove(&raum_id).unwrap_or_default();
             for m in &monster {
-                if let Some(pos) = lebend.iter().position(|x| *x == m) {
+                if let Some(pos) = lebend.iter().position(|x| x == m) {
                     lebend.remove(pos);
                 } else {
                     neue_monster.push((m.clone(), raum_id.clone()));

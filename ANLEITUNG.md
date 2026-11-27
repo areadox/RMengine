@@ -270,6 +270,11 @@ bei `waren` (`kaufe 2`, `kaufe 3 5` = dreimal Nummer 5, `lerne 1`), bei
 `zauber` (`zaubere 4`, `spezial 6 ratte`), bei Aufgaben (`annehmen 1`,
 `abbrechen 1`) und bei `beitreten` und `austreten`.
 
+**Geben:** `gib brot an bert`, `gib 50 bert` (Geld in der kleinsten Münze) –
+an Spieler und an NPCs (ob ein NPC etwas annimmt, bestimmt sein Skript).
+**Türen:** `oeffne tuer`, `schliesse tuer`, `aufschliessen tuer`,
+`abschliessen tuer` (Kapitel 25).
+
 Zwei Befehle gehören jeder Figur:
 
 ### Spielstand (`spielstand` oder kurz `sp`)
@@ -354,6 +359,7 @@ daten/
   koerper/             Körperbau: Hände, Maul, Pfoten ... (Kapitel 22)
   wetter/              Wetterarten (Kapitel 23)
   skripte/             Lua-Skripte: eigene Befehle und Ereignisse (Kapitel 24)
+                       (Skripte können auch direkt an Räumen, Gegenständen und NPCs stehen)
   vorlagen/            Vorlagen, von denen andere Einträge erben
   fertigkeiten/*.toml  Fertigkeiten
   zauber/*.toml        Zaubersprüche
@@ -2113,17 +2119,70 @@ befehl{
   zurück, war der Befehl nicht gemeint und es geht normal weiter.
 - Mehr Beispiele stehen in `daten/skripte/taverne.lua` und `wald.lua`.
 
+### Skripte an Räumen, Gegenständen und NPCs
+
+Statt in eine eigene Datei kann ein Skript auch direkt an einen Raum, einen
+Gegenstand oder einen NPC/ein Monster geschrieben werden – im Welteditor gibt es
+dafür das Feld *Skript (Lua)*, in der Datei das Feld `skript`:
+
+```toml
+[[raum]]
+id = "keller"
+# ...
+skript = '''
+befehl{
+  woerter = {"schieb", "schiebe"},
+  funktion = function(s, rest, raum)
+    if not rest:find("fass") then return false end
+    s:sende("Knirschend rutscht das Fass zur Seite – dahinter ist eine Tür!")
+    welt.tuer(raum.id, "west", "offen")
+  end,
+}
+'''
+```
+
+- **Im Skript eines Raums** gelten Befehle nur in diesem Raum, Ereignisse wie
+  `bei_betreten(function(s, raum) ... end)` beziehen sich ohne Ortsangabe auf ihn.
+- **Im Skript eines Gegenstands** gelten Befehle, solange man ihn dabeihat
+  (oder er im Raum liegt); `bei_nehmen(function(s, id, raum) ... end)` usw.
+  beziehen sich auf ihn.
+- **Im Skript eines NPCs/Monsters** gelten Befehle, solange er im Raum ist;
+  `bei_gespraech(...)`, `bei_bekommen(...)`, `bei_angriff(...)` beziehen sich
+  auf ihn.
+
+Drei Zeichen `'''` umschließen den Code; darin darf alles stehen, auch
+Anführungszeichen und Backslashes.
+
 ### Anmelden: Befehle und Ereignisse
 
-| Aufruf | Wann |
-|--------|------|
-| `befehl{ woerter = {...}, raum = "id", gebiet = "id", hilfe = "...", syntax = "...", funktion = function(s, rest, raum) ... end }` | Ein Befehl (raum/gebiet auch als Liste, z.B. `raum = {"a", "b"}`) |
-| `bei_betreten("raum", function(s, raum) ... end)` | Jemand betritt den Raum (`"*"` = jeden Raum) |
-| `bei_verlassen("raum", function(s, raum) ... end)` | Jemand verlässt den Raum |
-| `bei_sagen("raum", function(s, text, raum) ... end)` | Jemand sagt dort etwas |
-| `bei_sieg("monster", function(s, monster, raum) ... end)` | Jemand besiegt dieses Monster (`"*"` = jedes) |
-| `bei_takt(function() ... end)` | Alle paar Sekunden (Takt der Welt) |
-| `spaeter(sekunden, function() ... end)` | Etwas später ausführen, z.B. eine Tür wieder schließen |
+Jede `bei_...`-Funktion nimmt als Erstes, **wo** sie gilt: eine Raum-,
+Gegenstand- oder Monster-ID, `"*"` für überall – oder nichts (dann der
+Besitzer des Skripts). Gibt eine Funktion **`false`** zurück, wird die normale
+Aktion **verhindert** – die Funktion sagt dann selbst, was passiert.
+
+| Aufruf | Wann (Werte der Funktion) |
+|--------|---------------------------|
+| `befehl{ woerter = {...}, raum = "id", ... }` | Ein Befehl. Grenzen: `raum`, `gebiet`, `gegenstand` (man hat ihn dabei), `npc` (ist im Raum) – auch als Listen |
+| `bei_betreten(raum, f)` / `bei_verlassen(raum, f)` | Jemand kommt / geht `(s, raum)` |
+| `bei_gehen(raum, f)` | Jemand will durch einen Ausgang `(s, richtung, raum)` – false = Weg versperrt |
+| `bei_tuer(raum, f)` | Jemand will eine Tür öffnen, schließen, auf- oder abschließen `(s, aktion, richtung, raum)` |
+| `bei_ansehen(raum, f)` | Jemand sieht sich etwas an `(s, was, raum)` – false = du zeigst selbst etwas |
+| `bei_sagen(raum, f)` | Jemand sagt etwas `(s, text, raum)` |
+| `bei_nehmen(gegenstand, f)` | Aufheben `(s, id, raum)` |
+| `bei_ablegen(gegenstand, f)` | Hinlegen `(s, id, raum)` |
+| `bei_benutzen(gegenstand, f)` | Benutzen, Essen, Trinken `(s, id, raum)` |
+| `bei_anlegen(gegenstand, f)` / `bei_ausziehen(gegenstand, f)` | Anlegen / Abnehmen `(s, id, raum)` |
+| `bei_gespraech(npc, f)` | Sagen, fragen oder reden mit dem NPC `(s, text, npc, raum)` – false = du antwortest selbst |
+| `bei_bekommen(npc, f)` | Jemand gibt dem NPC etwas (`gib brot an wirt`) `(s, id, npc, raum)` – false = er nimmt es nicht |
+| `bei_angriff(monster, f)` | Jemand will angreifen `(s, monster, raum)` – false = verhindert |
+| `bei_sieg(monster, f)` | Jemand hat es besiegt `(s, monster_id, raum)` |
+| `bei_takt(f)` | Alle paar Sekunden (Takt der Welt) |
+| `spaeter(sekunden, f)` | Etwas später ausführen, z.B. eine Tür wieder schließen |
+
+**NPCs und Monster** (in `bei_gespraech`, `bei_bekommen`, `bei_angriff` und in
+`raum.wesen`) haben `npc.name`, `npc.id`, `npc.lp`, `npc.max_lp` und können:
+`npc:sage(text)`, `npc:tu(text)` („Der Wirt *nickt*.“), `npc:schade(n)`,
+`npc:heile(n)`, `npc:gehe(raum)`, `npc:verschwinde()`.
 
 ### Der Spieler `s`
 
@@ -2157,6 +2216,12 @@ befehl{
 |---------------|-----------|
 | `raum.id`, `raum.name`, `raum.gebiet`, `raum.drinnen` | Der Raum |
 | `raum.gegenstaende`, `raum.monster`, `raum.spieler` | Was dort ist (IDs bzw. Namen) |
+| `raum.wesen` | NPCs und Monster im Raum (mit `sage`, `tu` ...) |
+| `raum.ausgaenge`, `raum.tueren` | z.B. `raum.ausgaenge.nord` = Ziel, `raum.tueren.nord` = "offen"/"zu"/"verschlossen" |
+| `welt.raum(id)`, `welt.spieler(name)`, `welt.gegenstand(id)` | Einen anderen Raum, einen Spieler (online) oder einen Gegenstand nachschlagen |
+| `welt.tuer(raum, richtung, "offen"/"zu"/"verschlossen")` | Eine Tür stellen |
+| `welt.ausgang(raum, richtung, ziel)` | Einen Ausgang anlegen oder umleiten; `welt.ausgang_sperren(...)`, `welt.ausgang_normal(...)` |
+| `welt.raum_zusatz(raum, text)` | Eine Zeile unter die Raumbeschreibung setzen (`nil` = weg) |
 | `welt.sende_raum(raum, text)`, `welt.sende_alle(text)` | Nachrichten |
 | `welt.lege(raum, id)`, `welt.entferne(raum, id)` | Gegenstand in einen Raum legen / daraus entfernen |
 | `welt.erschaffe(raum, monster)` | Ein Monster oder einen NPC erscheinen lassen |
@@ -2176,6 +2241,54 @@ befehl{
   fertig ist. `s.geld` usw. zeigen innerhalb des Skripts schon den neuen Stand.
 - **Merker** der Spieler stehen in ihrem Spielstand, die der Welt in
   `spieler/welt_merker.json`.
+- **Zurücksetzen:** Türen, mit Skripten geöffnete Gänge und Raum-Zusätze
+  stehen nach dem Auffüllen der Welt (alle paar Minuten) wieder wie am Anfang.
 - **Quests:** Ein Schritt mit `art = "skript"` und `ziel = "hebel"` wird mit
   `s:fortschritt("hebel")` erledigt – so werden Rätsel zu Quest-Schritten.
+
+---
+
+## 25. Türen
+
+Eine Tür steht an einem Ausgang und gilt automatisch auch für den Rückweg aus
+dem Nachbarraum. Im Welteditor: Raum auswählen, unter *Türen* einen Haken bei
+der Richtung setzen.
+
+```toml
+[raum.tueren.runter]
+name         = "die Falltür"          # mit Artikel (Standard: "die Tür")
+woerter      = ["falltuer", "luke"]   # immer auch: tuer, tor
+beschreibung = "Eine schwere Falltür aus Eichenbohlen."
+zu           = true                   # anfangs geschlossen (Standard)
+verschlossen = false                  # anfangs abgeschlossen
+schluessel   = "kellerschluessel"     # dieser Gegenstand schließt auf und ab
+versteckt    = false                  # Geheimtür: zu = von hier aus unsichtbar
+```
+
+- Spieler: `oeffne tuer`, `oeffne falltuer`, `oeffne tuer norden`,
+  `schliesse tuer`, `aufschliessen tuer` (oder `schliesse tuer auf`),
+  `abschliessen tuer`, `schau tuer`. Wer den Schlüssel dabeihat, öffnet eine
+  verschlossene Tür gleich mit.
+- Die Ausgänge zeigen „unten (Falltür zu)“. Eine **Geheimtür** sieht man nur
+  von innen; von außen erst, wenn sie offen ist – z.B. per Skript
+  (`welt.tuer("keller", "west", "offen")`, Beispiel: das Fass im Weinkeller).
+- Monster gehen nicht durch geschlossene Türen, und Fliehen geht nur durch
+  offene.
+- Beim Auffüllen der Welt stehen alle Türen wieder wie am Anfang.
+
+---
+
+## 26. Große Welten und Speichern
+
+- **Was gespeichert wird:** Spielstände (alle paar Minuten und beim Beenden),
+  Gegenstände am Boden (`spieler/boden.json`), Leichen (`spieler/leichen.json`)
+  und Merker der Skripte (`spieler/welt_merker.json`). Was Spieler hinlegen,
+  bleibt also auch bei `neuladen` und nach einem Neustart liegen.
+- **Schlafende Gebiete:** Monster wandern und reden nur in Gebieten, in denen
+  gerade Spieler sind. Der Rest der Welt kostet kaum Rechenzeit.
+- **Passwörter** werden mit Argon2 gespeichert. Ältere Spielstände werden beim
+  nächsten Einloggen automatisch umgestellt.
+- Gemessen mit 40.000 Räumen und 20.000 Monstern: Laden in 2 Sekunden, etwa
+  350 MB Arbeitsspeicher, im Leerlauf unter 2 % Rechenzeit; das Auffüllen der
+  Welt dauert wenige Millisekunden.
 

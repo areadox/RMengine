@@ -11,6 +11,8 @@ use eframe::egui::{
     StrokeKind, Vec2,
 };
 use std::collections::{BTreeMap, HashSet};
+use std::rc::Rc;
+use std::time::Instant;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
@@ -20,11 +22,25 @@ const OW_ZELLE: f32 = 16.0;
 /// Eine Änderung, die nach dem Zeichnen ausgeführt wird (wenn `self` wieder frei ist).
 type Aktion = Option<Box<dyn FnOnce(&mut App)>>;
 
+/// Ein Stand für "Rückgängig". Unveränderte Räume teilen sich den Speicher
+/// mit dem vorigen Stand (Rc), so kostet ein Schritt nur die geänderten Räume.
 #[derive(Clone)]
 struct Stand {
-    raeume: Vec<Raum>,
+    raeume: Vec<Rc<Raum>>,
     startraum: String,
     wiederbelebung: String,
+}
+
+/// Welche Räume auf der gezeigten Karte und Ebene liegen – nur neu berechnet,
+/// wenn sich Räume ändern (bei großen Welten spart das viel Rechenzeit pro Bild).
+struct KartenCache {
+    schluessel: (u64, usize, String, i32),
+    /// Indizes der Räume dieser Ebene
+    ebene: Vec<usize>,
+    /// Indizes der Räume eine Ebene darüber/darunter
+    nachbarn: Vec<usize>,
+    /// ID -> Index (nur diese Ebene)
+    index: std::collections::HashMap<String, usize>,
 }
 
 /// Welcher Teil der Welt gerade bearbeitet wird.
@@ -61,6 +77,13 @@ pub struct App {
     welt: Option<Welt>,
     ladefehler: Option<String>,
     geladen: Stand,
+    /// "Gibt es Änderungen?" – kurz gemerkt, statt bei jedem Bild alles zu vergleichen
+    geaendert_merker: std::cell::Cell<Option<(Instant, bool)>>,
+    /// Wann die Prüfung zuletzt lief (im Bereich Inhalte/Befehle/Skripte)
+    probleme_zeit: Option<Instant>,
+    /// Zählt Änderungen an den Räumen (für den Karten-Cache)
+    aenderungen: u64,
+    karten_cache: Option<Rc<KartenCache>>,
 
     auswahl: Option<String>,
     id_eingabe: String,
@@ -132,6 +155,10 @@ impl App {
             welt: None,
             ladefehler: None,
             geladen: Stand { raeume: Vec::new(), startraum: String::new(), wiederbelebung: String::new() },
+            geaendert_merker: std::cell::Cell::new(None),
+            probleme_zeit: None,
+            aenderungen: 0,
+            karten_cache: None,
             auswahl: None,
             id_eingabe: String::new(),
             id_fehler: None,
@@ -321,10 +348,12 @@ impl App {
         match Welt::laden(&ordner) {
             Ok(w) => {
                 self.geladen = Stand {
-                    raeume: w.raeume.clone(),
+                    raeume: w.raeume.iter().cloned().map(Rc::new).collect(),
                     startraum: w.startraum.clone(),
                     wiederbelebung: w.wiederbelebung.clone(),
                 };
+                self.geaendert_merker.set(None);
+                self.aenderungen += 1;
                 let start = w.raum(&w.startraum).cloned();
                 self.welt = Some(w);
                 self.ladefehler = None;
@@ -371,22 +400,34 @@ impl App {
     }
 
     fn stand(&self) -> Stand {
-        Stand {
-            raeume: self.welt().raeume.clone(),
-            startraum: self.welt().startraum.clone(),
-            wiederbelebung: self.welt().wiederbelebung.clone(),
-        }
+        // Gleiche Räume aus dem letzten Stand wiederverwenden (nur Zeiger, kein Kopieren)
+        let vorlage = self.rueckgaengig.last().or_else(|| self.wiederholen.last()).unwrap_or(&self.geladen);
+        let raeume = self
+            .welt()
+            .raeume
+            .iter()
+            .enumerate()
+            .map(|(i, r)| match vorlage.raeume.get(i) {
+                Some(alt) if **alt == *r => alt.clone(),
+                _ => Rc::new(r.clone()),
+            })
+            .collect();
+        Stand { raeume, startraum: self.welt().startraum.clone(), wiederbelebung: self.welt().wiederbelebung.clone() }
     }
 
     fn stand_setzen(&mut self, s: Stand) {
+        self.geaendert_merker.set(None);
+        self.aenderungen += 1;
         let w = self.welt_mut();
-        w.raeume = s.raeume;
+        w.raeume = s.raeume.into_iter().map(|r| Rc::try_unwrap(r).unwrap_or_else(|r| (*r).clone())).collect();
         w.startraum = s.startraum;
         w.wiederbelebung = s.wiederbelebung;
     }
 
     /// Vor jeder Änderung aufrufen: merkt den Zustand für "Rückgängig".
     fn merken(&mut self) {
+        self.geaendert_merker.set(None);
+        self.aenderungen += 1;
         let s = self.stand();
         self.rueckgaengig.push(s);
         if self.rueckgaengig.len() > 200 {
@@ -417,6 +458,8 @@ impl App {
     }
 
     fn nach_aenderung(&mut self) {
+        self.geaendert_merker.set(None);
+        self.aenderungen += 1;
         if let Some(a) = &self.auswahl {
             if self.welt().raum(a).is_none() {
                 self.auswahl = None;
@@ -428,6 +471,18 @@ impl App {
     }
 
     fn geaendert(&self) -> bool {
+        // Höchstens alle 0,3 s wirklich vergleichen (bei großen Welten teuer)
+        if let Some((wann, wert)) = self.geaendert_merker.get() {
+            if wann.elapsed().as_millis() < 300 {
+                return wert;
+            }
+        }
+        let wert = self.geaendert_berechnen();
+        self.geaendert_merker.set(Some((Instant::now(), wert)));
+        wert
+    }
+
+    fn geaendert_berechnen(&self) -> bool {
         self.welt.as_ref().is_some_and(|w| w.geaendert(&self.geladen.raeume, &self.geladen.startraum, &self.geladen.wiederbelebung))
             || self.inhalte.as_ref().is_some_and(|b| b.geaendert())
             || self.befehlswerk.as_ref().is_some_and(|b| b.geaendert())
@@ -739,8 +794,11 @@ impl eframe::App for App {
                     }
                 }
             });
-            // Prüfung laufend aktualisieren (Änderungen passieren direkt im Formular)
-            self.probleme = self.alle_probleme();
+            // Prüfung laufend aktualisieren (Änderungen passieren direkt im Formular) – höchstens zweimal pro Sekunde
+            if self.probleme_zeit.is_none_or(|z| z.elapsed().as_millis() > 500) {
+                self.probleme = self.alle_probleme();
+                self.probleme_zeit = Some(Instant::now());
+            }
             self.fenster(&ctx);
             self.netz_fenster(&ctx);
             return;
@@ -1048,17 +1106,30 @@ impl App {
         let suche = self.suche.to_lowercase();
         let mut springen = None;
         egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
-            let mut gebiete: BTreeMap<String, Vec<(String, String)>> = BTreeMap::new();
+            let mut gebiete: BTreeMap<&str, Vec<(&str, &str)>> = BTreeMap::new();
             for r in &self.welt().raeume {
                 if suche.is_empty() || r.id.contains(&suche) || r.name.to_lowercase().contains(&suche) {
-                    let g = if r.gebiet.is_empty() { "(ohne Gebiet)".into() } else { r.gebiet.clone() };
-                    gebiete.entry(g).or_default().push((r.id.clone(), r.name.clone()));
+                    let g = if r.gebiet.is_empty() { "(ohne Gebiet)" } else { r.gebiet.as_str() };
+                    gebiete.entry(g).or_default().push((r.id.as_str(), r.name.as_str()));
                 }
             }
-            for (g, raeume) in gebiete {
-                egui::CollapsingHeader::new(format!("{g} ({})", raeume.len()))
-                    .default_open(true)
+            // Große Welten: Gebiete zugeklappt und höchstens 300 Einträge je Gebiet zeigen
+            let gross = self.welt().raeume.len() > 1500;
+            const HOECHSTENS: usize = 300;
+            let gebiete: Vec<(String, Vec<(String, String)>, usize)> = gebiete
+                .into_iter()
+                .map(|(g, l)| {
+                    let n = l.len();
+                    (g.to_string(), l.into_iter().take(HOECHSTENS).map(|(i, n)| (i.to_string(), n.to_string())).collect(), n)
+                })
+                .collect();
+            for (g, raeume, anzahl) in gebiete {
+                egui::CollapsingHeader::new(format!("{g} ({anzahl})"))
+                    .default_open(!gross || !suche.is_empty())
                     .show(ui, |ui| {
+                        if anzahl > raeume.len() {
+                            ui.label(egui::RichText::new(format!("… {} weitere – grenze mit der Suche ein.", anzahl - raeume.len())).weak().small());
+                        }
                         for (id, name) in raeume {
                             let gewaehlt = self.auswahl.as_deref() == Some(id.as_str());
                             let start = if self.welt().startraum == id { "★ " } else { "" };
@@ -1329,6 +1400,70 @@ impl App {
             }
         });
 
+        // Türen an den Ausgängen
+        ui.add_space(8.0);
+        ui.strong("Türen");
+        if r.ausgaenge.is_empty() {
+            ui.label(egui::RichText::new("Erst Ausgänge anlegen.").weak());
+        }
+        let richtungen: Vec<String> = r.ausgaenge.keys().cloned().collect();
+        let schluessel_liste = self.welt().gegenstaende.clone();
+        for ri in richtungen {
+            let mut hat = r.tueren.contains_key(&ri);
+            ui.horizontal(|ui| {
+                if ui.checkbox(&mut hat, format!("Tür nach {ri}")).changed() {
+                    if hat {
+                        r.tueren.insert(ri.clone(), crate::welt::Tuer::default());
+                    } else {
+                        r.tueren.remove(&ri);
+                    }
+                }
+            });
+            if let Some(t) = r.tueren.get_mut(&ri) {
+                egui::Grid::new(format!("tuer_{ri}")).num_columns(2).spacing([8.0, 3.0]).show(ui, |ui| {
+                    ui.label("  Name");
+                    crate::kontext::feld(ui, egui::TextEdit::singleline(&mut t.name).hint_text("die Tür, das Tor ...").desired_width(200.0));
+                    ui.end_row();
+                    ui.label("  Zustand");
+                    ui.horizontal(|ui| {
+                        ui.checkbox(&mut t.zu, "zu");
+                        ui.checkbox(&mut t.verschlossen, "verschlossen");
+                        ui.checkbox(&mut t.versteckt, "geheim").on_hover_text("Solange sie zu ist, sieht man den Ausgang von hier aus nicht (von drüben schon).");
+                    });
+                    ui.end_row();
+                    ui.label("  Schlüssel");
+                    egui::ComboBox::from_id_salt(format!("schluessel_{ri}"))
+                        .selected_text(if t.schluessel.is_empty() { "(kein Schloss)".to_string() } else { t.schluessel.clone() })
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(&mut t.schluessel, String::new(), "(kein Schloss)");
+                            for g in &schluessel_liste {
+                                ui.selectable_value(&mut t.schluessel, g.clone(), g);
+                            }
+                        });
+                    ui.end_row();
+                    ui.label("  Beschreibung");
+                    crate::kontext::feld(ui, egui::TextEdit::singleline(&mut t.beschreibung).hint_text("für \"schau tuer\"").desired_width(f32::INFINITY));
+                    ui.end_row();
+                });
+            }
+        }
+
+        // Skript für diesen Raum
+        ui.add_space(8.0);
+        egui::CollapsingHeader::new(if r.skript.trim().is_empty() { "Skript (Lua)" } else { "Skript (Lua) – vorhanden" })
+            .id_salt("raum_skript")
+            .show(ui, |ui| {
+                ui.label(
+                    egui::RichText::new("Befehle gelten nur in diesem Raum, Ereignisse wie bei_betreten(function(s, raum) ... end) beziehen sich auf ihn. Mehr im Bereich 📜 Skripte (Spickzettel).")
+                        .weak()
+                        .small(),
+                );
+                crate::kontext::feld(
+                    ui,
+                    egui::TextEdit::multiline(&mut r.skript).code_editor().desired_rows(8).desired_width(f32::INFINITY).hint_text("befehl{ woerter = {\"zieh\"}, funktion = function(s, rest, raum) ... end }"),
+                );
+            });
+
         ui.add_space(8.0);
         let w = self.welt();
         let (gg, mo, np, bi) = (w.gegenstaende.clone(), w.monster.clone(), w.npcs.clone(), w.bibliothek.clone());
@@ -1376,12 +1511,13 @@ impl App {
             let fokus = ui.ctx().memory(|m| m.focused());
             if fokus.is_none() || fokus != self.gruppe {
                 let mut s = self.stand();
-                s.raeume[i] = vorher;
+                s.raeume[i] = Rc::new(vorher);
                 self.rueckgaengig.push(s);
                 self.wiederholen.clear();
                 self.gruppe = fokus;
             }
             self.welt_mut().raeume[i] = r;
+            self.aenderungen += 1;
             self.probleme = self.alle_probleme();
         }
         if let Some(a) = aktion {
@@ -1439,22 +1575,48 @@ impl App {
         let o = zu_bild(0, 0);
         painter.circle_filled(o, 2.0, Color32::from_rgb(70, 75, 85));
 
+        // Räume dieser Ebene (zwischengespeichert, solange sich nichts ändert)
+        let schluessel = (self.aenderungen, self.welt().raeume.len(), self.karte.clone(), self.ebene);
+        if self.karten_cache.as_ref().is_none_or(|c| c.schluessel != schluessel) {
+            let raeume = &self.welt().raeume;
+            let ebene: Vec<usize> = (0..raeume.len()).filter(|i| raeume[*i].karte == self.karte && raeume[*i].z == self.ebene).collect();
+            let nachbarn: Vec<usize> =
+                (0..raeume.len()).filter(|i| raeume[*i].karte == self.karte && (raeume[*i].z - self.ebene).abs() == 1).collect();
+            let index = ebene.iter().map(|i| (raeume[*i].id.clone(), *i)).collect();
+            self.karten_cache = Some(Rc::new(KartenCache { schluessel, ebene, nachbarn, index }));
+        }
+        let cache = self.karten_cache.clone().expect("gerade gebaut");
         let welt = self.welt.as_ref().unwrap();
-        let ebene: Vec<&Raum> = welt.raeume.iter().filter(|r| r.karte == self.karte && r.z == self.ebene).collect();
-        let hier: HashSet<&str> = ebene.iter().map(|r| r.id.as_str()).collect();
+        let ebene: Vec<&Raum> = cache.ebene.iter().filter_map(|i| welt.raeume.get(*i)).collect();
+        // Räume dieser Ebene nach ID (schnelles Nachschlagen statt die ganze Liste zu durchsuchen)
+        let hier = |id: &str| cache.index.get(id).and_then(|i| welt.raeume.get(*i)).filter(|r| r.id == id);
+        // Nur zeichnen, was im Bild ist
+        let sichtbar = rect.expand(ZELLE * self.zoom);
+        let fehlerhafte: HashSet<&str> = self.probleme.iter().filter(|p| p.fehler).filter_map(|p| p.raum.as_deref()).collect();
 
         // Räume anderer Ebenen schwach andeuten
-        for r in welt.raeume.iter().filter(|r| r.karte == self.karte && (r.z - self.ebene).abs() == 1) {
+        for r in cache.nachbarn.iter().filter_map(|i| welt.raeume.get(*i)) {
             let b = Rect::from_center_size(zu_bild(r.x, r.y), box_groesse * 0.9);
+            if !sichtbar.intersects(b) {
+                continue;
+            }
             painter.rect_stroke(b, 4.0, Stroke::new(1.0, Color32::from_rgb(55, 60, 68)), StrokeKind::Inside);
         }
 
         // Verbindungen
         let mut gezeichnet = HashSet::new();
+        // Verbindungen nur für Räume in der Nähe des Bildausschnitts (Wege sind meist kurz)
+        let nah = rect.expand(ZELLE * self.zoom * 6.0);
         for r in &ebene {
+            if !nah.contains(zu_bild(r.x, r.y)) {
+                continue;
+            }
             for (ri, ziel) in &r.ausgaenge {
-                let Some(z) = welt.raum(ziel) else { continue };
-                if !hier.contains(ziel.as_str()) || welt::versatz(ri).is_some_and(|v| v.2 != 0) || ri == "rein" || ri == "raus" {
+                let Some(z) = hier(ziel.as_str()) else { continue };
+                if welt::versatz(ri).is_some_and(|v| v.2 != 0) || ri == "rein" || ri == "raus" {
+                    continue;
+                }
+                if !sichtbar.intersects(Rect::from_two_pos(zu_bild(r.x, r.y), zu_bild(z.x, z.y))) {
                     continue;
                 }
                 let paar = if r.id < z.id { (r.id.clone(), z.id.clone()) } else { (z.id.clone(), r.id.clone()) };
@@ -1464,7 +1626,7 @@ impl App {
                 let zurueck_irgendwo = z.ausgaenge.values().any(|v| *v == r.id);
                 let zurueck_auto = welt.beidseitig && !z.ausgaenge.contains_key(welt::gegenteil(ri));
                 let beidseitig = zurueck_explizit || zurueck_auto || zurueck_irgendwo;
-                let passt = welt::passt_zur_lage(welt, r, ri, ziel);
+                let passt = welt::passt_zur_lage_von(r, ri, z);
                 let farbe = if !passt {
                     Color32::from_rgb(230, 150, 60)
                 } else if beidseitig {
@@ -1496,6 +1658,9 @@ impl App {
         for r in &ebene {
             let mittel = zu_bild(r.x, r.y);
             let b = Rect::from_center_size(mittel, box_groesse);
+            if !sichtbar.intersects(b) {
+                continue;
+            }
             if maus.is_some_and(|m| b.expand(4.0).contains(m)) {
                 unter_maus = Some(r.id.clone());
             }
@@ -1503,7 +1668,7 @@ impl App {
             let fname = if !r.farbe.is_empty() { r.farbe.as_str() } else { g.map_or("", |g| g.farbe.as_str()) };
             let grund = farbe(fname);
             let gewaehlt = self.auswahl.as_deref() == Some(r.id.as_str());
-            let fehlerhaft = self.probleme.iter().any(|p| p.fehler && p.raum.as_deref() == Some(r.id.as_str()));
+            let fehlerhaft = fehlerhafte.contains(r.id.as_str());
             painter.rect_filled(b, CornerRadius::same(6), abdunkeln(grund, 0.35));
             let rand = if gewaehlt {
                 Stroke::new(3.0, Color32::from_rgb(255, 230, 80))

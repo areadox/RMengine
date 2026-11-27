@@ -32,6 +32,8 @@ mod gemeinschaft;
 mod handel;
 mod tueren;
 mod skripte;
+#[cfg(test)]
+mod spieltest;
 mod zeit;
 mod koerper;
 mod leichen;

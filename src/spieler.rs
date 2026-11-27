@@ -230,13 +230,35 @@ impl SpielerDaten {
         }
     }
 
+    /// Passwort mit Argon2 speichern (das Salz steckt im Hash selbst)
     pub fn passwort_setzen(&mut self, pw: &str) {
-        self.salz = neues_salz();
-        self.passwort_hash = passwort_hash(pw, &self.salz);
+        use argon2::password_hash::{rand_core::OsRng, PasswordHasher, SaltString};
+        let salz = SaltString::generate(&mut OsRng);
+        match argon2::Argon2::default().hash_password(pw.as_bytes(), &salz) {
+            Ok(h) => {
+                self.passwort_hash = h.to_string();
+                self.salz.clear();
+            }
+            // Sollte nie passieren – dann wenigstens das alte Verfahren
+            Err(_) => {
+                self.salz = neues_salz();
+                self.passwort_hash = passwort_hash(pw, &self.salz);
+            }
+        }
     }
 
     pub fn passwort_stimmt(&self, pw: &str) -> bool {
-        passwort_hash(pw, &self.salz) == self.passwort_hash
+        use argon2::password_hash::{PasswordHash, PasswordVerifier};
+        if self.passwort_hash.starts_with("$argon2") {
+            PasswordHash::new(&self.passwort_hash).is_ok_and(|h| argon2::Argon2::default().verify_password(pw.as_bytes(), &h).is_ok())
+        } else {
+            passwort_hash(pw, &self.salz) == self.passwort_hash
+        }
+    }
+
+    /// Noch mit dem alten Verfahren gespeichert? (wird beim Einloggen umgestellt)
+    pub fn passwort_veraltet(&self) -> bool {
+        !self.passwort_hash.starts_with("$argon2")
     }
 }
 

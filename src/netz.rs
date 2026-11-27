@@ -131,6 +131,11 @@ async fn verbindung(sock: TcpStream, welt: GeteilteWelt) -> io::Result<()> {
             echo(ECHO_AN);
             sende("\n");
             if sp.passwort_stimmt(&pw) {
+                // Alte Passwörter beim Einloggen auf Argon2 umstellen
+                let mut sp = sp;
+                if sp.passwort_veraltet() {
+                    sp.passwort_setzen(&pw);
+                }
                 break sp;
             }
             versuche += 1;

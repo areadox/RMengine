@@ -18,3 +18,15 @@ jobs:
       - run: cargo build --locked
       - run: ./target/debug/rmengine daten --pruefen
       - run: cargo test --locked --workspace
+
+  # Windows: baut Engine und Editor (mit Lua) und prüft die Beispielwelt
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --locked --workspace
+      - name: Beispielwelt prüfen
+        shell: cmd
+        run: target\debug\rmengine.exe daten --pruefen < NUL
+      - run: cargo test --locked --workspace

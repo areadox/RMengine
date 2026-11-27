@@ -24,11 +24,13 @@ pub struct Datei {
     original: String,
     /// Beim Speichern löschen (z.B. NPC-Datei eines gelöschten NPCs)
     pub loeschen: bool,
+    /// Wurde die Datei hier angefasst? Nur dann lohnt der (teure) Vergleich mit dem Original.
+    beruehrt: bool,
 }
 
 impl Datei {
     fn geaendert(&self) -> bool {
-        self.loeschen || self.doc.to_string() != self.original
+        self.loeschen || (self.beruehrt && self.doc.to_string() != self.original)
     }
 }
 
@@ -48,6 +50,8 @@ pub struct NeuDialog {
 pub struct Inhalte {
     pub ordner: PathBuf,
     pub dateien: Vec<Datei>,
+    /// Raum-IDs aus Dateien, die nur Räume enthalten (die hält der Bereich Räume)
+    nur_raeume: Vec<String>,
     pub art: usize,
     pub auswahl: Option<Ort>,
     suche: String,
@@ -111,6 +115,7 @@ impl Inhalte {
         rel.sort();
         let mut dateien = Vec::new();
         let mut ladefehler = Vec::new();
+        let mut nur_raeume = Vec::new();
         for r in rel {
             let text = match fs::read_to_string(ordner.join(&r)) {
                 Ok(t) => t,
@@ -120,11 +125,17 @@ impl Inhalte {
                 }
             };
             match text.parse::<DocumentMut>() {
-                Ok(doc) => dateien.push(Datei { rel: r, original: doc.to_string(), doc, loeschen: false }),
+                // Dateien nur mit Räumen bearbeitet der Bereich Räume – hier reichen die IDs
+                Ok(doc) if !doc.is_empty() && doc.iter().all(|(k, _)| k == "raum") => {
+                    if let Some(Item::ArrayOfTables(a)) = doc.get("raum") {
+                        nur_raeume.extend(a.iter().filter_map(|t| t.get("id")?.as_str().map(String::from)));
+                    }
+                }
+                Ok(doc) => dateien.push(Datei { rel: r, original: doc.to_string(), doc, loeschen: false, beruehrt: false }),
                 Err(e) => ladefehler.push(format!("Fehler in '{r}' – die Datei kann hier nicht bearbeitet werden:\n{e}")),
             }
         }
-        Inhalte { ordner: ordner.to_path_buf(), dateien, art: 0, auswahl: None, suche: String::new(), neu: None, loeschen_fragen: None, ladefehler }
+        Inhalte { ordner: ordner.to_path_buf(), dateien, nur_raeume, art: 0, auswahl: None, suche: String::new(), neu: None, loeschen_fragen: None, ladefehler }
     }
 
     pub fn geaendert(&self) -> bool {
@@ -161,6 +172,7 @@ impl Inhalte {
             }
             fs::write(&pfad, &text).map_err(|e| format!("{}: {e}", d.rel))?;
             d.original = d.doc.to_string();
+            d.beruehrt = false;
             geschrieben.push(d.rel.clone());
         }
         Ok(geschrieben)
@@ -207,7 +219,9 @@ impl Inhalte {
     }
 
     fn tabelle_mut(&mut self, art: &Art, o: Ort) -> Option<&mut Table> {
-        let doc = &mut self.dateien.get_mut(o.datei)?.doc;
+        let datei = self.dateien.get_mut(o.datei)?;
+        datei.beruehrt = true;
+        let doc = &mut datei.doc;
         if let Ablage::Fest { .. } = art.ablage {
             if doc.get(art.schluessel).is_none() {
                 let mut t = Table::new();
@@ -227,6 +241,7 @@ impl Inhalte {
         let mut v: Vec<String> = Vec::new();
         for s in schluessel {
             if *s == "raum" {
+                v.extend(self.nur_raeume.iter().cloned());
                 for d in self.dateien.iter().filter(|d| !d.loeschen) {
                     if let Some(Item::ArrayOfTables(a)) = d.doc.get("raum") {
                         v.extend(a.iter().filter_map(|t| t.get("id")?.as_str().map(String::from)));
@@ -1742,10 +1757,11 @@ impl Inhalte {
                 i
             }
             None => {
-                self.dateien.push(Datei { rel: d.datei.clone(), doc: DocumentMut::new(), original: String::new(), loeschen: false });
+                self.dateien.push(Datei { rel: d.datei.clone(), doc: DocumentMut::new(), original: String::new(), loeschen: false, beruehrt: true });
                 self.dateien.len() - 1
             }
         };
+        self.dateien[i].beruehrt = true;
         let doc = &mut self.dateien[i].doc;
         let index = match art.ablage {
             Ablage::EineDatei => {
@@ -1775,6 +1791,7 @@ impl Inhalte {
             }
             Ablage::Liste => {
                 let Some(d) = self.dateien.get_mut(o.datei) else { return };
+                d.beruehrt = true;
                 if let Some(Item::ArrayOfTables(a)) = d.doc.get_mut(art.schluessel) {
                     // Kommentar über dem Eintrag an den nächsten weitergeben
                     let p = a.get(o.index).map(praefix).unwrap_or_default();

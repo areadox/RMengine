@@ -188,6 +188,7 @@ const GEGENSTAND: &[Feld] = felder![
     f("tragbar", "Tragbar", Typ::Schalter, "Kann man ihn aufheben?"),
     f("erholung", "Erholung (s)", Typ::Komma, "Waffe: Sekunden zwischen zwei Angriffen."),
     f("haende", "Hände zum Halten", Typ::Zahl, "Waffe, Schild, Fackel: Standard 1. Zweihänder: 2."),
+    f("skript", "Skript (Lua)", Typ::Bild, "Befehle gelten, solange man ihn dabeihat; bei_nehmen(function(s, id, raum) ... end) usw. beziehen sich auf ihn."),
     f("fertigkeit", "Fertigkeit", Typ::Verweis(Ziel::Fertigkeit), "Waffe: welche Fertigkeit geübt wird."),
     f("eigenschaften", "Eigenschaften", Typ::Werte(EIGENSCHAFTEN), "schaden, ruestung, heilung, mana, essen (sättigt), trinken (löscht Durst) oder Werte wie staerke."),
     f("benutzen_text", "Text beim Benutzen", Typ::Text, ""),
@@ -265,6 +266,7 @@ const MONSTER: &[Feld] = felder![
     WESEN_REST[0], WESEN_REST[1], WESEN_REST[2], WESEN_REST[3], WESEN_REST[4], WESEN_REST[5], WESEN_REST[6], WESEN_REST[7],
     WESEN_REST[8], WESEN_REST[9], VERERBUNG[1],
     f("koerper", "Körperbau", Typ::Verweis(Ziel::Koerper), "Maul, Pfoten ...: damit greift es an, und man kann sie ansehen."),
+    f("skript", "Skript (Lua)", Typ::Bild, "Befehle gelten, solange es im Raum ist; bei_angriff(function(s, monster, raum) ... end) usw. beziehen sich darauf."),
     f("leiche", "Leiche", Typ::Unter(LEICHE), "Wie die Leiche nach dem Kampf aussieht. Die Beute liegt darin."),
 ];
 
@@ -312,6 +314,7 @@ const NPC: &[Feld] = felder![
     WESEN_REST[0], WESEN_REST[1], WESEN_REST[2], WESEN_REST[3], WESEN_REST[4], WESEN_REST[5], WESEN_REST[6], WESEN_REST[7],
     WESEN_REST[8], WESEN_REST[9],
     f("koerper", "Körperbau", Typ::Verweis(Ziel::Koerper), "Wenn man ihn angreifen kann: damit wehrt er sich."),
+    f("skript", "Skript (Lua)", Typ::Bild, "Befehle gelten, solange er im Raum ist; bei_gespraech(function(s, text, npc, raum) ... end), bei_bekommen(...) usw. beziehen sich auf ihn."),
     f("leiche", "Leiche", Typ::Unter(LEICHE), "Nur wenn man ihn angreifen kann."),
 ];
 

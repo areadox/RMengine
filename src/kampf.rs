@@ -821,21 +821,25 @@ pub fn takt(w: &mut Welt) {
     for m in w.monster.values_mut() {
         m.ziele.retain(|sid| orte.get(sid).is_some_and(|(raum, tot)| *raum == m.raum && !tot));
     }
-    let monster_orte: std::collections::HashMap<u64, String> =
-        w.monster.iter().map(|(id, m)| (*id, m.raum.clone())).collect();
-    for s in w.spieler.values_mut() {
-        if let Some(mid) = s.kampf_ziel {
-            if monster_orte.get(&mid) != Some(&s.sp.raum) {
-                s.kampf_ziel = None;
-            }
+    // (nur Monster, die gerade ein Ziel sind – keine Liste aller Monster)
+    let weg: Vec<u64> = w
+        .spieler
+        .iter()
+        .filter(|(_, s)| s.kampf_ziel.is_some_and(|mid| w.monster.get(&mid).is_none_or(|m| m.raum != s.sp.raum)))
+        .map(|(id, _)| *id)
+        .collect();
+    for sid in weg {
+        if let Some(s) = w.spieler.get_mut(&sid) {
+            s.kampf_ziel = None;
         }
     }
     // Wer kein Ziel (mehr) hat, aber angegriffen wird, wehrt sich gegen den Angreifer
+    let kaempfende: Vec<(u64, &Vec<u64>)> = w.monster.iter().filter(|(_, m)| !m.ziele.is_empty()).map(|(id, m)| (*id, &m.ziele)).collect();
     let angreifer_von: Vec<(u64, u64)> = w
         .spieler
         .iter()
         .filter(|(_, s)| s.kampf_ziel.is_none() && s.tot_bis.is_none())
-        .filter_map(|(sid, _)| w.monster.iter().find(|(_, m)| m.ziele.contains(sid)).map(|(mid, _)| (*sid, *mid)))
+        .filter_map(|(sid, _)| kaempfende.iter().find(|(_, z)| z.contains(sid)).map(|(mid, _)| (*sid, *mid)))
         .collect();
     for (sid, mid) in angreifer_von {
         if let Some(s) = w.spieler.get_mut(&sid) {
@@ -852,17 +856,24 @@ pub fn takt(w: &mut Welt) {
     }
 
     // 3. Aggressive Monster stürzen sich auf Spieler im Raum.
+    // (Räume mit lebenden Spielern einmal sammeln statt für jedes Monster alle Spieler zu prüfen)
+    let mut besetzt: std::collections::HashMap<&str, u64> = std::collections::HashMap::new();
+    for (sid, s) in &w.spieler {
+        if s.tot_bis.is_none() {
+            besetzt.entry(s.sp.raum.as_str()).or_insert(*sid);
+        }
+    }
     let mut neue: Vec<(u64, u64)> = Vec::new();
-    for (mid, m) in &w.monster {
-        if !m.ziele.is_empty() {
-            continue;
-        }
-        let Some(def) = w.d.monster.get(&m.def) else { continue };
-        if !def.aggressiv || !def.ist_angreifbar() {
-            continue;
-        }
-        if let Some((sid, _)) = w.spieler.iter().find(|(_, s)| s.sp.raum == m.raum && s.tot_bis.is_none()) {
-            neue.push((*mid, *sid));
+    if !besetzt.is_empty() {
+        for (mid, m) in &w.monster {
+            if !m.ziele.is_empty() {
+                continue;
+            }
+            let Some(sid) = besetzt.get(m.raum.as_str()) else { continue };
+            let Some(def) = w.d.monster.get(&m.def) else { continue };
+            if def.aggressiv && def.ist_angreifbar() {
+                neue.push((*mid, *sid));
+            }
         }
     }
     for (mid, sid) in neue {

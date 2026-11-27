@@ -77,6 +77,101 @@ pub const FARBEN: [&str; 16] = [
 // Modell
 // ---------------------------------------------------------------------------
 
+/// Eine Tür an einem Ausgang
+#[derive(Debug, Clone, PartialEq)]
+pub struct Tuer {
+    pub name: String,
+    pub beschreibung: String,
+    pub zu: bool,
+    pub verschlossen: bool,
+    pub versteckt: bool,
+    pub schluessel: String,
+    pub woerter: Vec<String>,
+}
+
+impl Default for Tuer {
+    fn default() -> Self {
+        Tuer {
+            name: "die Tür".into(),
+            beschreibung: String::new(),
+            zu: true,
+            verschlossen: false,
+            versteckt: false,
+            schluessel: String::new(),
+            woerter: Vec::new(),
+        }
+    }
+}
+
+fn tueren_lesen(i: Option<&Item>) -> BTreeMap<String, Tuer> {
+    let mut m = BTreeMap::new();
+    let Some(t) = i.and_then(|i| i.as_table_like()) else { return m };
+    for (k, v) in t.iter() {
+        let Some(tt) = v.as_table_like() else { continue };
+        let text = |f: &str| tt.get(f).and_then(|i| i.as_str()).unwrap_or_default().to_string();
+        let ja = |f: &str, std: bool| tt.get(f).and_then(|i| i.as_bool()).unwrap_or(std);
+        let name = text("name");
+        m.insert(
+            k.to_string(),
+            Tuer {
+                name: if name.is_empty() { "die Tür".into() } else { name },
+                beschreibung: text("beschreibung"),
+                zu: ja("zu", true),
+                verschlossen: ja("verschlossen", false),
+                versteckt: ja("versteckt", false),
+                schluessel: text("schluessel"),
+                woerter: tt
+                    .get("woerter")
+                    .and_then(|i| i.as_array())
+                    .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+                    .unwrap_or_default(),
+            },
+        );
+    }
+    m
+}
+
+fn setze_tueren(t: &mut Table, v: &BTreeMap<String, Tuer>) {
+    if tueren_lesen(t.get("tueren")) == *v {
+        return;
+    }
+    if v.is_empty() {
+        t.remove("tueren");
+        return;
+    }
+    if !t.get("tueren").is_some_and(|i| i.is_table()) {
+        let mut neu = Table::new();
+        neu.set_implicit(true);
+        t.insert("tueren", Item::Table(neu));
+    }
+    let Some(tab) = t.get_mut("tueren").and_then(|i| i.as_table_mut()) else { return };
+    let weg: Vec<String> = tab.iter().map(|(k, _)| k.to_string()).filter(|k| !v.contains_key(k)).collect();
+    for k in weg {
+        tab.remove(&k);
+    }
+    for (k, tuer) in v {
+        if !tab.get(k).is_some_and(|i| i.is_table()) {
+            tab.insert(k, Item::Table(Table::new()));
+        }
+        let Some(sub) = tab.get_mut(k).and_then(|i| i.as_table_mut()) else { continue };
+        if tuer.name == "die Tür" {
+            sub.remove("name");
+        } else {
+            setze_text(sub, "name", &tuer.name, false);
+        }
+        setze_liste(sub, "woerter", &tuer.woerter);
+        setze_text(sub, "beschreibung", &tuer.beschreibung, false);
+        for (f, wert, std) in [("zu", tuer.zu, true), ("verschlossen", tuer.verschlossen, false), ("versteckt", tuer.versteckt, false)] {
+            if wert == std {
+                sub.remove(f);
+            } else if sub.get(f).and_then(|i| i.as_bool()) != Some(wert) {
+                wert_setzen(sub, f, Value::from(wert));
+            }
+        }
+        setze_text(sub, "schluessel", &tuer.schluessel, false);
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Raum {
     pub id: String,
@@ -98,6 +193,10 @@ pub struct Raum {
     pub beschreibung_nacht: String,
     /// Drinnen/draußen (None = wie das Gelände)
     pub drinnen: Option<bool>,
+    /// Türen an Ausgängen (Richtung -> Tür)
+    pub tueren: BTreeMap<String, Tuer>,
+    /// Lua-Skript für diesen Raum
+    pub skript: String,
     pub nutzt: Vec<String>,
     pub gegenstaende: Vec<String>,
     pub monster: Vec<String>,
@@ -344,6 +443,8 @@ impl Welt {
                         gefuehl: s(t, "gefuehl"),
                         beschreibung_nacht: s(t, "beschreibung_nacht"),
                         drinnen: t.get("drinnen").and_then(|i| i.as_bool()),
+                        tueren: tueren_lesen(t.get("tueren")),
+                        skript: s(t, "skript"),
                         nutzt: liste(t, "nutzt"),
                         gegenstaende: liste(t, "gegenstaende"),
                         monster: liste(t, "monster"),
@@ -534,6 +635,15 @@ impl Welt {
         };
         let mut warnungen: Vec<Problem> = Vec::new();
         let mut gesehen = BTreeSet::new();
+        // Alle IDs einmal sammeln (statt für jeden Ausgang die ganze Liste zu durchsuchen)
+        let ids: std::collections::HashSet<&str> = self.raeume.iter().map(|r| r.id.as_str()).collect();
+        let gueltig = |z: &str| {
+            ids.contains(z)
+                || match (oberwelt_feld(z), &self.oberwelt) {
+                    (Some((x, y)), Some(o)) => o.begehbar(x, y),
+                    _ => false,
+                }
+        };
         let mut orte: HashMap<(&str, i32, i32, i32), &str> = HashMap::new();
         for r in &self.raeume {
             if !id_gueltig(&r.id) {
@@ -559,7 +669,7 @@ impl Welt {
                 if !RICHTUNGEN.contains(&ri.as_str()) {
                     fehler(&r.id, format!("'{}': '{ri}' ist keine Richtung.", r.id));
                 }
-                if !self.ziel_gueltig(z) {
+                if !gueltig(z) {
                     fehler(&r.id, if z.starts_with("ow:") {
                             format!("'{}': Ausgang {ri}: '{z}' ist kein begehbares Feld der Oberwelt.", r.id)
                         } else {
@@ -596,7 +706,7 @@ impl Welt {
             }
         }
         p.extend(warnungen);
-        if self.startraum.is_empty() || !self.ziel_gueltig(&self.startraum) {
+        if self.startraum.is_empty() || !gueltig(&self.startraum) {
             p.push(Problem {
                 fehler: true,
                 raum: None,
@@ -816,8 +926,11 @@ impl Welt {
     }
 
     /// Gibt es Änderungen gegenüber den Dateien?
-    pub fn geaendert(&self, geladen: &[Raum], start: &str, wiederbelebung: &str) -> bool {
-        self.raeume != geladen || self.startraum != start || self.wiederbelebung != wiederbelebung
+    pub fn geaendert(&self, geladen: &[std::rc::Rc<Raum>], start: &str, wiederbelebung: &str) -> bool {
+        self.raeume.len() != geladen.len()
+            || self.raeume.iter().zip(geladen).any(|(a, b)| *a != **b)
+            || self.startraum != start
+            || self.wiederbelebung != wiederbelebung
     }
 }
 
@@ -876,7 +989,15 @@ pub fn oberwelt_feld(id: &str) -> Option<(i32, i32)> {
 
 /// Liegt das Ziel eines Ausgangs dort, wo die Richtung hinzeigt? (rein/raus und andere Karten zählen nicht)
 pub fn passt_zur_lage(w: &Welt, r: &Raum, richtung: &str, ziel: &str) -> bool {
-    let (Some((dx, dy, dz)), Some(z)) = (versatz(richtung), w.raum(ziel)) else { return true };
+    match w.raum(ziel) {
+        Some(z) => passt_zur_lage_von(r, richtung, z),
+        None => true,
+    }
+}
+
+/// Wie passt_zur_lage, wenn der Zielraum schon bekannt ist
+pub fn passt_zur_lage_von(r: &Raum, richtung: &str, z: &Raum) -> bool {
+    let Some((dx, dy, dz)) = versatz(richtung) else { return true };
     z.karte != r.karte || (z.x, z.y, z.z) == (r.x + dx, r.y + dy, r.z + dz)
 }
 
@@ -1125,6 +1246,8 @@ fn raum_schreiben(t: &mut Table, r: &Raum) {
     setze_text(t, "geraeusch", &r.geraeusch, false);
     setze_text(t, "gefuehl", &r.gefuehl, false);
     setze_text(t, "beschreibung_nacht", &r.beschreibung_nacht, false);
+    setze_text(t, "skript", &r.skript, false);
+    setze_tueren(t, &r.tueren);
     match r.drinnen {
         Some(b) if t.get("drinnen").and_then(|i| i.as_bool()) != Some(b) => wert_setzen(t, "drinnen", Value::from(b)),
         None => {
