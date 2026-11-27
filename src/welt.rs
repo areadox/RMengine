@@ -123,6 +123,9 @@ pub struct Welt {
     pub wetter_bis: Instant,
     /// Zuletzt gesehene Tages- und Jahreszeit (für die Meldungen beim Wechsel)
     pub zeit_stand: Option<(usize, usize)>,
+    /// Lua-Skripte (daten/skripte) und was sie sich für die Welt merken
+    pub skripte: crate::skripte::Skripte,
+    pub skript_merker: BTreeMap<String, crate::spieler::Merk>,
     naechste_id: u64,
     takte: u64,
 }
@@ -139,11 +142,14 @@ impl Welt {
             wetter: String::new(),
             wetter_bis: Instant::now(),
             zeit_stand: None,
+            skripte: crate::skripte::laden(daten_ordner).0,
+            skript_merker: BTreeMap::new(),
             naechste_id: 1,
             takte: 0,
         };
         w.bevoelkern();
         crate::leichen::laden(&mut w);
+        crate::skripte::merker_laden(&mut w);
         crate::zeit::takt(&mut w);
         w
     }
@@ -219,6 +225,7 @@ impl Welt {
         let neu = daten::laden(&self.daten_ordner)?;
         let warnungen = neu.warnungen.clone();
         self.d = neu;
+        self.skripte = crate::skripte::laden(&self.daten_ordner).0;
         self.bevoelkern();
         let start = self.d.welt.startraum.clone();
         let d = &self.d;
@@ -396,6 +403,7 @@ impl Welt {
             self.speichern(&s.sp);
         }
         crate::leichen::speichern(self);
+        crate::skripte::merker_speichern(self);
     }
 
     // ------------------------------------------------------------------
@@ -427,6 +435,7 @@ impl Welt {
         crate::ernaehrung::takt(self, self.takte % pro_minute == 0);
         crate::leichen::takt(self);
         crate::zeit::takt(self);
+        crate::skripte::takt(self);
 
         // Monster erholen sich, wenn sie nicht kämpfen
         let prozent = self.d.kampf.monster_erholung_prozent;

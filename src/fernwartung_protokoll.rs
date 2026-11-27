@@ -55,7 +55,8 @@ pub enum Antwort {
 /// Darf diese Datei über die Fernwartung gelesen oder geschrieben werden?
 /// Nur Welt-Dateien im Datenordner – keine Spielstände, keine Programme.
 pub fn pfad_erlaubt(p: &str) -> bool {
-    let endung_ok = p.ends_with(".toml") || p.ends_with(".txt") || p.ends_with(".md");
+    // .lua: Skripte (laufen in der Engine abgesichert, ohne Zugriff auf Dateien)
+    let endung_ok = p.ends_with(".toml") || p.ends_with(".txt") || p.ends_with(".md") || p.ends_with(".lua");
     !p.is_empty()
         && p.len() < 300
         && endung_ok
@@ -81,7 +82,7 @@ mod tests {
 
     #[test]
     fn nur_weltdateien_erlaubt() {
-        for ok in ["welt.toml", "raeume/dorf.toml", "oberwelt/karte.txt", "befehle/gesten.toml"] {
+        for ok in ["welt.toml", "raeume/dorf.toml", "oberwelt/karte.txt", "befehle/gesten.toml", "skripte/taverne.lua"] {
             assert!(pfad_erlaubt(ok), "{ok}");
         }
         for nein in [

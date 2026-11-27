@@ -129,7 +129,7 @@ pub const ZAUBER_TYPEN: &[&str] = &["zauber", "technik"];
 pub const WIRKUNGEN: &[&str] =
     &["heilen", "mana", "ausdauer", "schaden", "teleport", "schild", "ruestung", "bonus", "kraft", "tempo", "betaeuben"];
 pub const QUEST_ARTEN: &[&str] = &["aufgabe", "quest"];
-pub const SCHRITT_ARTEN: &[&str] = &["toeten", "bringen", "besuchen", "sprechen", "befehl"];
+pub const SCHRITT_ARTEN: &[&str] = &["toeten", "bringen", "besuchen", "sprechen", "befehl", "skript"];
 pub const ROLLEN: &[&str] = &["spieler", "baumeister", "admin"];
 const EIGENSCHAFTEN: &[&str] = &["schaden", "ruestung", "heilung", "mana", "essen", "trinken", "landkarte", "staerke", "geschick", "ausdauer", "intelligenz", "weisheit"];
 const WERTE: &[&str] = &["staerke", "geschick", "ausdauer", "intelligenz", "weisheit"];
@@ -377,7 +377,7 @@ const GILDE: &[Feld] = felder![
 
 const SCHRITT: &[Feld] = felder![
     f("art", "Art", Typ::Auswahl(SCHRITT_ARTEN), ""),
-    f("ziel", "Ziel", Typ::SchrittZiel, "Monster (toeten), Gegenstand (bringen), Raum (besuchen), NPC (sprechen) oder eigener Befehl (befehl)."),
+    f("ziel", "Ziel", Typ::SchrittZiel, "Monster (toeten), Gegenstand (bringen), Raum (besuchen), NPC (sprechen) oder eigener Befehl (befehl). Bei skript: ein freies Wort, das ein Skript mit s:fortschritt(\"...\") meldet."),
     f("anzahl", "Anzahl", Typ::Zahl, "Standard 1."),
     f("an", "Bringen an", Typ::Verweis(Ziel::Npc), "Leer = der Geber."),
     f("text", "Text im Aufgabenbuch", Typ::Text, "Leer = automatisch."),

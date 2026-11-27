@@ -33,6 +33,7 @@ enum Bereich {
     Raeume,
     Inhalte,
     Befehle,
+    Skripte,
 }
 
 enum Ziehen {
@@ -53,6 +54,7 @@ pub struct App {
     bereich: Bereich,
     inhalte: Option<Inhalte>,
     befehlswerk: Option<Befehlswerk>,
+    skriptwerk: Option<crate::skripte::Skriptwerk>,
     befehl_auswahl: Option<BefehlsAuswahl>,
     bereich_suche: String,
     ordner_eingabe: String,
@@ -123,6 +125,7 @@ impl App {
             bereich: Bereich::Raeume,
             inhalte: None,
             befehlswerk: None,
+            skriptwerk: None,
             befehl_auswahl: None,
             bereich_suche: String::new(),
             ordner_eingabe: ordner.display().to_string(),
@@ -301,6 +304,8 @@ impl App {
             self.melden(f.clone(), true);
         }
         self.inhalte = Some(inhalte);
+        // Skripte (Auswahl bleibt nicht erhalten, die Liste kann sich ändern)
+        self.skriptwerk = Some(crate::skripte::Skriptwerk::laden(&ordner));
         self.befehlswerk = match Befehlswerk::laden(&ordner) {
             Ok(b) => Some(b),
             Err(e) => {
@@ -426,6 +431,7 @@ impl App {
         self.welt.as_ref().is_some_and(|w| w.geaendert(&self.geladen.raeume, &self.geladen.startraum, &self.geladen.wiederbelebung))
             || self.inhalte.as_ref().is_some_and(|b| b.geaendert())
             || self.befehlswerk.as_ref().is_some_and(|b| b.geaendert())
+            || self.skriptwerk.as_ref().is_some_and(|b| b.geaendert())
     }
 
     /// Probleme aller Bereiche: Räume, Inhalte und Befehle.
@@ -437,6 +443,9 @@ impl App {
         }
         if let Some(b) = &self.befehlswerk {
             p.extend(b.pruefen().into_iter().map(|(fehler, text)| Problem { fehler, raum: None, text }));
+        }
+        if let Some(b) = &self.skriptwerk {
+            p.extend(b.probleme().into_iter().map(|text| Problem { fehler: true, raum: None, text }));
         }
         p
     }
@@ -450,6 +459,9 @@ impl App {
                 d.extend(b.speichern()?);
             }
             if let Some(b) = self.befehlswerk.as_mut() {
+                d.extend(b.speichern()?);
+            }
+            if let Some(b) = self.skriptwerk.as_mut() {
                 d.extend(b.speichern()?);
             }
             d.sort();
@@ -698,6 +710,11 @@ impl eframe::App for App {
                         b.liste(ui);
                     }
                 }
+                Bereich::Skripte => {
+                    if let Some(b) = self.skriptwerk.as_mut() {
+                        b.liste(ui);
+                    }
+                }
                 _ => match self.befehlswerk.as_mut() {
                     Some(b) => bereiche::befehle_liste(ui, b, &mut self.befehl_auswahl, &mut self.bereich_suche),
                     None => {
@@ -708,6 +725,11 @@ impl eframe::App for App {
             egui::CentralPanel::default().show(ui, |ui| match bereich {
                 Bereich::Inhalte => {
                     if let Some(b) = self.inhalte.as_mut() {
+                        b.formular(ui);
+                    }
+                }
+                Bereich::Skripte => {
+                    if let Some(b) = self.skriptwerk.as_mut() {
                         b.formular(ui);
                     }
                 }
@@ -858,7 +880,7 @@ impl App {
     fn oben(&mut self, ui: &mut egui::Ui) {
         egui::Panel::top("oben").show(ui, |ui| {
             ui.horizontal(|ui| {
-                for (b, name) in [(Bereich::Raeume, "🗺 Räume"), (Bereich::Inhalte, "📚 Inhalte"), (Bereich::Befehle, "⌨ Befehle")] {
+                for (b, name) in [(Bereich::Raeume, "🗺 Räume"), (Bereich::Inhalte, "📚 Inhalte"), (Bereich::Befehle, "⌨ Befehle"), (Bereich::Skripte, "📜 Skripte")] {
                     if ui.selectable_label(self.bereich == b, egui::RichText::new(name).strong()).clicked() && self.bereich != b {
                         self.bereich = b;
                         self.bereich_suche.clear();

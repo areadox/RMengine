@@ -17,6 +17,7 @@ mod fernwartung;
 mod inhalte;
 mod kontext;
 mod schema;
+mod skripte;
 #[allow(dead_code)]
 #[path = "../../src/darstellung.rs"]
 mod darstellung;

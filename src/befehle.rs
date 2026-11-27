@@ -61,6 +61,12 @@ pub fn ausfuehren(w: &mut Welt, sid: u64, eingabe: &str) -> Folge {
     const TOT: &str = "{grau}Du bist tot. Warte, bis dich jemand wiederbelebt, oder tippe 'aufgeben'.{/}";
     const UNBEKANNT: &str = "Wie bitte? Tippe {gelb}hilfe{/} für eine Liste der Befehle.";
 
+    // Skripte zuerst: Ein Raum kann eigene Befehle haben ("kriech unter den tisch")
+    if fest.is_none() && !tot && !befehl.is_empty() && crate::skripte::befehl(w, sid, &befehl, rest) {
+        prompt(w, sid);
+        return Folge::Weiter;
+    }
+
     // Was ist gemeint? (Wörter, Rollen und Abschalten stehen in befehle.toml)
     let treffer = fest.or_else(|| w.d.befehle.aufloesen(&befehl));
     let id: &str = match treffer {
@@ -189,6 +195,7 @@ pub fn ausfuehren(w: &mut Welt, sid: u64, eingabe: &str) -> Folge {
         "aufgeben" => kampf::aufgeben(w, sid),
         "sage" | "sag" | "say" => {
             sagen(w, sid, rest);
+            crate::skripte::sagen(w, sid, rest);
             if let Some(mid) = npc_fuer_satz(w, sid, rest) {
                 crate::quests::angesprochen(w, sid, mid, gespraech::fragt_nach_aufgabe(rest));
             }
@@ -489,6 +496,19 @@ fn hilfe(w: &Welt, sid: u64, rolle: Rolle, rest: &str) {
             format!("  {} {}", text::auffuellen(&format!("{{gelb}}{kopf}{{/}}"), 30), e.hilfe)
         })
         .collect();
+    // Befehle aus Skripten: überall gültige und die für diesen Raum
+    let raum = w.spieler[&sid].sp.raum.clone();
+    let gebiet = w.d.gebiet(&raum);
+    let mut eigene = eigene;
+    for b in &w.skripte.befehle {
+        let hier = (b.raeume.is_empty() || b.raeume.contains(&raum)) && (b.gebiete.is_empty() || b.gebiete.contains(&gebiet));
+        if !hier || b.hilfe.is_empty() {
+            continue;
+        }
+        let kopf = if b.syntax.is_empty() { b.woerter.first().cloned().unwrap_or_default() } else { b.syntax.clone() };
+        let ort = if b.raeume.is_empty() && b.gebiete.is_empty() { "" } else { " {grau}(hier){/}" };
+        eigene.push(format!("  {} {}{ort}", text::auffuellen(&format!("{{gelb}}{kopf}{{/}}"), 30), b.hilfe));
+    }
     if !eigene.is_empty() {
         t.push_str(&format!("\n{{fett}}Besondere Befehle{{/}}\n{}\n", eigene.join("\n")));
     }
@@ -717,6 +737,7 @@ fn gehen(w: &mut Welt, sid: u64, richt: Richtung) {
     }
     w.sende_raum(&ziel, &format!("{name} {}.", richt.kommt()), &[sid]);
     raum_zeigen(w, sid, false);
+    crate::skripte::raumwechsel(w, sid, &alt, &ziel);
 }
 
 /// Was hat der Spieler gemeint?
@@ -1786,6 +1807,7 @@ pub(crate) fn wirkung_anwenden(w: &mut Welt, sid: u64, art: &str, wert: i32, rau
             w.sende_raum(&alt, &format!("{name} verschwindet in einem Lichtblitz."), &[sid]);
             w.sende_raum(raum, &format!("{name} erscheint in einem Lichtblitz."), &[sid]);
             raum_anzeigen(w, sid);
+            crate::skripte::raumwechsel(w, sid, &alt, raum);
         }
         "schaden" => {
             s.sende("{grau}(Gegen andere Spieler wird hier nicht gekämpft.){/}");

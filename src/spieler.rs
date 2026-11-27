@@ -102,6 +102,17 @@ pub struct SpielerDaten {
     /// Hunger und Durst: wie satt bzw. wie wenig durstig (negativ = noch nicht gesetzt, also voll)
     pub essen: f64,
     pub trinken: f64,
+    /// Was sich Skripte für diesen Spieler merken (s:merke("muenze", true))
+    pub merker: BTreeMap<String, Merk>,
+}
+
+/// Ein gemerkter Wert aus einem Skript: wahr/falsch, Zahl oder Text
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum Merk {
+    Wahr(bool),
+    Zahl(f64),
+    Text(String),
 }
 
 /// Ein gefüllter Behälter. Leere Behälter haben keinen Eintrag.
@@ -204,6 +215,7 @@ impl Default for SpielerDaten {
             bereit: String::new(),
             essen: -1.0,
             trinken: -1.0,
+            merker: BTreeMap::new(),
         }
     }
 }

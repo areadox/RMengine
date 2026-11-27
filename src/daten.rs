@@ -1281,7 +1281,7 @@ fn standard_questart() -> String {
 }
 
 pub const QUEST_ARTEN: &[&str] = &["aufgabe", "quest"];
-pub const SCHRITT_ARTEN: &[&str] = &["toeten", "bringen", "besuchen", "sprechen", "befehl"];
+pub const SCHRITT_ARTEN: &[&str] = &["toeten", "bringen", "besuchen", "sprechen", "befehl", "skript"];
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -1897,6 +1897,7 @@ pub fn laden(ordner: &Path) -> Result<Daten, Vec<String>> {
 
     d.oberwelt = oberwelt::laden(ordner, &mut fehler);
     d.befehle = crate::befehlskonfig::laden(ordner, &d.eigene_befehle, &mut fehler, &mut warnungen);
+    fehler.extend(crate::skripte::pruefen(ordner));
     pruefen(&mut d, &mut fehler, &mut warnungen);
 
     if fehler.is_empty() {

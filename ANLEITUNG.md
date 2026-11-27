@@ -353,6 +353,7 @@ daten/
   quests/, rassen/, gilden/, berufe/   Aufgaben, Rassen, Gilden, Berufe
   koerper/             Körperbau: Hände, Maul, Pfoten ... (Kapitel 22)
   wetter/              Wetterarten (Kapitel 23)
+  skripte/             Lua-Skripte: eigene Befehle und Ereignisse (Kapitel 24)
   vorlagen/            Vorlagen, von denen andere Einträge erben
   fertigkeiten/*.toml  Fertigkeiten
   zauber/*.toml        Zaubersprüche
@@ -1911,6 +1912,7 @@ titel        = ""
 | `besuchen` | man den Raum `ziel` betritt                                   |
 | `sprechen` | man mit dem NPC `ziel` redet                                  |
 | `befehl`   | man den eigenen Befehl `ziel` `anzahl`-mal benutzt (Kapitel 12) |
+| `skript`   | ein Skript `s:fortschritt(ziel)` aufruft (Kapitel 24)           |
 
 Spieler: `aufgaben`, `aufgaben erledigt`, `annehmen [nr|name]`, `abgeben`,
 `abbrechen <nr|name>`. Zum Abgeben reicht es auch, mit dem Geber zu reden.
@@ -2062,4 +2064,118 @@ beginn  = "Es fängt an zu schneien."       # Meldung, wenn es anfängt
 gewicht = 4                                # wie oft (höher = häufiger)
 jahreszeiten = ["winter"]                  # leer = immer
 ```
+
+---
+
+## 24. Skripte (Lua)
+
+Mit Skripten baust du alles, was es nicht fertig gibt: einen Befehl, den es nur
+in einem Raum gibt („kriech unter den tisch“), Rätsel, Fallen, Schalter,
+Belohnungen, Ereignisse beim Betreten eines Raums und vieles mehr. Skripte
+werden in **Lua** geschrieben – einer kleinen, leicht lernbaren
+Programmiersprache, die auch viele andere Spiele benutzen.
+
+Skripte liegen in `daten/skripte/*.lua`. Im Welteditor gibt es dafür den
+Bereich **📜 Skripte** mit Code-Editor, *Prüfen* (findet Tippfehler) und einem
+Spickzettel. Über die Fernwartung werden sie wie alle anderen Weltdateien
+übertragen; `neuladen` lädt sie neu.
+
+### Ein Beispiel
+
+```lua
+-- "kriech unter den tisch" – nur in der Taverne
+befehl{
+  woerter = {"kriech", "krieche", "kriechen"},
+  raum    = "taverne",                 -- weglassen = überall; gebiet = "dorf" geht auch
+  syntax  = "kriech unter den tisch",  -- steht in der Hilfe
+  hilfe   = "Unter einen der Tische kriechen",
+  funktion = function(s, rest, raum)
+    if not rest:find("tisch") then
+      return false        -- nicht gemeint: dann gelten die normalen Befehle
+    end
+    s:sende("Du kriechst unter einen der schweren Eichentische.")
+    s:andere(s.name .. " kriecht unter einen der Tische.")
+    if s.merker.taverne_muenze then
+      s:sende("Außer Krümeln ist hier nichts.")
+    else
+      s:sende("Zwischen den Dielen glänzt eine Silbermünze! Du steckst sie ein.")
+      s:geld_aendern(10)
+      s:merke("taverne_muenze", true)   -- bleibt gespeichert: jeder findet sie nur einmal
+    end
+  end,
+}
+```
+
+- `s` ist der Spieler, `rest` das, was hinter dem Befehlswort getippt wurde
+  („unter den tisch“), `raum` der Raum.
+- Skript-Befehle kommen **vor** den eingebauten Befehlen. So kannst du auch
+  eingebaute Befehle in einem Raum anders machen. Gibt die Funktion `false`
+  zurück, war der Befehl nicht gemeint und es geht normal weiter.
+- Mehr Beispiele stehen in `daten/skripte/taverne.lua` und `wald.lua`.
+
+### Anmelden: Befehle und Ereignisse
+
+| Aufruf | Wann |
+|--------|------|
+| `befehl{ woerter = {...}, raum = "id", gebiet = "id", hilfe = "...", syntax = "...", funktion = function(s, rest, raum) ... end }` | Ein Befehl (raum/gebiet auch als Liste, z.B. `raum = {"a", "b"}`) |
+| `bei_betreten("raum", function(s, raum) ... end)` | Jemand betritt den Raum (`"*"` = jeden Raum) |
+| `bei_verlassen("raum", function(s, raum) ... end)` | Jemand verlässt den Raum |
+| `bei_sagen("raum", function(s, text, raum) ... end)` | Jemand sagt dort etwas |
+| `bei_sieg("monster", function(s, monster, raum) ... end)` | Jemand besiegt dieses Monster (`"*"` = jedes) |
+| `bei_takt(function() ... end)` | Alle paar Sekunden (Takt der Welt) |
+| `spaeter(sekunden, function() ... end)` | Etwas später ausführen, z.B. eine Tür wieder schließen |
+
+### Der Spieler `s`
+
+| Wert | Bedeutung |
+|------|-----------|
+| `s.name`, `s.raum`, `s.stufe`, `s.rolle` | Name, Raum-ID, Stufe, spieler/baumeister/admin |
+| `s.lp`, `s.max_lp`, `s.mp`, `s.max_mp`, `s.ausdauer`, `s.geld` | Werte (Geld in der kleinsten Münze) |
+| `s.rasse`, `s.gilde`, `s.berufe` | Gemeinschaften |
+| `s.inventar`, `s.angelegt` | Liste der Gegenstand-IDs; Platz → ID |
+| `s.fertigkeiten` | Fertigkeit → Stufe |
+| `s.merker` | Was sich Skripte für ihn gemerkt haben |
+| `s.tot`, `s.im_kampf` | wahr/falsch |
+
+| Tun | Wirkung |
+|-----|---------|
+| `s:sende(text)` | Text an den Spieler (Farben wie überall: `{gelb}...{/}`) |
+| `s:andere(text)` | Text an alle anderen im Raum |
+| `s:hat(id)` | Hat er den Gegenstand dabei oder angelegt? |
+| `s:gib(id, anzahl)` / `s:nimm(id)` | Gegenstand geben / wegnehmen (`nimm` gibt false, wenn er ihn nicht hat) |
+| `s:geld_aendern(n)` / `s:zahle(n)` | Geld geben oder abziehen / bezahlen (false, wenn es nicht reicht) |
+| `s:heile(n)`, `s:schade(n)`, `s:mana(n)`, `s:erfahrung(n)` | Werte ändern (Schaden kann töten) |
+| `s:gehe(raum, text_weg, text_an)` | In einen anderen Raum versetzen |
+| `s:merke(name, wert)` | Dauerhaft merken (wahr/falsch, Zahl, Text; `nil` löscht) |
+| `s:befehl("schau")` | Einen normalen Befehl für ihn ausführen |
+| `s:zauber(id)` | Die Wirkungen eines Zaubers auf ihn legen (ohne Kosten) |
+| `s:fortschritt(ziel)` | Quest-Schritt `art = "skript"` mit diesem `ziel` zählt eins weiter |
+
+### Der Raum und die Welt
+
+| Wert / Aufruf | Bedeutung |
+|---------------|-----------|
+| `raum.id`, `raum.name`, `raum.gebiet`, `raum.drinnen` | Der Raum |
+| `raum.gegenstaende`, `raum.monster`, `raum.spieler` | Was dort ist (IDs bzw. Namen) |
+| `welt.sende_raum(raum, text)`, `welt.sende_alle(text)` | Nachrichten |
+| `welt.lege(raum, id)`, `welt.entferne(raum, id)` | Gegenstand in einen Raum legen / daraus entfernen |
+| `welt.erschaffe(raum, monster)` | Ein Monster oder einen NPC erscheinen lassen |
+| `welt.merke(name, wert)`, `welt.merker.name` | Für die ganze Welt merken (bleibt gespeichert) |
+| `welt.zeit.stunde`, `.minute`, `.tageszeit`, `.jahreszeit`, `.wetter` | Tag und Nacht (nur wenn eingeschaltet) |
+| `math.random(1, 6)`, `string.find`, `print(...)` | Lua selbst; `print` schreibt in die Server-Konsole |
+
+### Gut zu wissen
+
+- **Sicher:** Skripte haben keinen Zugriff auf Dateien, Programme oder das
+  Netz. Ein Skript, das zu lange läuft (Endlosschleife), wird abgebrochen.
+- **Fehler** zeigt `rmengine --pruefen` (und *Prüfen* im Editor) mit Datei und
+  Zeile. Fehler während des Spiels stehen in der Server-Konsole und werden
+  Baumeistern und Admins im Spiel angezeigt; Spieler lesen nur „Da ist etwas
+  schiefgegangen.“
+- **Reihenfolge:** Was ein Skript tut, führt die Engine aus, sobald das Skript
+  fertig ist. `s.geld` usw. zeigen innerhalb des Skripts schon den neuen Stand.
+- **Merker** der Spieler stehen in ihrem Spielstand, die der Welt in
+  `spieler/welt_merker.json`.
+- **Quests:** Ein Schritt mit `art = "skript"` und `ziel = "hebel"` wird mit
+  `s:fortschritt("hebel")` erledigt – so werden Rätsel zu Quest-Schritten.
 

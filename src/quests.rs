@@ -44,6 +44,7 @@ pub fn schritt_text(w: &Welt, q: &QuestDef, sch: &SchrittDef) -> String {
         }
         "besuchen" => format!("Gehe zu: {}", w.d.raum(&sch.ziel).map(|r| r.name.clone()).unwrap_or_else(|| sch.ziel.clone())),
         "sprechen" => format!("Sprich mit {}", npc_dativ(&sch.ziel)),
+        "skript" => format!("Erledige: {}", sch.ziel),
         a => a.to_string(),
     }
 }

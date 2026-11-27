@@ -242,6 +242,7 @@ pub fn fliehen(w: &mut Welt, sid: u64) {
     w.sende(sid, &format!("{{hellgelb}}Du fliehst nach {}!{{/}}", richt.anzeige()));
     w.sende_raum(&ziel, &format!("{name} {} und ist völlig außer Atem.", richt.kommt()), &[sid]);
     befehle::raum_anzeigen(w, sid);
+    crate::skripte::raumwechsel(w, sid, &raum, &ziel);
 }
 
 /// "schaetze wolf": Wie gefährlich ist ein Gegner?
@@ -662,6 +663,7 @@ pub(crate) fn monster_stirbt(w: &mut Welt, mid: u64) {
     }
     for sid in &sieger {
         crate::quests::fortschritt(w, *sid, "toeten", &def.id, 1);
+        crate::skripte::sieg(w, *sid, &def.id);
     }
     for sid in m.ziele {
         let Some(s) = w.spieler.get_mut(&sid) else { continue };
@@ -723,7 +725,7 @@ pub fn erfahrung_geben(w: &mut Welt, sid: u64, ep: u64) {
     w.sende_ankuendigung(&format!("{{grau}}[{name} hat Stufe {stufe} erreicht!]{{/}}"), &[sid]);
 }
 
-fn spieler_stirbt(w: &mut Welt, sid: u64) {
+pub(crate) fn spieler_stirbt(w: &mut Welt, sid: u64) {
     kampf_beenden(w, sid);
     let k = w.d.kampf.clone();
     let jetzt = Instant::now();
@@ -788,6 +790,7 @@ fn erwecken(w: &mut Welt, sid: u64, im_tempel: bool) {
         w.sende(sid, "{hellcyan}Ein warmes Licht umfängt dich. Du schlägst die Augen auf ...{/}\n");
         w.sende_raum(&ziel, &format!("{name} erscheint in einem Lichtschein, bleich und zitternd."), &[sid]);
         befehle::raum_anzeigen(w, sid);
+        crate::skripte::raumwechsel(w, sid, &alt, &ziel);
         befehle::prompt(w, sid);
     }
     let sp = w.spieler[&sid].sp.clone();
@@ -799,6 +802,8 @@ fn erwecken(w: &mut Welt, sid: u64, im_tempel: bool) {
 // ---------------------------------------------------------------------------
 
 pub fn takt(w: &mut Welt) {
+    // Fällige spaeter(...)-Funktionen der Skripte
+    crate::skripte::timer(w);
     let jetzt = Instant::now();
     let mut beteiligt: BTreeSet<u64> = BTreeSet::new();
 

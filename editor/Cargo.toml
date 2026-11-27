@@ -15,3 +15,5 @@ serde_json = "1"
 sha2 = "0.10"
 ureq = { version = "2", default-features = false, features = ["tls", "native-certs", "json", "proxy-from-env"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+# Skripte prüfen (dasselbe Lua wie die Engine)
+mlua = { version = "0.10", features = ["lua54", "vendored", "send"] }

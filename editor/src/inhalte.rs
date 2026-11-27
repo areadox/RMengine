@@ -868,6 +868,16 @@ fn feld_zeigen(ui: &mut egui::Ui, ctx: &mut Kontext, t: &mut dyn TableLike, feld
                 }
             });
         }
+        Typ::SchrittZiel if lies_text(t, "art") == "skript" => {
+            ui.horizontal(|ui| {
+                beschriftung(ui, feld, pflicht);
+                let mut v = lies_text(t, feld.name);
+                if crate::kontext::feld(ui, egui::TextEdit::singleline(&mut v).hint_text("z.B. hebel – im Skript: s:fortschritt(\"hebel\")")).changed() {
+                    text_setzen(t, feld.name, &v);
+                    geaendert = true;
+                }
+            });
+        }
         Typ::SchrittZiel => {
             let z = schritt_ziel(&lies_text(t, "art"));
             let liste = z.map(|z| ctx.ids(z)).unwrap_or_default();

@@ -79,6 +79,7 @@ das Update und veröffentlicht alles als Release.
 - **Bereitschaft** (`bereite`): Der Autoangriff setzt einen Zauber (mit Zauberstab) oder eine Technik von selbst ein
 - **Geld** mit eigenen Münzstufen (z.B. Gold/Silber/Kupfer), **Händler** (`waren`, `kaufe`, `verkaufe`) und **Lehrmeister** (`lerne`)
 - **Wählbare Darstellung** für Händlerlisten, Spielstand, Spielerbuch und Inventar (auch als Figur), mit Vorschau im Editor
+- **Skripte in Lua**: eigene Befehle und Ereignisse für einzelne Räume (z.B. „kriech unter den tisch“), abgesichert, mit Code-Editor im Welteditor
 - **Tag und Nacht, Jahreszeiten und Wetter** (Nacht-Beschreibungen, drinnen/draußen)
 - **Hunger und Durst**, **Leichen** besiegter Gegner (beschreibbar, Beute darin) und **Körperbau** (Hände zum Halten, Maul und Pfoten zum Angreifen – alles mit Details)
 - **Eigene Befehle** mit Bedingungen (Ort, Gegenstände, Gilde, Kosten, Abklingzeit, Zufall) und Wirkungen (Heilen, Geld, Gegenstände, Teleport, Zauber, weitere Befehle) – im Editor bearbeitbar
@@ -124,6 +125,7 @@ das Update und veröffentlicht alles als Release.
 | `leichen.rs` | Leichen besiegter Gegner                                     |
 | `koerper.rs` | Körperbau: Hände, Angriffe mit Körperteilen                  |
 | `zeit.rs`    | Tag und Nacht, Jahreszeiten, Wetter                          |
+| `skripte.rs` | Lua-Skripte (mit `skripte_vorspann.lua`)                     |
 | `neue_welt.rs` | Leere Welt anlegen (`--neue-welt`, auch im Editor)         |
 | `darstellung.rs` | Stile für Händlerlisten, Spielstand, Spielerbuch; Geldbeträge (auch im Editor) |
 | `gemeinschaft.rs` | Rassen, Gilden und Berufe                               |
